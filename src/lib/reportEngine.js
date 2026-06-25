@@ -1417,7 +1417,7 @@ function regeneratePlans(plans, seed = 1, cluster = null) {
 function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   const insight = classifyObservationInsight(observation ?? {});
   const anchor = deriveEvidenceAnchor(observation, insight, seed, index);
-  const concept = conceptForInsight(insight.type, seed + (stableHash(anchor.sourceUrl || anchor.title || anchor.focusTerm) % 97), index);
+  const concept = conceptForInsight(anchor.conceptType || insight.type, seed + (stableHash(anchor.sourceUrl || anchor.title || anchor.focusTerm) % 97), index);
   const signalAnchor = categoryId === 'trend-explainer' ? anchor : { ...anchor, title: anchor.focusTerm };
   const signal = observationSignalForPlan(observation, insight, signalAnchor);
   const keyword = anchor.focusTerm || concept.keyword;
@@ -1428,11 +1428,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
 
   if (categoryId === 'short-video') {
     return {
-      titleCandidates: rotatedTitleCandidates(
-        [`${anchor.actionLabel}を3カットで見せる`, `${keyword}を1画面でほどく`, `保存用・${artifact}`, `${anchor.productionAngle}の30秒`],
-        seed,
-        index,
-      ),
+      titleCandidates: titleCandidatesForCategory(categoryId, concept, anchor, seed, index),
       protagonist: `${keyword}に反応した視聴者自身。${anchor.readerNeed}を、顔出し人物ではなく手元と生活動線で見せる。`,
       setting: `縦画面の${anchor.scene}。スマホだけで撮れ、視聴者が同じ場所で試せる。`,
       incitingIncident: `${artifact}を冒頭0秒に置き、説明前に「困った瞬間」か「改善後」を見せる。`,
@@ -1460,11 +1456,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
 
   if (categoryId === 'trend-explainer') {
     return {
-      titleCandidates: rotatedTitleCandidates(
-        [`${keyword}が刺さる理由`, `${anchor.productionAngle}を企画に変える方法`, `${compactEvidenceText(anchor.title, 24)}の反応を読む`, `${anchor.tension}の分解`],
-        seed,
-        index,
-      ),
+      titleCandidates: titleCandidatesForCategory(categoryId, concept, anchor, seed, index),
       protagonist: `${keyword}を企画に使いたいが、根拠と安全な変換方法を知りたい制作者向けの語り手。`,
       setting: '観測データ、架空UI、ホワイトボード、媒体別作例を並べる解説画面。',
       incitingIncident: `${signal} そこから、なぜ反応が起きるのかを問いにする。`,
@@ -1492,11 +1484,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
 
   if (categoryId === 'long-novel') {
     return {
-      titleCandidates: rotatedTitleCandidates(
-        [`${artifact}の${lens}保管庫`, `${keyword}を読む${moment}`, `${anchor.productionAngle}の${lens}の町`, `${anchor.tension}の${moment}記録`],
-        seed,
-        index,
-      ),
+      titleCandidates: titleCandidatesForCategory(categoryId, concept, anchor, seed, index),
       protagonist: `${anchor.readerNeed}を避けて生きてきた主人公。最初は自分の問題だけを解決したいが、${anchor.tension}に巻き込まれる。`,
       setting: `${artifact}が、${anchor.scene}を起点に架空の町・図書館・記録庫・職場制度として広がる世界。`,
       incitingIncident: `主人公が${artifact}に触れ、自分だけの悩みだと思っていたものが町全体の記録だと知る。`,
@@ -1523,11 +1511,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   }
 
   return {
-    titleCandidates: rotatedTitleCandidates(
-      [`${keyword}の朝`, `${artifact}が見える日`, `${keyword}の裏側`, `${anchor.productionAngle}の通知欄`],
-      seed,
-      index,
-    ),
+    titleCandidates: titleCandidatesForCategory('story-manga', concept, anchor, seed, index),
     protagonist: `${anchor.readerNeed}を抱えた主人公。最初は${anchor.tension}を自分の弱さだと思い込んでいる。`,
     setting: `${artifact}が、${anchor.scene}の中で漫画で一目で読める小道具として現れる世界。`,
     incitingIncident: `主人公が${artifact}を1ページ目で目撃し、日常の見え方が変わる。`,
@@ -1714,6 +1698,35 @@ function pickVariant(items, offset) {
   return items[offset % items.length];
 }
 
+function titleCandidatesForCategory(categoryId, concept, anchor, seed, index) {
+  const fallbackTitles = {
+    'story-manga': [
+      concept?.storyTitle,
+      anchor?.artifact,
+      ...(concept?.storyTitles ?? []),
+    ],
+    'long-novel': [
+      concept?.novelTitle,
+      anchor?.artifact,
+      ...(concept?.novelTitles ?? []),
+    ],
+    'short-video': [
+      concept?.shortTitle,
+      `${anchor?.actionLabel ?? concept?.actionNoun ?? '一手'}を3カットで見せる`,
+      `保存用・${anchor?.artifact ?? concept?.artifact ?? '生活メモ'}`,
+      ...(concept?.shortTitles ?? []),
+    ],
+    'trend-explainer': [
+      concept?.explainerTitle,
+      `${anchor?.focusTerm ?? concept?.keyword ?? '話題'}が刺さる理由`,
+      `${anchor?.productionAngle ?? '制作判断'}を企画に変える方法`,
+      `${compactEvidenceText(anchor?.title, 24)}の反応を読む`,
+      ...(concept?.explainerTitles ?? []),
+    ],
+  };
+  return rotatedTitleCandidates(fallbackTitles[categoryId] ?? fallbackTitles['story-manga'], seed, index);
+}
+
 function rotatedTitleCandidates(candidates, seed, index) {
   const items = uniqueList(candidates);
   if (items.length === 0) return ['物語の種'];
@@ -1878,13 +1891,36 @@ function evidenceTraitFor(observation, insight) {
 }
 
 function focusTermForObservation(observation, trait, offset) {
-  const tags = Array.isArray(observation?.tags)
-    ? observation.tags.map((tag) => compactEvidenceText(tag, 8)).filter(Boolean).slice(0, 2)
-    : [];
-  if (tags.length > 0) return `${tags.join('・')}への反応`;
-  const query = safeQueryForPlan(observation?.queryUsed ?? observation?.query);
-  if (query && query !== '公開Web/RSS') return query;
+  const tags = focusTermsFromValues(Array.isArray(observation?.tags) ? observation.tags : []);
+  if (tags.length > 0) return tags.join('・');
+  const queryTerms = focusTermsFromValues([safeQueryForPlan(observation?.queryUsed ?? observation?.query)]);
+  if (queryTerms.length > 0) return queryTerms.join('・');
   return pickVariant(trait.focusTerms, offset);
+}
+
+function focusTermsFromValues(values) {
+  return uniqueList(
+    values
+      .flatMap((value) => String(value ?? '').split(/[\s、,／/・]+/))
+      .map(cleanFocusTerm)
+      .filter((value) => value && !isMetaFocusTerm(value)),
+  ).slice(0, 2);
+}
+
+function cleanFocusTerm(value) {
+  return compactEvidenceText(value, 14)
+    .replace(/への反応|の反応|周辺の反応|反応/g, '')
+    .replace(/[【】「」『』（）()[\]"”“]/g, '')
+    .trim();
+}
+
+function isMetaFocusTerm(value) {
+  const normalized = String(value ?? '').trim();
+  return (
+    /^(漫画|まんが|マンガ|小説|動画|ショート|ショート動画|縦読み|4コマ|企画|解説|トレンド|話題|カテゴリ|媒体|対象|読者|視聴者|公開Web|RSS|Web|検索|取得|分析|ニュース|SNS|note|GitHub|日本|国内|JP|JAPAN|public|general|round)$/i.test(
+      normalized,
+    ) || /^\d+d?$/.test(normalized)
+  );
 }
 
 function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0) {
@@ -1901,6 +1937,7 @@ function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0) {
     observedAt: observation?.observedAt ?? '',
     publishedAt: observation?.publishedAt ?? '',
     insightType: insight?.type ?? 'topic',
+    conceptType: trait.fallbackInsights?.[0] ?? insight?.type ?? 'topic',
     focusTerm: focusTermForObservation(observation, trait, offset),
     scene: pickVariant(trait.scenes, offset + 1),
     artifact: pickVariant(trait.artifacts, offset + 2),
@@ -1969,7 +2006,7 @@ function enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed =
   return {
     ...base,
     surfacePattern: uniqueList([
-      `分析ラウンド${(Math.abs(Number(variantSeed) || 0) % 9) + 1}: 今回の分析角度は${anchorSummary}。${observationPhrase}を、${primary.scene}の見せ場へ変換します。`,
+      `今回の切り口: ${anchorSummary}。${observationPhrase}を、${primary.scene}の見せ場へ変換します。`,
       categoryMoves[categoryId] ?? categoryMoves['story-manga'],
       ...base.surfacePattern,
     ]).slice(0, 5),
@@ -1992,7 +2029,7 @@ function enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed =
       `${queryPhrase}で見えた反応は、そのまま流行語にせず「${primary.focusTerm}」として扱うと、反復ではなく今回固有の企画判断になります。`,
       ...base.opportunityGap,
     ]).slice(0, 3),
-    categoryInsight: `分析ラウンド${(Math.abs(Number(variantSeed) || 0) % 9) + 1}では、${primary.focusTerm}を${primary.tension}という読者・視聴者心理に変換できる。今回は${primary.artifact}を核にすると、再検索ごとに別の企画角度を作れます。`,
+    categoryInsight: `今回の分析では、${primary.focusTerm}を${primary.tension}という読者・視聴者心理に変換できる。今回は${primary.artifact}を核にすると、再検索ごとに別の企画角度を作れます。`,
   };
 }
 

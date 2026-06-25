@@ -13,7 +13,7 @@ const STORAGE_KEY = 'viral-radar-settings-v1';
 const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
-const APP_VERSION = '1.1.7';
+const APP_VERSION = '1.1.8';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -262,7 +262,7 @@ function render() {
           <div class="section-heading">
             ${renderDataLabel('具体例', dataTimestamp)}
             <h2>そのまま企画に使える案</h2>
-            <p>各案の下に、ChatGPTやGeminiなど別AIへ貼り付けるための本文生成プロンプトを付けています。</p>
+            <p>各案の下に、他AIへ貼り付けるための本文生成プロンプトを付けています。</p>
           </div>
           <button class="secondary-action plan-refresh" id="suggest-more" type="button" ${disabled}>再検索して別案を出す</button>
         </div>
@@ -649,7 +649,7 @@ function copyMessage(result, successSummary) {
     return {
       summary: successSummary,
       risk_note: 'APIキーはコピー内容に含めていません。',
-      next_actions: ['ChatGPT、Gemini、Claudeなどに貼り付けて本文生成に使えます。'],
+      next_actions: ['他AIに貼り付けて本文生成に使えます。'],
     };
   }
 

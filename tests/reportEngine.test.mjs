@@ -290,6 +290,71 @@ test('search-driven story plans transform noisy article titles into original fic
   assert.doesNotMatch(plan.titleCandidates[0], /第1ページ$/);
 });
 
+test('story and novel plans use emotional work titles instead of analysis labels', () => {
+  const reactionObservation = {
+    id: 'story-reaction-label-title',
+    categoryId: 'story-manga',
+    source: 'はてな 暮らし',
+    sourceType: 'public-web-rss',
+    title: '漫画・企画への反応の不安が広がる',
+    snippet: 'SNSで漫画や企画への反応を見て、買い忘れと我慢が並ぶ冷蔵庫メモに共感が集まっている。',
+    tags: ['漫画', '企画への反応', '買い忘れ', '我慢', '冷蔵庫メモ'],
+    query: '漫画 企画への反応 買い忘れ 我慢',
+    queryUsed: '漫画 企画への反応 買い忘れ 我慢 / 公開Web/RSS取得5',
+    metrics: { rank: 1, recencyScore: 88, sourceWeight: 88, hatenaCount: 100 },
+    sourceUrl: 'https://example.com/reaction-label',
+    observedAt: '2026-06-25T18:13:24+09:00',
+    publishedAt: '2026-06-25T18:00:00+09:00',
+  };
+
+  const story = buildReport({
+    categoryId: 'story-manga',
+    observations: [reactionObservation, ...PUBLIC_OBSERVATIONS],
+    providerMode: 'fixture',
+  });
+  const novel = buildReport({
+    categoryId: 'long-novel',
+    observations: [reactionObservation, ...PUBLIC_OBSERVATIONS],
+    providerMode: 'fixture',
+  });
+  const storyTitles = story.creativePlans.flatMap((plan) => plan.titleCandidates).join(' / ');
+  const novelTitles = novel.creativePlans.flatMap((plan) => plan.titleCandidates).join(' / ');
+  const combinedDeepAnalysis = JSON.stringify([story.deepAnalysis, novel.deepAnalysis]);
+
+  assert.doesNotMatch(storyTitles, /漫画・企画|企画への反応|への反応|分析|取得根拠/);
+  assert.doesNotMatch(novelTitles, /漫画・企画|企画への反応|への反応|分析|取得根拠/);
+  assert.match(storyTitles, /冷蔵庫|買い忘れ|我慢|レシート|生活|メモ|棚|朝|夜/);
+  assert.match(novelTitles, /冷蔵庫|買い忘れ|我慢|レシート|生活|メモ|棚|町|図書館|記録/);
+  assert.doesNotMatch(combinedDeepAnalysis, /分析ラウンド\d/);
+});
+
+test('fiction focus terms ignore medium and region tags before choosing material words', () => {
+  const metaTaggedObservation = {
+    id: 'story-meta-tags',
+    categoryId: 'story-manga',
+    source: '公開Web/RSS',
+    sourceType: 'public-web-rss',
+    title: '暮らしの小さな我慢に共感が集まる',
+    snippet: '冷蔵庫メモ、買い忘れ、我慢の回数など、生活の小さな違和感が話題になっている。',
+    tags: ['漫画', '企画', '読者反応', '日本'],
+    query: 'モヤモヤ 共感 SNS 話題',
+    queryUsed: 'モヤモヤ 共感 SNS 話題 / 7d / general / public Web/RSS round 1',
+    metrics: { rank: 1, recencyScore: 80, sourceWeight: 90 },
+    sourceUrl: 'https://example.com/meta-tags',
+    observedAt: '2026-06-25T18:52:33+09:00',
+    publishedAt: '2026-06-25T18:00:00+09:00',
+  };
+
+  const report = buildReport({
+    categoryId: 'story-manga',
+    observations: [metaTaggedObservation, ...PUBLIC_OBSERVATIONS],
+    providerMode: 'fixture',
+  });
+
+  assert.doesNotMatch(report.deepAnalysis.categoryInsight, /日本を|漫画を|企画を|読者反応/);
+  assert.match(report.deepAnalysis.categoryInsight, /モヤモヤ|共感|我慢|生活|買い忘れ/);
+});
+
 test('fiction writing prompts keep platform names out of the story body instructions', () => {
   const story = buildReport({ categoryId: 'story-manga', observations: PUBLIC_OBSERVATIONS });
   const novel = buildReport({ categoryId: 'long-novel', observations: PUBLIC_OBSERVATIONS });
