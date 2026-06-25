@@ -205,6 +205,77 @@ test('regenerated plans bind visible briefs to distinct evidence anchors, not on
   assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.creatorBrief.protagonist)).size, 3);
 });
 
+test('regenerated plans rebuild professional notes and story architecture per evidence anchor', () => {
+  const evidenceSet = [
+    {
+      id: 'memo-1',
+      categoryId: 'story-manga',
+      source: 'Local RSS A',
+      sourceType: 'public-web-rss',
+      title: '冷蔵庫の買い忘れメモから家族の我慢が話題に',
+      snippet: '家族の小さな我慢、節約疲れ、買い忘れの気まずさに共感が集まっている。',
+      tags: ['生活', '家族', '我慢', '節約'],
+      query: '生活 家族 我慢',
+      queryUsed: '生活 家族 我慢 / 公開Web/RSS取得1',
+      metrics: { rank: 1, recencyScore: 80, sourceWeight: 90 },
+      sourceUrl: 'https://example.com/memo-1',
+      observedAt: '2026-06-25T12:00:00+09:00',
+      publishedAt: '2026-06-25T11:00:00+09:00',
+    },
+    {
+      id: 'memo-2',
+      categoryId: 'story-manga',
+      source: 'Local RSS B',
+      sourceType: 'public-web-rss',
+      title: '駅の貼り紙ルール変更で通勤の不公平感が広がる',
+      snippet: '通勤時の小さな不公平、見えない制度、言い返せない理不尽への反応が多い。',
+      tags: ['仕事', '制度', '理不尽', '不公平'],
+      query: '通勤 不公平 制度',
+      queryUsed: '通勤 不公平 制度 / 公開Web/RSS取得2',
+      metrics: { rank: 2, recencyScore: 77, sourceWeight: 88 },
+      sourceUrl: 'https://example.com/memo-2',
+      observedAt: '2026-06-25T12:05:00+09:00',
+      publishedAt: '2026-06-25T10:30:00+09:00',
+    },
+    {
+      id: 'memo-3',
+      categoryId: 'story-manga',
+      source: 'Local RSS C',
+      sourceType: 'public-web-rss',
+      title: '返信期限を過ぎた通知に後悔の声が集まる',
+      snippet: '返せなかった一言、近い相手とのすれ違い、時間を戻したい後悔が読まれている。',
+      tags: ['後悔', '人間関係', '未返信', '時間'],
+      query: '未返信 後悔 関係',
+      queryUsed: '未返信 後悔 関係 / 公開Web/RSS取得3',
+      metrics: { rank: 3, recencyScore: 74, sourceWeight: 86 },
+      sourceUrl: 'https://example.com/memo-3',
+      observedAt: '2026-06-25T12:10:00+09:00',
+      publishedAt: '2026-06-25T10:00:00+09:00',
+    },
+  ];
+  const report = buildReport({
+    categoryId: 'story-manga',
+    observations: evidenceSet,
+    providerMode: 'fixture',
+    variantSeed: 0,
+  });
+
+  assert.equal(report.creativePlans.length, 3);
+  assert.equal(
+    new Set(
+      report.creativePlans.map((plan) =>
+        plan.craftNotes.find((note) => note.label === '読者維持エンジン')?.detail,
+      ),
+    ).size,
+    3,
+  );
+  assert.equal(new Set(report.creativePlans.map((plan) => plan.storyArchitecture.gmc.goal)).size, 3);
+  assert.equal(
+    new Set(report.creativePlans.map((plan) => plan.storyArchitecture.mediumExecution.focus)).size,
+    3,
+  );
+});
+
 test('creative plans are actionable story briefs, not only analysis notes', () => {
   const report = buildReport({
     categoryId: 'story-manga',

@@ -838,23 +838,29 @@ function buildCraftNotes(plan, categoryId, creatorBrief) {
   };
   const formatGuide = mediumGuide[categoryId] ?? mediumGuide['story-manga'];
   const firstThreeBeats = plan.outline.slice(0, 3).join('」→「');
+  const anchor = plan.evidenceAnchor ?? {};
+  const anchorFocus = cleanBeatLabel(anchor.focusTerm ?? plan.titleCandidates[0] ?? '今回の根拠');
+  const anchorScene = cleanBeatLabel(anchor.scene ?? '冒頭場面');
+  const anchorArtifact = cleanBeatLabel(anchor.artifact ?? inferRecurringMotif(plan));
+  const anchorTension = cleanBeatLabel(anchor.tension ?? plan.emotionalHook);
+  const anchorMove = cleanBeatLabel(anchor.productionAngle ?? plan.differentiation);
 
   return [
     {
       label: '編集者に通す一文',
-      detail: `「${plan.titleCandidates[0]}」は、${plan.emotionalHook}を${plan.formatLabel}の形式で可視化し、${plan.audiencePromise}`,
+      detail: `「${plan.titleCandidates[0]}」は、取得根拠の「${anchorFocus}」を${anchorScene}の${anchorArtifact}に置き換え、${plan.emotionalHook}を${plan.formatLabel}で可視化する企画。${plan.audiencePromise}`,
     },
     {
       label: '主人公の欠落',
-      detail: `${creatorBrief.protagonist} ただし最初は「${creatorBrief.choice}」を選べず、そこがドラマの初期弱点になる。`,
+      detail: `${creatorBrief.protagonist} 最初は「${anchorTension}」を自分の弱さとして処理しようとし、「${creatorBrief.choice}」を選べないことが初期弱点になる。`,
     },
     {
       label: '読者維持エンジン',
-      detail: `${formatGuide}。流れは「${firstThreeBeats}」で、各回に小さな発見と未解決を置く。`,
+      detail: `${formatGuide}。${anchorArtifact}を「${firstThreeBeats}」の各段階で別の意味に変え、${anchorFocus}の小さな発見と未解決を置く。`,
     },
     {
       label: '凡庸化を避ける手',
-      detail: `${plan.differentiation} 悪役の強さではなく、主人公の選択と画面・文章上の発見で読ませる。`,
+      detail: `${plan.differentiation} ${anchorMove}を優先し、悪役の強さではなく、主人公の選択と画面・文章上の発見で読ませる。`,
     },
   ];
 }
@@ -912,6 +918,11 @@ function buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign)
   );
   const lastBeat = cleanBeatLabel(plan.outline?.at(-1) ?? retentionDesign?.payoff ?? creatorBrief.payoff);
   const motif = inferRecurringMotif(plan);
+  const anchor = plan.evidenceAnchor ?? {};
+  const anchorArtifact = cleanBeatLabel(anchor.artifact ?? motif);
+  const anchorScene = cleanBeatLabel(anchor.scene ?? firstBeat);
+  const anchorTension = cleanBeatLabel(anchor.tension ?? plan.emotionalHook);
+  const anchorFocus = cleanBeatLabel(anchor.focusTerm ?? plan.titleCandidates?.[0] ?? motif);
 
   const medium = {
     'story-manga': {
@@ -1004,13 +1015,13 @@ function buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign)
     method: '知識境界',
     protagonistKnows: `${medium.agentLabel}は「${firstBeat}」を体験するが、最初は原因を取り違える。`,
     readerKnows: medium.readerKnows,
-    hiddenTruth: medium.hiddenTruth,
+    hiddenTruth: `${medium.hiddenTruth} 今回は「${anchorTension}」を隠れた真相の圧力として扱う。`,
     revealRule: medium.revealRule,
   };
 
   const mediumExecution = {
     method: '媒体実装',
-    focus: medium.execution,
+    focus: `${medium.execution} 具体物は「${anchorArtifact}」、場面は「${anchorScene}」、根拠焦点は「${anchorFocus}」に固定する。`,
     firstOutput: categoryId === 'short-video' ? '秒数つき台本' : categoryId === 'trend-explainer' ? '章立て台本' : categoryId === 'long-novel' ? '第1章と章末フック' : '第1ページのネーム',
     revisionTarget: plan.draftInstructions,
   };
@@ -1034,7 +1045,7 @@ function buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign)
     },
     {
       label: knowledgeBoundary.method,
-      detail: `${knowledgeBoundary.protagonistKnows} ${knowledgeBoundary.readerKnows} ${knowledgeBoundary.revealRule}`,
+      detail: `${knowledgeBoundary.protagonistKnows} ${knowledgeBoundary.readerKnows} ${knowledgeBoundary.hiddenTruth} ${knowledgeBoundary.revealRule}`,
     },
     {
       label: mediumExecution.method,
@@ -1488,9 +1499,9 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
       protagonist: `${anchor.readerNeed}を避けて生きてきた主人公。最初は自分の問題だけを解決したいが、${anchor.tension}に巻き込まれる。`,
       setting: `${artifact}が、${anchor.scene}を起点に架空の町・図書館・記録庫・職場制度として広がる世界。`,
       incitingIncident: `主人公が${artifact}に触れ、自分だけの悩みだと思っていたものが町全体の記録だと知る。`,
-      conflict: '記録を読めば救われる人がいる一方で、他人の痛みを覗く危うさもある。',
-      choice: '自分だけ助かるか、仕組みそのものを読み解いて他者にも返すか。',
-      payoff: '短い逆転ではなく、章を重ねて誤解がほどける救済へ向かう。',
+      conflict: `${anchor.tension}を読み解けば救われる人がいる一方で、他人の痛みを覗く危うさもある。`,
+      choice: `${artifact}を自分の救いだけに使うか、${anchor.tension}の記録として他者にも返すか。`,
+      payoff: `${anchor.readerNeed}が章を重ねて他者の痛みへ広がり、誤解がほどける救済へ向かう。`,
       reasonToWin: [
         signal,
         `${artifact}は章ごとの謎や記録として長期連載に広げやすい`,
@@ -1500,7 +1511,12 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
       emotionalHook: anchor.emotionalHook,
       premise: `取得根拠から抽出した「${keyword}」を、${lens}の視点で${artifact}と${anchor.tension}に変換する。主人公が記録、制度、町のルールを読み解き、章ごとに他者の事情へ近づく中長編にする。`,
       exampleDetail: `第1章では${artifact}を発見する。章末で${anchor.tension}が別人物にも関わる証拠を置き、次章へ読ませる。`,
-      outline: ['第1部: 記録の発見', '第2部: 他者の痛みへ広がる', '第3部: 仕組みの誤読を暴く', '終盤: 小さな救済を連鎖させる'],
+      outline: [
+        `第1部: ${artifact}の発見`,
+        `第2部: ${keyword}が他者の痛みへ広がる`,
+        `第3部: ${anchor.tension}の誤読を暴く`,
+        `終盤: ${anchor.actionLabel}を救済として連鎖させる`,
+      ],
       opening: `${artifact}には、主人公の名前だけが空白で残されていた。`,
       productionNotes: ['実在サービス名は出さない', '章末ごとに新しい証拠を置く', '救済を急がない'],
       differentiation: '単発の能力ものではなく、記録を読む長期ミステリーにする。',
@@ -1515,9 +1531,9 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
     protagonist: `${anchor.readerNeed}を抱えた主人公。最初は${anchor.tension}を自分の弱さだと思い込んでいる。`,
     setting: `${artifact}が、${anchor.scene}の中で漫画で一目で読める小道具として現れる世界。`,
     incitingIncident: `主人公が${artifact}を1ページ目で目撃し、日常の見え方が変わる。`,
-    conflict: '個人を責めれば簡単だが、本当の原因は見えない仕組みや誤解にある。',
-    choice: '怒りで暴くか、構造を読み解いて誰かが言葉にできる形へ戻すか。',
-    payoff: '最後に小さな行動で、読者が自分の生活へ持ち帰れる救済を置く。',
+    conflict: `${anchor.tension}を個人の弱さとして片付けると楽だが、${artifact}を追うほど見えない仕組みや誤読が現れる。`,
+    choice: `${anchor.actionLabel}を自分だけの解決で終わらせるか、${artifact}の意味を読み替えて誰かに言葉として返すか。`,
+    payoff: `${anchor.actionLabel}の小さな行動で、読者が自分の生活へ持ち帰れる救済を置く。`,
     reasonToWin: [
       signal,
       `${artifact}は漫画の冒頭1ページで異常として見せやすい`,
@@ -1527,7 +1543,12 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
     emotionalHook: anchor.emotionalHook,
     premise: `取得根拠から抽出した「${keyword}」を、主人公が${artifact}を通じて読み解く漫画企画にする。${anchor.tension}を、1話の感情反転として見せる。`,
     exampleDetail: `冒頭は${artifact}を大ゴマで見せる。主人公は${keyword}を自分だけの問題だと思うが、別人物にも同じ兆候が出て、仕組みを読む物語に変わる。`,
-    outline: ['冒頭: 異常表示の発見', '中盤: 自分だけではないと知る', '転機: 仕組みの誤読を見抜く', '結末: 小さな救済を返す'],
+    outline: [
+      `冒頭: ${artifact}の異常表示`,
+      `中盤: ${keyword}が自分だけではないと知る`,
+      `転機: ${anchor.tension}の仕組みを見抜く`,
+      `結末: ${anchor.actionLabel}で小さな救済を返す`,
+    ],
     opening: `${artifact}は、誰にも見えないはずの欄にだけ残っていた。`,
     productionNotes: ['実在サービス名は出さない', '固有名詞を架空UIへ変換する', '1話1つの小道具に絞る'],
     differentiation: `既存トレンド名ではなく、観測された${anchor.focusTerm}を漫画的な見せ場へ変換する。`,

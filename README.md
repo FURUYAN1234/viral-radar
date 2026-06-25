@@ -1,6 +1,6 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
-![Version](https://img.shields.io/badge/version-1.1.8-0f766e)
+![Version](https://img.shields.io/badge/version-1.1.9-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -795,6 +795,12 @@ npm run deploy
 ---
 
 ## Changelog / 更新履歴
+
+### v1.1.9 (2026-06-25)
+
+- プロ向け設計メモと物語・台本設計を、各案の取得根拠、焦点語、小道具、場面、緊張に連動して再生成するよう修正。
+- GitHub Pages版の公開Web/RSS取得で後段CORSプロキシを追加し、ローカルだけでなく公開URLでも実データ取得を試行できる経路を強化。
+- 取得失敗時の文字化けしたエラー文を修正。
 
 ### v1.1.8 (2026-06-25)
 

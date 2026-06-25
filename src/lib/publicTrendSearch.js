@@ -124,6 +124,8 @@ const PUBLIC_CORS_FETCHERS = [
   (url) => url,
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://cors.isomorphic-git.org/${url}`,
 ];
 
 export function buildTrendSearchUrl({ categoryId, timeWindow, audience, searchSeed }) {

@@ -13,7 +13,7 @@ const STORAGE_KEY = 'viral-radar-settings-v1';
 const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
-const APP_VERSION = '1.1.8';
+const APP_VERSION = '1.1.9';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -500,10 +500,10 @@ async function fetchTrendObservations() {
   const response = await fetch(buildTrendSearchUrl(searchParams));
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || '??Web/RSS??????????????');
+    throw new Error(payload.error || '公開Web/RSS取得に失敗しました。');
   }
   if (!Array.isArray(payload.observations) || payload.observations.length === 0) {
-    throw new Error('??Web/RSS?????????????????????');
+    throw new Error('公開Web/RSSの取得結果がありません。再検索してください。');
   }
   return payload.observations;
 }
