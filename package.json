@@ -1,0 +1,28 @@
+{
+  "name": "monogatari-buzz-maker",
+  "version": "0.1.2",
+  "private": true,
+  "homepage": "https://FURUYAN1234.github.io/viral-radar",
+  "description": "物語バズメーカー - 公開Web/RSSトレンドを漫画・動画・小説の実用企画へ変換する創作支援ツール",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5180 --strictPort",
+    "prebuild": "npm run check:upstreams",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5180 --strictPort",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
+    "sync:story-maker": "node scripts/sync-story-maker-routines.mjs",
+    "check:story-maker": "node scripts/sync-story-maker-routines.mjs --check",
+    "sync:nano-fallback": "node scripts/sync-nano-fallback-chain.mjs",
+    "check:nano-fallback": "node scripts/sync-nano-fallback-chain.mjs --check",
+    "check:upstreams": "npm run check:story-maker && npm run check:nano-fallback",
+    "pretest": "npm run check:upstreams",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "vite": "^6.0.0"
+  }
+}
