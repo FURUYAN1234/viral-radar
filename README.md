@@ -1,6 +1,6 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
-![Version](https://img.shields.io/badge/version-0.1.2-0f766e)
+![Version](https://img.shields.io/badge/version-0.1.3-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -795,6 +795,11 @@ npm run deploy
 ---
 
 ## Changelog / 更新履歴
+
+### v0.1.3 (2026-06-25)
+
+- GitHub Pages の project path 配信で JS/CSS が root `/assets/` を参照して真っ白になる問題を修正。
+- Vite の production asset base を `/viral-radar/` に固定し、公開URL配下から正しく読み込む回帰テストを追加。
 
 ### v0.1.2 (2026-06-25)
 

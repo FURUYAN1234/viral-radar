@@ -4,8 +4,10 @@ import { execFile } from 'node:child_process';
 import { defineConfig } from 'vite';
 
 const ALLOWED_EXTENSIONS = new Set(['.docx', '.json']);
+const GITHUB_PAGES_BASE = '/viral-radar/';
 
 export default defineConfig({
+  base: GITHUB_PAGES_BASE,
   plugins: [nativeSaveDialogPlugin(), trendSearchPlugin(), providerProxyPlugin()],
   server: {
     host: '127.0.0.1',
