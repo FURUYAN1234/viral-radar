@@ -6,6 +6,7 @@ import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
 import { buildReport } from './lib/reportEngine.js';
 import { getProviderStatus, maskKey, runDraftSample, runProviderAnalysis } from './lib/providers.js';
+import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
 import { loadSettingsFromStorage, settingsForStorage } from './lib/settings.js';
 
 const STORAGE_KEY = 'viral-radar-settings-v1';
@@ -444,30 +445,34 @@ function rebuildReport({ advanceSearch = false } = {}) {
 }
 
 async function fetchTrendObservations() {
-  if (isStaticPagesRuntime()) {
-    throw new Error(
-      'GitHub Pages版は静的プレビューです。公開Web/RSS取得とAPI中継を使う場合は、ローカル起動版を http://127.0.0.1:5180/ で開いてください。',
-    );
-  }
-  const params = new URLSearchParams({
+  const searchParams = {
     categoryId: state.selectedCategoryId,
     timeWindow: state.timeWindow,
     audience: state.audience,
-    searchSeed: String(state.searchSeed),
-  });
-  const response = await fetch(`/api/trend-search?${params.toString()}`);
+    searchSeed: state.searchSeed,
+  };
+  if (!shouldUseLocalTrendApi()) {
+    const payload = await searchTrendObservations(searchParams);
+    return payload.observations;
+  }
+  const response = await fetch(buildTrendSearchUrl(searchParams));
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || '公開Web検索を取得できませんでした。');
+    throw new Error(payload.error || '??Web/RSS??????????????');
   }
   if (!Array.isArray(payload.observations) || payload.observations.length === 0) {
-    throw new Error('公開Web検索から有効な結果を取得できませんでした。');
+    throw new Error('??Web/RSS?????????????????????');
   }
   return payload.observations;
 }
 
 function isStaticPagesRuntime() {
   return globalThis.location?.hostname?.endsWith('github.io') ?? false;
+}
+
+function shouldUseLocalTrendApi() {
+  const hostname = globalThis.location?.hostname ?? '';
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 }
 
 async function refreshTrendObservations({ runProvider = false, announce = false } = {}) {

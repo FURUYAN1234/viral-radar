@@ -1,6 +1,6 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
-![Version](https://img.shields.io/badge/version-1.1.4-0f766e)
+![Version](https://img.shields.io/badge/version-1.1.5-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -54,7 +54,7 @@ GitHub Pages:
 https://FURUYAN1234.github.io/viral-radar/
 ```
 
-GitHub Pages版は静的プレビューです。公開Web/RSS取得、OpenAI CORS回避、DOCX/JSONのネイティブ保存ダイアログはローカルViteサーバーの中継機能を使います。
+GitHub Pages版でも公開Web/RSS取得はブラウザ側から実行し、CORSで直接取得できないRSSは公開取得プロキシを経由します。ローカルVite版も同じ検索モジュールを使います。DOCX/JSONのネイティブ保存ダイアログとローカルOpenAI中継はローカルViteサーバーの機能を使います。
 
 ローカル開発:
 
@@ -528,7 +528,7 @@ node --test tests\docxExporter.test.mjs
 | Test | Node.js test runner |
 | Deploy | GitHub Pages, gh-pages |
 
-追加のフロントエンドフレームワークは使っていません。静的配信しやすく、ローカルViteの中継でAPIと保存ダイアログを扱う構成です。
+追加のフロントエンドフレームワークは使っていません。GitHub PagesとローカルViteの両方で同じ公開Web/RSS検索モジュールを使い、ローカルViteでは保存ダイアログとOpenAI CORS回避用の中継も扱う構成です。
 
 ---
 
@@ -795,6 +795,13 @@ npm run deploy
 ---
 
 ## Changelog / 更新履歴
+
+### v1.1.5 (2026-06-25)
+
+- GitHub Pages版でも公開Web/RSS取得を実行できるよう、ブラウザ実行用のRSS検索モジュールを追加。
+- ローカルViteの `/api/trend-search` も同じ検索モジュールを使うようにし、GitHub Pages版とローカル版の取得ロジック差分を解消。
+- RSS直接取得がCORSで失敗した場合は公開取得プロキシを順に試し、全ソース失敗時は成功扱いせず取得失敗として表示。
+- `GitHub Pages版は静的プレビュー` という誤ったREADME表記を修正。
 
 ### v1.1.4 (2026-06-25)
 

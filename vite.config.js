@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import { execFile } from 'node:child_process';
 import { defineConfig } from 'vite';
+import { searchTrendObservations } from './src/lib/publicTrendSearch.js';
 
 const ALLOWED_EXTENSIONS = new Set(['.docx', '.json']);
 const GITHUB_PAGES_BASE = '/viral-radar/';
@@ -45,36 +46,15 @@ function registerTrendSearchRoute(middlewares) {
       }
 
       const url = new URL(request.url, 'http://127.0.0.1');
-      const categoryId = String(url.searchParams.get('categoryId') || 'story-manga');
-      const timeWindow = String(url.searchParams.get('timeWindow') || '7d');
-      const audience = String(url.searchParams.get('audience') || 'general');
-      const searchSeed = Number(url.searchParams.get('searchSeed') || 0);
-      const sources = trendSourcesFor(categoryId, searchSeed);
-      const results = await Promise.allSettled(sources.map(fetchTrendSource));
-      const succeeded = results
-        .filter((result) => result.status === 'fulfilled')
-        .flatMap((result) => result.value);
-      const categoryPool = enrichTrendMetrics(buildCategoryRelevantPool(succeeded, categoryId));
-      const observations = selectDiverseTrendItems(categoryPool, searchSeed)
-        .slice(0, 8)
-        .map((item, index) =>
-          toTrendObservation(item, {
-            audience,
-            categoryId,
-            index,
-            searchSeed,
-            timeWindow,
-          }),
-        );
-      if (observations.length === 0) throw new Error('公開Web/RSSから有効な結果を取得できませんでした。');
-
-      sendJson(response, 200, {
-        ok: true,
-        query: [...new Set(sources.map((source) => source.query))].join(' / '),
-        sourcesAttempted: sources.map((source) => source.label),
-        sourcesSucceeded: [...new Set(observations.map((observation) => observation.source))],
-        observations,
+      const payload = await searchTrendObservations({
+        categoryId: String(url.searchParams.get('categoryId') || 'story-manga'),
+        timeWindow: String(url.searchParams.get('timeWindow') || '7d'),
+        audience: String(url.searchParams.get('audience') || 'general'),
+        searchSeed: Number(url.searchParams.get('searchSeed') || 0),
+        fetchImpl: fetch,
       });
+
+      sendJson(response, 200, payload);
     } catch (error) {
       sendJson(response, 502, {
         ok: false,
