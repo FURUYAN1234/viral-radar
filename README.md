@@ -1,6 +1,6 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
-![Version](https://img.shields.io/badge/version-0.1.3-0f766e)
+![Version](https://img.shields.io/badge/version-0.1.4-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -795,6 +795,12 @@ npm run deploy
 ---
 
 ## Changelog / 更新履歴
+
+### v0.1.4 (2026-06-25)
+
+- 再検索・別案生成で、企画案と深掘り分析が固定ローテーションに戻りにくいよう強化。
+- 各企画案を個別の取得根拠アンカーに結びつけ、タイトル、前提、主人公、舞台、小道具、緊張を根拠由来で変化させるよう調整。
+- 深掘り分析にも分析ラウンドと中心根拠を反映し、カテゴリ固定文だけにならない回帰テストを追加。
 
 ### v0.1.3 (2026-06-25)
 

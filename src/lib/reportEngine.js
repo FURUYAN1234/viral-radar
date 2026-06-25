@@ -499,7 +499,7 @@ function summarizeMetrics(metrics = {}) {
   return parts.join(' / ') || '公開RSS取得';
 }
 
-function buildDeepAnalysis(categoryId, cluster) {
+function buildDeepAnalysis(categoryId, cluster, variantSeed = 0) {
   const analysis = {
     'story-manga': {
       surfacePattern: [
@@ -551,7 +551,8 @@ function buildDeepAnalysis(categoryId, cluster) {
     },
   };
 
-  return analysis[categoryId] ?? analysis['story-manga'];
+  const base = analysis[categoryId] ?? analysis['story-manga'];
+  return enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed);
 }
 
 function buildCategoryReasons(categoryId) {
@@ -1375,11 +1376,11 @@ function buildCategoryFitCards(categoryId, cluster) {
 function regeneratePlans(plans, seed = 1, cluster = null) {
   if (!Array.isArray(plans) || plans.length === 0) return [];
   const categoryId = plans[0]?.id?.split('-').slice(0, 2).join('-') ?? 'story-manga';
-  const observations = Array.isArray(cluster?.observations) ? cluster.observations.slice(0, PLAN_BATCH_SIZE) : [];
-  if (observations.length === 0) return [];
   const numericSeed = Number(seed) || 0;
+  const observations = rotatePlanObservations(cluster?.observations, numericSeed, PLAN_BATCH_SIZE);
+  if (observations.length === 0) return [];
   const searchFrames = Array.from({ length: PLAN_BATCH_SIZE }).map((_, index) =>
-    buildSearchDrivenFrame(categoryId, observations[(index + numericSeed) % observations.length], numericSeed, index),
+    buildSearchDrivenFrame(categoryId, observations[index], numericSeed, index),
   );
 
   return Array.from({ length: PLAN_BATCH_SIZE }).map((_, index) => {
@@ -1400,6 +1401,7 @@ function regeneratePlans(plans, seed = 1, cluster = null) {
       differentiation: frame.differentiation,
       riskNotes: frame.riskNotes,
       draftInstructions: frame.draftInstructions,
+      evidenceAnchor: frame.evidenceAnchor,
       creatorBrief: {
         protagonist: frame.protagonist,
         setting: frame.setting,
@@ -1414,40 +1416,55 @@ function regeneratePlans(plans, seed = 1, cluster = null) {
 
 function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   const insight = classifyObservationInsight(observation ?? {});
-  const concept = conceptForInsight(insight.type, seed, index);
-  const signal = observationSignalForPlan(observation, insight, concept);
-  const keyword = concept.keyword;
+  const anchor = deriveEvidenceAnchor(observation, insight, seed, index);
+  const concept = conceptForInsight(insight.type, seed + (stableHash(anchor.sourceUrl || anchor.title || anchor.focusTerm) % 97), index);
+  const signalAnchor = categoryId === 'trend-explainer' ? anchor : { ...anchor, title: anchor.focusTerm };
+  const signal = observationSignalForPlan(observation, insight, signalAnchor);
+  const keyword = anchor.focusTerm || concept.keyword;
+  const artifact = anchor.artifact || concept.artifact;
+  const planAnchor = evidenceAnchorForPlan(anchor, categoryId);
+  const lens = pickVariant(['基点', '別視点', '余白', '反転', '深層', '再読'], (Number(seed) || 0) * 5 + index);
+  const moment = pickVariant(['朝', '夜', '記録', '街', '章', '窓'], (Number(seed) || 0) * 5 + index + 1);
 
   if (categoryId === 'short-video') {
     return {
-      titleCandidates: [concept.shortTitle, `${keyword}を3カットで直す`, `保存用・${concept.actionNoun}`],
-      protagonist: `${concept.readerNeed}を毎日少し感じている視聴者自身。顔出し人物ではなく、手元と生活動線で見せる。`,
-      setting: `縦画面の${concept.shortSetting}。スマホだけで撮れ、視聴者が同じ場所で試せる。`,
-      incitingIncident: `${concept.visualCue}を冒頭0秒に置き、説明前に「困った瞬間」か「改善後」を見せる。`,
+      titleCandidates: rotatedTitleCandidates(
+        [`${anchor.actionLabel}を3カットで見せる`, `${keyword}を1画面でほどく`, `保存用・${artifact}`, `${anchor.productionAngle}の30秒`],
+        seed,
+        index,
+      ),
+      protagonist: `${keyword}に反応した視聴者自身。${anchor.readerNeed}を、顔出し人物ではなく手元と生活動線で見せる。`,
+      setting: `縦画面の${anchor.scene}。スマホだけで撮れ、視聴者が同じ場所で試せる。`,
+      incitingIncident: `${artifact}を冒頭0秒に置き、説明前に「困った瞬間」か「改善後」を見せる。`,
       conflict: '説明が長いと離脱されるが、手順が浅いと保存する理由が残らない。',
       choice: 'ネタを広げるより、1つの不便と1つの改善だけに絞る。',
       payoff: '最後に明日使う理由を1行字幕で残し、保存やコメントにつなげる。',
       reasonToWin: [
         signal,
-        `${concept.visualCue}は、冒頭1秒で損失や変化を見せやすい`,
+        `${anchor.tension}を冒頭1秒で損失や変化として見せやすい`,
         '1本の中で「困った瞬間」「直す手順」「保存理由」まで短く完結できる',
       ],
-      audiencePromise: `${concept.readerNeed}を、短尺で真似できる改善に変える。`,
-      emotionalHook: concept.emotionalHook,
-      premise: `取得データから抽出した「${concept.readerNeed}」を、視聴者が自分の生活で見つけ、1つだけ直せる短尺動画にする。`,
-      exampleDetail: `冒頭は${concept.visualCue}を説明せずに見せる。次に原因を3語字幕で分解し、最後に${concept.actionNoun}を1つだけ改善した画を置く。`,
+      audiencePromise: `${anchor.readerNeed}を、短尺で真似できる改善に変える。`,
+      emotionalHook: anchor.emotionalHook,
+      premise: `取得根拠から抽出した「${keyword}」を、${lens}の視点で${artifact}と${anchor.tension}に落とし、視聴者が${anchor.scene}で${anchor.actionLabel}を1つだけ試せる短尺動画にする。`,
+      exampleDetail: `冒頭は${artifact}を説明せずに見せる。次に${anchor.tension}を短字幕で分解し、最後に${anchor.actionLabel}を1つだけ改善した画を置く。`,
       outline: ['0秒: 結論か困りごとを見せる', '1-7秒: 原因を短字幕で分解', '8-24秒: 1つだけ直す', 'ラスト: 保存理由とコメント誘導'],
-      opening: `「${concept.readerNeed}、毎日ちょっと損してませんか？」`,
+      opening: `「${keyword}、毎日ちょっと損してませんか？」`,
       productionNotes: ['縦画面固定', '実在サービス名や個人情報を映さない', '効果を盛らず1つの改善に絞る'],
-      differentiation: '総まとめ動画ではなく、観測データ1件から1つの生活場面へ落とす。',
+      differentiation: `総まとめ動画ではなく、観測データ1件から${anchor.scene}の1場面へ落とす。`,
       riskNotes: ['健康・金銭効果を断定しない'],
       draftInstructions: '秒数、映像、字幕、ナレーション、撮影小物、保存誘導まで具体化してください。',
+      evidenceAnchor: planAnchor,
     };
   }
 
   if (categoryId === 'trend-explainer') {
     return {
-      titleCandidates: [concept.explainerTitle, `${keyword}が刺さる理由`, `${keyword}を企画に変える方法`],
+      titleCandidates: rotatedTitleCandidates(
+        [`${keyword}が刺さる理由`, `${anchor.productionAngle}を企画に変える方法`, `${compactEvidenceText(anchor.title, 24)}の反応を読む`, `${anchor.tension}の分解`],
+        seed,
+        index,
+      ),
       protagonist: `${keyword}を企画に使いたいが、根拠と安全な変換方法を知りたい制作者向けの語り手。`,
       setting: '観測データ、架空UI、ホワイトボード、媒体別作例を並べる解説画面。',
       incitingIncident: `${signal} そこから、なぜ反応が起きるのかを問いにする。`,
@@ -1456,72 +1473,83 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
       payoff: '視聴者が自分の漫画、動画、小説へ転用できるチェックリストを持ち帰る。',
       reasonToWin: [
         signal,
-        `${concept.readerNeed}は解説の入口として共感を取りやすい`,
+        `${anchor.readerNeed}は解説の入口として共感を取りやすい`,
         '観測、理由、制作手順、注意点の順にすると打ち合わせや企画書へ転用しやすい',
       ],
       audiencePromise: `${keyword}を、創作で使える構造と注意点に分解する。`,
-      emotionalHook: '流行を追っているのに、なぜ自分の企画には使えないのかという焦り。',
-      premise: `取得データを起点に、伸びた表層ではなく、読者・視聴者が反応した心理と制作上の型を解説する。`,
-      exampleDetail: `前半で${concept.readerNeed}の観測を示し、中盤で${keyword}の反応理由を分解し、後半で漫画・短尺・小説への変換例を出す。`,
+      emotionalHook: `流行を追っているのに、${anchor.tension}をどう企画に変えるか分からない焦り。`,
+      premise: `取得データを起点に、伸びた表層ではなく、${lens}の視点で${anchor.tension}を読み、${anchor.readerNeed}と${anchor.productionAngle}を解説する。`,
+      exampleDetail: `前半で${anchor.title}の観測を示し、中盤で${anchor.tension}を分解し、後半で漫画・短尺・小説への変換例を出す。`,
       outline: ['導入: 観測結果', '理由: 反応した心理', '変換: 媒体別の作り方', '注意: 実在名と断定を避ける'],
-      opening: `「今日は、${concept.readerNeed}がなぜ企画に使えるのかを分解します。」`,
+      opening: `「今日は、${keyword}がなぜ企画に使えるのかを分解します。」`,
       productionNotes: ['実在人物を告発対象にしない', '画面例は自作モックにする', '出典と推測を分ける'],
       differentiation: 'ニュース解説ではなく、創作者の制作判断へ落とす。',
       riskNotes: ['内部事情や因果関係を断定しない'],
       draftInstructions: '7分から10分の解説台本として、章立て、ナレーション、図解、作例、注意点を書いてください。',
+      evidenceAnchor: planAnchor,
     };
   }
 
   if (categoryId === 'long-novel') {
     return {
-      titleCandidates: [concept.novelTitle, `${concept.artifact}の保管庫`, `${keyword}を読む夜`],
-      protagonist: `${concept.readerNeed}を避けて生きてきた主人公。最初は自分の問題だけを解決したいが、他者の痛みに巻き込まれる。`,
-      setting: `${concept.artifact}が、架空の町・図書館・記録庫・職場制度として存在する世界。`,
-      incitingIncident: `主人公が${concept.artifact}に触れ、自分だけの悩みだと思っていたものが町全体の記録だと知る。`,
+      titleCandidates: rotatedTitleCandidates(
+        [`${artifact}の${lens}保管庫`, `${keyword}を読む${moment}`, `${anchor.productionAngle}の${lens}の町`, `${anchor.tension}の${moment}記録`],
+        seed,
+        index,
+      ),
+      protagonist: `${anchor.readerNeed}を避けて生きてきた主人公。最初は自分の問題だけを解決したいが、${anchor.tension}に巻き込まれる。`,
+      setting: `${artifact}が、${anchor.scene}を起点に架空の町・図書館・記録庫・職場制度として広がる世界。`,
+      incitingIncident: `主人公が${artifact}に触れ、自分だけの悩みだと思っていたものが町全体の記録だと知る。`,
       conflict: '記録を読めば救われる人がいる一方で、他人の痛みを覗く危うさもある。',
       choice: '自分だけ助かるか、仕組みそのものを読み解いて他者にも返すか。',
       payoff: '短い逆転ではなく、章を重ねて誤解がほどける救済へ向かう。',
       reasonToWin: [
         signal,
-        `${concept.artifact}は章ごとの謎や記録として長期連載に広げやすい`,
-        '検索・評価・未返信などの生活不安を、世界観と伏線に変換できる',
+        `${artifact}は章ごとの謎や記録として長期連載に広げやすい`,
+        `${anchor.tension}を、世界観と伏線に変換できる`,
       ],
       audiencePromise: `${keyword}を長期の謎と救済に変えるWeb小説企画。`,
-      emotionalHook: concept.emotionalHook,
-      premise: `取得データから抽出した「${concept.readerNeed}」を、主人公が記録、制度、町のルールを読み解き、章ごとに他者の事情へ近づく中長編にする。`,
-      exampleDetail: `第1章では${concept.artifact}を発見する。章末で${keyword}が別人物にも関わる証拠を置き、次章へ読ませる。`,
+      emotionalHook: anchor.emotionalHook,
+      premise: `取得根拠から抽出した「${keyword}」を、${lens}の視点で${artifact}と${anchor.tension}に変換する。主人公が記録、制度、町のルールを読み解き、章ごとに他者の事情へ近づく中長編にする。`,
+      exampleDetail: `第1章では${artifact}を発見する。章末で${anchor.tension}が別人物にも関わる証拠を置き、次章へ読ませる。`,
       outline: ['第1部: 記録の発見', '第2部: 他者の痛みへ広がる', '第3部: 仕組みの誤読を暴く', '終盤: 小さな救済を連鎖させる'],
-      opening: `${concept.artifact}には、主人公の名前だけが空白で残されていた。`,
+      opening: `${artifact}には、主人公の名前だけが空白で残されていた。`,
       productionNotes: ['実在サービス名は出さない', '章末ごとに新しい証拠を置く', '救済を急がない'],
       differentiation: '単発の能力ものではなく、記録を読む長期ミステリーにする。',
       riskNotes: ['実在企業や特定制度の告発にしない'],
       draftInstructions: '短編・中編・長編のどれに伸ばせるかを示しつつ、第1章本文、章末の引き、長期展開メモを書いてください。',
+      evidenceAnchor: planAnchor,
     };
   }
 
   return {
-    titleCandidates: [concept.storyTitle, `${concept.artifact}が見える日`, `${keyword}の裏側`],
-    protagonist: `${concept.readerNeed}を抱えた主人公。最初は自分の弱さだと思い込んでいる。`,
-    setting: `${concept.artifact}が、架空の通知、レシート、検索窓、掲示板など漫画で一目で読める小道具として現れる世界。`,
-    incitingIncident: `主人公が${concept.artifact}を1ページ目で目撃し、日常の見え方が変わる。`,
+    titleCandidates: rotatedTitleCandidates(
+      [`${keyword}の朝`, `${artifact}が見える日`, `${keyword}の裏側`, `${anchor.productionAngle}の通知欄`],
+      seed,
+      index,
+    ),
+    protagonist: `${anchor.readerNeed}を抱えた主人公。最初は${anchor.tension}を自分の弱さだと思い込んでいる。`,
+    setting: `${artifact}が、${anchor.scene}の中で漫画で一目で読める小道具として現れる世界。`,
+    incitingIncident: `主人公が${artifact}を1ページ目で目撃し、日常の見え方が変わる。`,
     conflict: '個人を責めれば簡単だが、本当の原因は見えない仕組みや誤解にある。',
     choice: '怒りで暴くか、構造を読み解いて誰かが言葉にできる形へ戻すか。',
     payoff: '最後に小さな行動で、読者が自分の生活へ持ち帰れる救済を置く。',
     reasonToWin: [
       signal,
-      `${concept.artifact}は漫画の冒頭1ページで異常として見せやすい`,
+      `${artifact}は漫画の冒頭1ページで異常として見せやすい`,
       `${keyword}を架空UIや小道具にすると、説明より先に感情が伝わる`,
     ],
     audiencePromise: `${keyword}の不安を、1ページ目でわかる異常表示と小さな救済に変える。`,
-    emotionalHook: concept.emotionalHook,
-    premise: `取得データから抽出した「${concept.readerNeed}」を、主人公が架空の表示や小道具を通じて読み解く漫画企画にする。`,
-    exampleDetail: `冒頭は${concept.artifact}を大ゴマで見せる。主人公は${keyword}を自分だけの問題だと思うが、別人物にも同じ兆候が出て、仕組みを読む物語に変わる。`,
+    emotionalHook: anchor.emotionalHook,
+    premise: `取得根拠から抽出した「${keyword}」を、主人公が${artifact}を通じて読み解く漫画企画にする。${anchor.tension}を、1話の感情反転として見せる。`,
+    exampleDetail: `冒頭は${artifact}を大ゴマで見せる。主人公は${keyword}を自分だけの問題だと思うが、別人物にも同じ兆候が出て、仕組みを読む物語に変わる。`,
     outline: ['冒頭: 異常表示の発見', '中盤: 自分だけではないと知る', '転機: 仕組みの誤読を見抜く', '結末: 小さな救済を返す'],
-    opening: `${concept.artifact}は、誰にも見えないはずの欄にだけ残っていた。`,
+    opening: `${artifact}は、誰にも見えないはずの欄にだけ残っていた。`,
     productionNotes: ['実在サービス名は出さない', '固有名詞を架空UIへ変換する', '1話1つの小道具に絞る'],
-    differentiation: '既存トレンド名ではなく、観測された不安を漫画的な見せ場へ変換する。',
+    differentiation: `既存トレンド名ではなく、観測された${anchor.focusTerm}を漫画的な見せ場へ変換する。`,
     riskNotes: ['実在人物や企業への告発にしない'],
     draftInstructions: 'ストーリー漫画の第1話として、ページごとの流れ、重要コマ、セリフ、ラストの引きを具体的に書いてください。',
+    evidenceAnchor: planAnchor,
   };
 }
 
@@ -1686,10 +1714,293 @@ function pickVariant(items, offset) {
   return items[offset % items.length];
 }
 
-function observationSignalForPlan(observation, insight, concept) {
+function rotatedTitleCandidates(candidates, seed, index) {
+  const items = uniqueList(candidates);
+  if (items.length === 0) return ['物語の種'];
+  const start = Math.abs((Number(seed) || 0) * (PLAN_BATCH_SIZE + 2) + index) % items.length;
+  return Array.from({ length: Math.min(3, items.length) }).map((_, candidateIndex) => items[(start + candidateIndex) % items.length]);
+}
+
+function uniqueList(items) {
+  const seen = new Set();
+  return (items ?? []).filter((item) => {
+    const value = String(item ?? '').trim();
+    if (!value || seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
+function stableHash(value) {
+  return Array.from(String(value ?? '')).reduce((hash, char) => ((hash * 31 + char.charCodeAt(0)) >>> 0), 2166136261);
+}
+
+function compactEvidenceText(value, maxLength = 56) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function observationEvidenceText(observation) {
+  return [
+    observation?.title,
+    observation?.snippet,
+    observation?.queryUsed,
+    observation?.query,
+    ...(Array.isArray(observation?.tags) ? observation.tags : []),
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function rotatePlanObservations(observations, seed = 0, limit = PLAN_BATCH_SIZE) {
+  const pool = Array.isArray(observations) ? observations.filter(Boolean) : [];
+  if (pool.length === 0) return [];
+  const start = Math.abs(Number(seed) || 0) % pool.length;
+  return Array.from({ length: limit }).map((_, index) => pool[(start + index) % pool.length]);
+}
+
+function evidenceTraits() {
+  return [
+    {
+      key: 'reply',
+      test: /返信|未返信|通知|既読|連絡|言葉|本音|メッセージ|返事/,
+      fallbackInsights: ['relation'],
+      focusTerms: ['返せなかった一言', '届かなかった本音', '未返信の後悔'],
+      scenes: ['玄関とスマホ通知の間', '駅前の待ち合わせ場所', '夜の部屋と未読欄'],
+      artifacts: ['返せなかった一文だけが光る通知欄', '未送信の言葉を預かる改札', '既読にならない手紙の束'],
+      tensions: ['近い相手ほど本音を飲み込む', '言うほどでもない一言が関係を変える', '返せなかった時間だけが残る'],
+      readerNeeds: ['近い相手ほど言葉を飲み込んでしまう不安', '小さなすれ違いを取り戻したい気持ち'],
+      emotionalHooks: ['悪意ではなかった言葉が届かないまま関係を変える痛み。', '一通だけ返せなかったことが、後から大きく見えてくる怖さ。'],
+      actionLabels: ['返事の整え方', '言えなかった一言の戻し方'],
+      productionAngles: ['対話の遅延を見せ場にする', '未返信を回収フックにする'],
+    },
+    {
+      key: 'public-rule',
+      test: /駅|通勤|制度|ルール|貼り紙|不公平|理不尽|職場|申請|規約|構造/,
+      fallbackInsights: ['unfairness', 'system'],
+      focusTerms: ['見えないルールの不公平', '言い返せない理不尽', '透明な制度疲れ'],
+      scenes: ['駅前や職場の掲示板', '申請窓口と通勤導線', '誰も読まない規約が増える場所'],
+      artifacts: ['細則だけが増える貼り紙', '反論だけが赤字で残る回覧板', '選択肢の裏側を示す導線図'],
+      tensions: ['ルールはあるのに理由が見えない', '正しいことを言うほど立場が悪くなる', '自分の失敗に見える不利益が仕組みから来る'],
+      readerNeeds: ['自分のせいに見える不利益の裏側を知りたい欲求', 'その場で言い返せなかった悔しさ'],
+      emotionalHooks: ['自分の失敗だと思っていたことが、実は仕組みで誘導されていたと知る衝撃。', '正しいことを言うほど立場が悪くなる理不尽さ。'],
+      actionLabels: ['仕組みの見抜き方', '理不尽をかわす一手'],
+      productionAngles: ['構造を小道具化する', '反論の余白を見せ場にする'],
+    },
+    {
+      key: 'family-life',
+      test: /家族|家庭|冷蔵庫|買い物|節約|家計|我慢|暮らし|生活|子育て|親子/,
+      fallbackInsights: ['life', 'relatable'],
+      focusTerms: ['生活の小さな我慢', '家族に言えない不便', '節約疲れの違和感'],
+      scenes: ['台所や帰宅後の机', '冷蔵庫の前と買い物メモ', '家族の生活動線が重なる場所'],
+      artifacts: ['買い忘れと我慢が並ぶ冷蔵庫メモ', '我慢の回数が印字されるレシート', '生活のズレを記録する買い物メモ'],
+      tensions: ['近い相手ほど小さな我慢を言い出せない', '節約や家事の小さな差が感情に変わる', '便利なはずの生活メモが負担を可視化する'],
+      readerNeeds: ['生活の数字に追われる不安', '自分だけだと思っていた小さなあるある'],
+      emotionalHooks: ['誰にも説明するほどではない違和感が、毎日少しずつ積もる感覚。', '残高や予定表を見るたび、選択肢が少しずつ削られる感覚。'],
+      actionLabels: ['我慢の減らし方', '生活違和感の直し方'],
+      productionAngles: ['生活小道具から感情を出す', '我慢の回数を物語化する'],
+    },
+    {
+      key: 'time-regret',
+      test: /時間|期限|予定|後悔|遅れ|間に合|年後|今日|明日/,
+      fallbackInsights: ['regret'],
+      focusTerms: ['取り戻せない時間', '期限を過ぎた後悔', '先延ばしの痛み'],
+      scenes: ['机のカレンダーと通知欄', '朝の部屋と予定表', '期限だけが光る画面'],
+      artifacts: ['明日だけが先に届くカレンダー', '過ぎた日付を配達する郵便受け', '昨日の予定だけが残るスマホ通知'],
+      tensions: ['まだ間に合うと思っていた予定が遠く過ぎる', '小さな先延ばしが取り戻せない差になる', '時間だけが自分を置いて進む'],
+      readerNeeds: ['時間だけが早く過ぎてしまう後悔', 'まだ間に合う方法を知りたい焦り'],
+      emotionalHooks: ['まだ間に合うと思っていた予定が、気づいた時には遠く過ぎている怖さ。', '一日を失った感覚が、生活全体の不安に変わる痛み。'],
+      actionLabels: ['予定の見直し方', '後悔を減らす一手'],
+      productionAngles: ['時間差をフックにする', '予定表を謎として扱う'],
+    },
+    {
+      key: 'evaluation',
+      test: /評価|採点|点数|査定|ランキング|比較|AI|合格|却下/,
+      fallbackInsights: ['evaluation'],
+      focusTerms: ['見えない評価', '理由のない点数', '比較疲れ'],
+      scenes: ['通知欄と提出物の横', 'ランキング画面の外側', '採点理由が隠れた画面'],
+      artifacts: ['理由だけが浮かぶ評価欄', '点数の下に出る灰色メモ', '評価不能と書かれた空白欄'],
+      tensions: ['点数だけが先に届き理由だけが見えない', '比べるほど自分の基準が消える', '評価されているのに改善点が読めない'],
+      readerNeeds: ['理由の見えない点数に振り回される不安', '比較され続ける疲れから降りたい気持ち'],
+      emotionalHooks: ['点数だけが先に届き、理由だけが誰にも見えない怖さ。', '比べられるほど、自分の輪郭が薄くなる不安。'],
+      actionLabels: ['判断基準の見直し方', '比較疲れから降りる方法'],
+      productionAngles: ['評価欄を謎にする', '点数の裏側を安全に見せる'],
+    },
+    {
+      key: 'saving',
+      test: /保存|ノウハウ|方法|手順|便利|知恵|対策|コツ|あとで/,
+      fallbackInsights: ['saving'],
+      focusTerms: ['あとで助かる知恵', '保存したくなる一手', '明日の自分へのメモ'],
+      scenes: ['机、冷蔵庫、玄関、メモアプリ', '困った時だけ開く生活ノート', '手元だけで試せる場所'],
+      artifacts: ['未来の自分から届くメモ', '明日の自分宛ての付箋', 'あとで助かる一行が増える冷蔵庫'],
+      tensions: ['今すぐは無理でも後で見返したい', '知っているだけでは使えない', '便利情報が多すぎて本当に使う一手が残らない'],
+      readerNeeds: ['今すぐは無理でもあとで見返したい安心感', '小さな逃げ道を持っておきたい気持ち'],
+      emotionalHooks: ['自分だけで抱えていた不便に、小さな逃げ道が見つかる安心。', '明日の自分が少し助かるだけで、今日の不安が軽くなる。'],
+      actionLabels: ['保存される一手', '明日の自分に渡す方法'],
+      productionAngles: ['保存理由を先に見せる', '手順を一つに絞る'],
+    },
+    {
+      key: 'continuity',
+      test: /続き|連載|章|伏線|考察|読了|次回|回収|謎/,
+      fallbackInsights: ['continuity'],
+      focusTerms: ['章をまたぐ謎', '続きが気になる余白', '回収待ちの伏線'],
+      scenes: ['章末の白紙ログ', '未完成の図と次話予告', '読了後に一行増える目次'],
+      artifacts: ['章末だけに現れる白紙ログ', '次話の証拠だけが消えたノート', '空欄のまま届く章末メモ'],
+      tensions: ['一度ではわからない違和感が後で意味を変える', '答えが出ないから読み続けたくなる', '回収前の余白が不安と期待を同時に残す'],
+      readerNeeds: ['答えを急がず追い続けたい問い', '読み進めるほど意味が変わる快感'],
+      emotionalHooks: ['一度ではわからない違和感が、読み進めるほど別の意味に変わる快感。', '空欄が残るほど、次の章を開きたくなる。'],
+      actionLabels: ['次回の残し方', '章末フックの作り方'],
+      productionAngles: ['章末の空欄を使う', '伏線の再解釈を設計する'],
+    },
+  ];
+}
+
+function evidenceTraitFor(observation, insight) {
+  const text = observationEvidenceText(observation);
+  const traits = evidenceTraits();
+  return (
+    traits.find((trait) => trait.test.test(text)) ??
+    traits.find((trait) => trait.fallbackInsights?.includes(insight?.type)) ??
+    {
+      key: 'topic',
+      focusTerms: ['世の中で動いた感情', '言葉にしにくい違和感', '名前のない反応'],
+      scenes: ['スマホ画面と机の上', '移動中の手元', '匿名の反応が集まる画面'],
+      artifacts: ['感情だけが残る通知欄', '本文が消えて気持ちだけ残ったメモ', '名前のない反応を集める画面'],
+      tensions: ['何に反応したのか自分でもわからない', '言葉にしにくい違和感が画面上に形を持つ', '匿名の反応だけが先に増える'],
+      readerNeeds: ['言葉にしにくい違和感を誰かに代弁してほしい欲求', '自分の反応の正体を知りたい気持ち'],
+      emotionalHooks: ['何に反応したのか自分でもわからない感情が、画面上に形を持つ瞬間。', '名前がつかない違和感ほど、誰かに形にしてほしくなる。'],
+      actionLabels: ['感情の見せ方', '違和感の言語化'],
+      productionAngles: ['感情だけを小道具化する', '反応の正体を分解する'],
+    }
+  );
+}
+
+function focusTermForObservation(observation, trait, offset) {
+  const tags = Array.isArray(observation?.tags)
+    ? observation.tags.map((tag) => compactEvidenceText(tag, 8)).filter(Boolean).slice(0, 2)
+    : [];
+  if (tags.length > 0) return `${tags.join('・')}への反応`;
+  const query = safeQueryForPlan(observation?.queryUsed ?? observation?.query);
+  if (query && query !== '公開Web/RSS') return query;
+  return pickVariant(trait.focusTerms, offset);
+}
+
+function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0) {
+  const trait = evidenceTraitFor(observation, insight);
+  const hash = stableHash(`${observation?.id ?? ''}|${observation?.title ?? ''}|${observation?.sourceUrl ?? ''}|${seed}|${index}`);
+  const offset = Math.abs((Number(seed) || 0) * 7 + index + hash);
+  const title = compactEvidenceText(observation?.title ?? insight?.material ?? pickVariant(trait.focusTerms, offset), 72);
+  return {
+    id: observation?.id ?? '',
+    source: observation?.source ?? '公開Web/RSS',
+    sourceUrl: observation?.sourceUrl ?? '',
+    title,
+    query: safeQueryForPlan(observation?.queryUsed ?? observation?.query),
+    observedAt: observation?.observedAt ?? '',
+    publishedAt: observation?.publishedAt ?? '',
+    insightType: insight?.type ?? 'topic',
+    focusTerm: focusTermForObservation(observation, trait, offset),
+    scene: pickVariant(trait.scenes, offset + 1),
+    artifact: pickVariant(trait.artifacts, offset + 2),
+    tension: pickVariant(trait.tensions, offset + 3),
+    readerNeed: pickVariant(trait.readerNeeds, offset + 4),
+    emotionalHook: pickVariant(trait.emotionalHooks, offset + 5),
+    actionLabel: pickVariant(trait.actionLabels, offset + 6),
+    productionAngle: pickVariant(trait.productionAngles, offset + 7),
+  };
+}
+
+function evidenceAnchorForPlan(anchor, categoryId) {
+  const base = {
+    id: anchor.id,
+    sourceUrl: anchor.sourceUrl,
+    observedAt: anchor.observedAt,
+    publishedAt: anchor.publishedAt,
+    focusTerm: anchor.focusTerm,
+    query: categoryId === 'trend-explainer' ? anchor.query : undefined,
+    scene: anchor.scene,
+    artifact: anchor.artifact,
+    tension: anchor.tension,
+    readerNeed: anchor.readerNeed,
+    productionAngle: anchor.productionAngle,
+  };
+  if (categoryId === 'trend-explainer') {
+    return {
+      ...base,
+      title: anchor.title,
+      source: anchor.source,
+    };
+  }
+  return base;
+}
+
+function analysisAnchorsForCluster(cluster, seed = 0) {
+  return rotatePlanObservations(cluster?.observations, seed, PLAN_BATCH_SIZE).map((observation, index) => {
+    const insight = classifyObservationInsight(observation ?? {});
+    return deriveEvidenceAnchor(observation, insight, seed, index);
+  });
+}
+
+function enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed = 0) {
+  const anchors = analysisAnchorsForCluster(cluster, variantSeed);
+  if (anchors.length === 0) return base;
+  const primary = anchors[0];
+  const anchorSummary = uniqueList(anchors.map((anchor) => `「${anchor.focusTerm}」`)).slice(0, 3).join(' / ');
+  const observationPhrase =
+    categoryId === 'trend-explainer'
+      ? `取得タイトル「${primary.title}」周辺の反応`
+      : `取得根拠から抽出した「${primary.focusTerm}」`;
+  const queryPhrase = categoryId === 'trend-explainer' ? primary.query : primary.focusTerm;
+  const categoryMoves = {
+    'story-manga': `${primary.artifact}を冒頭1ページの異常表示にし、${primary.tension}を読者が先に感じる構造にする。`,
+    'short-video': `${primary.scene}で${primary.artifact}を冒頭0秒に置き、${primary.actionLabel}までを3カットで回収する。`,
+    'trend-explainer': `${primary.title}を現象名として消費せず、${primary.tension}と${primary.productionAngle}に分解する。`,
+    'long-novel': `${primary.artifact}を章ごとの記録にし、${primary.tension}を他者の痛みへ連鎖させる。`,
+  };
+  const productionMoves = {
+    'story-manga': `${primary.scene}を舞台に、固有名詞ではなく${primary.artifact}で現代性を見せる`,
+    'short-video': `${primary.actionLabel}を1本1手順に固定し、保存理由を最後の字幕に置く`,
+    'trend-explainer': `観測、心理、制作手順、注意点の順で${primary.productionAngle}を説明する`,
+    'long-novel': `${primary.artifact}を章末証拠として反復し、回収前の余白を作る`,
+  };
+
+  return {
+    ...base,
+    surfacePattern: uniqueList([
+      `分析ラウンド${(Math.abs(Number(variantSeed) || 0) % 9) + 1}: 今回の分析角度は${anchorSummary}。${observationPhrase}を、${primary.scene}の見せ場へ変換します。`,
+      categoryMoves[categoryId] ?? categoryMoves['story-manga'],
+      ...base.surfacePattern,
+    ]).slice(0, 5),
+    humanMotivation: uniqueList([
+      primary.readerNeed,
+      ...anchors.slice(1).map((anchor) => anchor.readerNeed),
+      ...base.humanMotivation,
+    ]).slice(0, 5),
+    narrativeMechanism: uniqueList([
+      primary.tension,
+      `${primary.artifact}を使った見せ場`,
+      ...base.narrativeMechanism,
+    ]).slice(0, 5),
+    productionMechanism: uniqueList([
+      productionMoves[categoryId] ?? productionMoves['story-manga'],
+      primary.productionAngle,
+      ...base.productionMechanism,
+    ]).slice(0, 5),
+    opportunityGap: uniqueList([
+      `${queryPhrase}で見えた反応は、そのまま流行語にせず「${primary.focusTerm}」として扱うと、反復ではなく今回固有の企画判断になります。`,
+      ...base.opportunityGap,
+    ]).slice(0, 3),
+    categoryInsight: `分析ラウンド${(Math.abs(Number(variantSeed) || 0) % 9) + 1}では、${primary.focusTerm}を${primary.tension}という読者・視聴者心理に変換できる。今回は${primary.artifact}を核にすると、再検索ごとに別の企画角度を作れます。`,
+  };
+}
+
+function observationSignalForPlan(observation, insight, anchor) {
   const observedAt = observation?.observedAt ? `取得時刻 ${formatShortDateTime(observation.observedAt)}` : '取得時刻未取得';
   const query = observation?.queryUsed ? `検索語「${safeQueryForPlan(observation.queryUsed)}」` : '公開Web/RSS取得';
-  return `${query}で、${insight.material}に近い反応を確認（${observedAt}）。企画では「${concept.readerNeed}」として扱う。`;
+  const title = anchor?.title ? `取得タイトル「${anchor.title}」` : `${insight.material}に近い反応`;
+  return `${query}で、${title}を確認（${observedAt}）。企画では「${anchor?.readerNeed ?? '読者欲求'}」として扱う。`;
 }
 
 function safeQueryForPlan(query) {
@@ -2498,7 +2809,7 @@ export function buildReport({
     sourcesUsed: [...new Set(selectedObservations.map((item) => item.source))],
     trendClusters: [cluster],
     evidenceCards,
-    deepAnalysis: buildDeepAnalysis(category.id, cluster),
+    deepAnalysis: buildDeepAnalysis(category.id, cluster, variantSeed),
     categoryFitCards: buildCategoryFitCards(category.id, cluster),
     categoryReasons: buildCategoryReasons(category.id),
     beginnerGuide: buildBeginnerGuide(category.id, creativePlans[0], cluster),

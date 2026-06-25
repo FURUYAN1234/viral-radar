@@ -117,6 +117,94 @@ test('alternate concepts draw from the full plan pool instead of only reframing 
   assert.ok(secondBatch.creativePlans.every((plan) => plan.id.includes('-search-1-')));
 });
 
+test('deep analysis changes with the selected evidence round instead of staying category-static', () => {
+  for (const categoryId of ['story-manga', 'short-video', 'trend-explainer', 'long-novel']) {
+    const analyses = [0, 1, 2, 3].map((variantSeed) =>
+      JSON.stringify(
+        buildReport({
+          categoryId,
+          observations: PUBLIC_OBSERVATIONS,
+          providerMode: 'fixture',
+          variantSeed,
+        }).deepAnalysis,
+      ),
+    );
+
+    assert.ok(new Set(analyses).size >= 3, `${categoryId} should produce at least three analysis angles`);
+  }
+});
+
+test('regenerated plans bind visible briefs to distinct evidence anchors, not only concept rotations', () => {
+  const evidenceSet = [
+    {
+      id: 'variation-1',
+      categoryId: 'story-manga',
+      source: 'Local RSS A',
+      sourceType: 'public-web-rss',
+      title: '冷蔵庫の買い忘れメモから家族の我慢が話題に',
+      snippet: '家族の小さな我慢、節約疲れ、買い忘れの気まずさに共感が集まっている。',
+      tags: ['生活', '家族', '我慢', '節約'],
+      query: '生活 家族 我慢',
+      queryUsed: '生活 家族 我慢 / 公開Web/RSS取得1',
+      metrics: { rank: 1, recencyScore: 80, sourceWeight: 90 },
+      sourceUrl: 'https://example.com/variation-1',
+      observedAt: '2026-06-25T12:00:00+09:00',
+      publishedAt: '2026-06-25T11:00:00+09:00',
+    },
+    {
+      id: 'variation-2',
+      categoryId: 'story-manga',
+      source: 'Local RSS B',
+      sourceType: 'public-web-rss',
+      title: '駅の貼り紙ルール変更で通勤の不公平感が広がる',
+      snippet: '通勤時の小さな不公平、見えない制度、言い返せない理不尽への反応が多い。',
+      tags: ['仕事', '制度', '理不尽', '不公平'],
+      query: '通勤 不公平 制度',
+      queryUsed: '通勤 不公平 制度 / 公開Web/RSS取得2',
+      metrics: { rank: 2, recencyScore: 77, sourceWeight: 88 },
+      sourceUrl: 'https://example.com/variation-2',
+      observedAt: '2026-06-25T12:05:00+09:00',
+      publishedAt: '2026-06-25T10:30:00+09:00',
+    },
+    {
+      id: 'variation-3',
+      categoryId: 'story-manga',
+      source: 'Local RSS C',
+      sourceType: 'public-web-rss',
+      title: '返信期限を過ぎた通知に後悔の声が集まる',
+      snippet: '返せなかった一言、近い相手とのすれ違い、時間を戻したい後悔が読まれている。',
+      tags: ['後悔', '人間関係', '未返信', '時間'],
+      query: '未返信 後悔 関係',
+      queryUsed: '未返信 後悔 関係 / 公開Web/RSS取得3',
+      metrics: { rank: 3, recencyScore: 74, sourceWeight: 86 },
+      sourceUrl: 'https://example.com/variation-3',
+      observedAt: '2026-06-25T12:10:00+09:00',
+      publishedAt: '2026-06-25T10:00:00+09:00',
+    },
+  ];
+  const firstRound = buildReport({
+    categoryId: 'story-manga',
+    observations: evidenceSet,
+    providerMode: 'fixture',
+    variantSeed: 0,
+  });
+  const secondRound = buildReport({
+    categoryId: 'story-manga',
+    observations: evidenceSet,
+    providerMode: 'fixture',
+    variantSeed: 1,
+  });
+
+  assert.equal(firstRound.creativePlans.length, 3);
+  assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl)).size, 3);
+  assert.notDeepEqual(
+    firstRound.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl),
+    secondRound.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl),
+  );
+  assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.premise)).size, 3);
+  assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.creatorBrief.protagonist)).size, 3);
+});
+
 test('creative plans are actionable story briefs, not only analysis notes', () => {
   const report = buildReport({
     categoryId: 'story-manga',
