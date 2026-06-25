@@ -84,6 +84,33 @@ h1 {
   line-height: 1;
 }
 
+.brand-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid #0b7f78;
+  background: #f9fbf8;
+  color: #0b7f78;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.version-badge.compact {
+  min-height: 20px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
 .lead {
   max-width: 820px;
   margin: 12px 0 0;
@@ -130,6 +157,13 @@ h1 {
   background: #d9dfdc;
   color: #65717e;
   cursor: not-allowed;
+}
+
+.api-panel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .status-strip .ok {

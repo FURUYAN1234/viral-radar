@@ -1,6 +1,6 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
-![Version](https://img.shields.io/badge/version-1.1.6-0f766e)
+![Version](https://img.shields.io/badge/version-1.1.7-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -795,6 +795,11 @@ npm run deploy
 ---
 
 ## Changelog / 更新履歴
+
+### v1.1.7 (2026-06-25)
+
+- アプリ名横に小さなバージョン表示を追加。
+- API入力/設定パネルにも同じバージョン表示を追加し、AIや運用者が画面状態を確認しやすく調整。
 
 ### v1.1.6 (2026-06-25)
 

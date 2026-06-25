@@ -13,6 +13,7 @@ const STORAGE_KEY = 'viral-radar-settings-v1';
 const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
+const APP_VERSION = '1.1.7';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -143,7 +144,10 @@ function render() {
       <header class="topbar">
         <div class="brand-block">
           <p class="eyebrow">物語トレンド設計</p>
-          <h1>物語バズメーカー</h1>
+          <div class="brand-title-row">
+            <h1>物語バズメーカー</h1>
+            <span class="version-badge" aria-label="アプリバージョン">v${APP_VERSION}</span>
+          </div>
           <p class="lead">根拠、ウケる理由、具体企画、他AIに貼る執筆プロンプトまでをカテゴリ別にまとめます。</p>
         </div>
         <div class="header-api-block">
@@ -305,7 +309,10 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
   return `
     <section class="api-connect-panel" aria-label="APIキー入力">
       <div class="api-connect-copy">
-        <p class="panel-label">${isConnected ? 'API設定' : '最初に設定'}</p>
+        <p class="panel-label api-panel-meta">
+          <span>${isConnected ? 'API設定' : '最初に設定'}</span>
+          <span class="version-badge compact" aria-label="アプリバージョン">v${APP_VERSION}</span>
+        </p>
         <h2>${isConnected ? 'AIエンジン設定' : 'AIエンジンを接続'}</h2>
         <p>${
           isConnected

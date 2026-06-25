@@ -8,6 +8,7 @@ const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8
 const viteConfig = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
 
 assert.match(html, /物語バズメーカー/);
+assert.match(html, /物語バズメーカー v1\.1\.7/);
 assert.doesNotMatch(html, /日本語圏|Story Maker/);
 assert.match(categories, /ストーリー漫画/);
 assert.match(categories, /トレンド解説動画/);
@@ -22,6 +23,10 @@ assert.match(main, /id="connect-api"/);
 assert.match(main, /接続/);
 assert.match(main, /id="api-settings"/);
 assert.match(main, /API設定/);
+assert.match(main, /const APP_VERSION = '1\.1\.7'/);
+assert.match(main, /brand-title-row/);
+assert.match(main, /version-badge/);
+assert.match(main, /api-panel-meta/);
 assert.doesNotMatch(main, /maskKey|maskedKey/);
 assert.doesNotMatch(main, /sk-proj\.\.\.|AIza\.\.\./);
 assert.match(main, /function isStaticPagesRuntime/);
@@ -83,6 +88,9 @@ assert.ok(main.indexOf('renderActionMessage(state.actionMessage)') < main.indexO
 assert.doesNotMatch(main, /api-scroll-locked|scrollTo|body\.style\.top/);
 assert.doesNotMatch(main, /progress-steps|busy-progress|根拠シグナルを再検索/);
 assert.match(styles, /\.analysis-busy-banner\s*\{[\s\S]*?display:\s*flex;/);
+assert.match(styles, /\.brand-title-row\s*\{[\s\S]*?display:\s*flex;/);
+assert.match(styles, /\.version-badge\s*\{[\s\S]*?white-space:\s*nowrap;/);
+assert.match(styles, /\.api-panel-meta\s*\{[\s\S]*?display:\s*flex;/);
 assert.doesNotMatch(styles, /\.analysis-busy-banner\s*\{[\s\S]*?position:\s*fixed/);
 assert.match(styles, /\.app-shell\s*\{[\s\S]*?padding:\s*0 22px 22px;/);
 assert.match(styles, /\.topbar\s*\{[\s\S]*?position:\s*sticky;/);
