@@ -5,7 +5,7 @@ import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from './lib/docxExporter.j
 import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
 import { buildReport } from './lib/reportEngine.js';
-import { getProviderStatus, maskKey, runDraftSample, runProviderAnalysis } from './lib/providers.js';
+import { getProviderStatus, runDraftSample, runProviderAnalysis } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
 import { loadSettingsFromStorage, settingsForStorage } from './lib/settings.js';
 
@@ -43,8 +43,16 @@ const state = {
 
 state.observations = [];
 state.report = createReport();
-render();
-if (getProviderStatus(state.settings).provider.connected) {
+bootstrapApp();
+
+function bootstrapApp() {
+  const providerStatus = getProviderStatus(state.settings);
+  state.apiPanelOpen = !providerStatus.provider.connected;
+  render();
+  if (!providerStatus.provider.connected) {
+    focusApiInputSoon();
+    return;
+  }
   refreshTrendObservations({ runProvider: true });
 }
 
@@ -89,6 +97,16 @@ function isUiWorking() {
 
 function isApiReady() {
   return getProviderStatus(state.settings).provider.connected;
+}
+
+function hasLiveObservations() {
+  return Array.isArray(state.observations) && state.observations.length > 0;
+}
+
+function focusApiInputSoon() {
+  window.requestAnimationFrame(() => {
+    document.querySelector('#api-key')?.focus();
+  });
 }
 
 function wait(ms) {
@@ -186,7 +204,10 @@ function render() {
         <input id="json-file-input" class="visually-hidden" type="file" accept="application/json,.json" />
       </section>
 
-      <div class="${isLocked ? 'is-disabled' : ''}" ${isLocked ? 'aria-disabled="true"' : ''}>
+      ${
+        !isApiReady()
+          ? renderApiStartGate()
+          : `<div class="${isLocked ? 'is-disabled' : ''}" ${isLocked ? 'aria-disabled="true"' : ''}>
       ${renderInsightDashboard(report)}
       ${state.providerSummary && !uiWorking ? renderProviderSummary(state.providerSummary, dataTimestamp) : ''}
       ${renderBeginnerGuide(report, dataTimestamp)}
@@ -246,10 +267,24 @@ function render() {
         </div>
       </section>
       </div>
+      `
+      }
     </main>
   `;
 
   bindEvents(isLocked, showApiPanel);
+  if (!isApiReady() && showApiPanel) focusApiInputSoon();
+}
+
+function renderApiStartGate() {
+  return `
+    <section class="panel api-start-gate" aria-live="polite">
+      ${renderDataLabel('開始待機')}
+      <h2>APIキーを入力すると公開Web/RSS検索を開始します。</h2>
+      <p>OpenAIまたはGeminiのAPIキーを接続するまで、検索と分析は実行しません。</p>
+      <p>キーはこのブラウザの保存領域にだけ保存し、レポートやDOCX/JSONには含めません。</p>
+    </section>
+  `;
 }
 
 function renderApiConnectPanel(draftStatus, uiWorking) {
@@ -282,7 +317,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
       <form class="api-connect-form" id="api-connect-form" autocomplete="off">
         <label for="api-key">APIキー</label>
         <div class="api-connect-row">
-          <input id="api-key" type="password" value="${escapeAttr(draftKey)}" placeholder="sk-proj... または AIza..." autocomplete="off" data-lpignore="true" ${inputDisabled} />
+          <input id="api-key" type="password" value="${escapeAttr(draftKey)}" placeholder="OpenAI または Gemini のAPIキー" autocomplete="off" data-lpignore="true" ${inputDisabled} />
           <button class="primary-action compact" id="connect-api" type="submit" ${connectDisabled}>${state.apiSaving ? '接続中' : '接続'}</button>
         </div>
         <small class="${draftStatus.provider.connected ? 'ok' : ''}">${escapeHtml(draftProviderHint)}</small>
@@ -417,7 +452,7 @@ async function connectApiKey() {
   } finally {
     state.apiSaving = false;
     showActionMessage({
-      summary: 'APIキーを保存しました。',
+      summary: 'APIキーを保存しました。公開Web/RSS検索を開始します。',
     });
     render();
   }
@@ -793,6 +828,10 @@ async function runProviderDeepening() {
     render();
     return;
   }
+  if (!hasLiveObservations()) {
+    refreshTrendObservations({ runProvider: true });
+    return;
+  }
 
   state.providerSummary = {
     summary: 'API稼働中',
@@ -818,7 +857,7 @@ async function runOneProvider(provider, apiKey) {
     report: state.report,
     proxyBase: PROVIDER_PROXY,
   });
-  return { provider, maskedKey: maskKey(apiKey), summary };
+  return { provider, summary };
 }
 
 function mergeProviderResults(results) {
@@ -1404,6 +1443,7 @@ function renderProviderSummary(summary, timestamp = '') {
     <section class="provider-summary panel">
       ${renderDataLabel('API詳細分析', timestamp)}
       <h2>${escapeHtml(summary.summary ?? '追加分析')}</h2>
+      ${summary.used_model ? `<p><strong>使用モデル:</strong> ${escapeHtml(summary.used_model)}</p>` : ''}
       ${summary.strongest_signal ? `<p><strong>最も強いシグナル:</strong> ${escapeHtml(summary.strongest_signal)}</p>` : ''}
       ${summary.practical_revision ? `<p><strong>実用的な修正案:</strong> ${escapeHtml(summary.practical_revision)}</p>` : ''}
       ${summary.risk_note ? `<p><strong>注意点:</strong> ${escapeHtml(summary.risk_note)}</p>` : ''}

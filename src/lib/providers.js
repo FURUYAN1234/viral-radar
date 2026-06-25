@@ -4,12 +4,6 @@ const OPENAI_ENDPOINT = 'https://api.openai.com/v1/responses';
 const GEMINI_MODEL_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const SECRET_PATTERNS = [/sk-proj-[A-Za-z0-9_-]+/g, /sk-[A-Za-z0-9_-]+/g, /AIza[0-9A-Za-z_-]+/g];
 
-export function maskKey(key = '') {
-  if (!key || key.length < 12) return '未設定';
-  const prefix = key.startsWith('sk-proj-') ? 'sk-proj' : key.slice(0, 6);
-  return `${prefix}...${key.slice(-4)}`;
-}
-
 export function detectProvider(apiKey = '') {
   const normalized = apiKey.trim();
   if (!normalized) return 'fixture';
@@ -23,7 +17,8 @@ export function getProviderStatus({ apiKey = '', openaiKey = '', geminiKey = '' 
   const mode = detectProvider(normalized);
   const providerName = mode === 'openai' ? 'OpenAI' : mode === 'gemini' ? 'Gemini' : '';
   const connected = mode === 'openai' || mode === 'gemini';
-  const label = connected ? `${providerName} ${maskKey(normalized)}` : mode === 'unknown' ? 'APIキー形式未判定' : 'API未設定';
+  const model = connected ? primaryModel(mode) : '';
+  const label = connected ? `${providerName} ${model}` : mode === 'unknown' ? 'APIキー形式未判定' : 'API未設定';
 
   return {
     mode,
@@ -31,14 +26,17 @@ export function getProviderStatus({ apiKey = '', openaiKey = '', geminiKey = '' 
     provider: {
       connected,
       name: providerName,
+      model,
       label,
     },
     openai: {
       connected: mode === 'openai',
+      model: mode === 'openai' ? model : '',
       label: mode === 'openai' ? label : 'OpenAI 未設定',
     },
     gemini: {
       connected: mode === 'gemini',
+      model: mode === 'gemini' ? model : '',
       label: mode === 'gemini' ? label : 'Gemini 未設定',
     },
   };
@@ -293,9 +291,12 @@ function parseProviderPayload(provider, payload) {
     };
   }
 
-  try {
-    return normalizeProviderSummary(JSON.parse(raw));
-  } catch {
+  const parsedSummary = parseProviderJsonPayload(raw);
+  if (parsedSummary) {
+    return normalizeProviderSummary(parsedSummary);
+  }
+
+  {
     return {
       summary: stringifySummaryValue(raw),
       strongest_signal: '',
@@ -304,6 +305,63 @@ function parseProviderPayload(provider, payload) {
       next_actions: [],
     };
   }
+}
+
+function parseProviderJsonPayload(raw) {
+  for (const candidate of buildJsonTextCandidates(raw)) {
+    const parsed = tryParseJsonCandidate(candidate);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  }
+  return null;
+}
+
+function buildJsonTextCandidates(raw) {
+  const text = String(raw ?? '').trim();
+  const withoutFence = stripMarkdownFence(text).trim();
+  return [...new Set([text, withoutFence, extractBalancedJsonText(text), extractBalancedJsonText(withoutFence)].filter(Boolean))];
+}
+
+function tryParseJsonCandidate(candidate, depth = 0) {
+  try {
+    const parsed = JSON.parse(candidate);
+    if (typeof parsed === 'string' && depth < 2) return tryParseJsonCandidate(parsed, depth + 1);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function extractBalancedJsonText(value) {
+  const text = String(value ?? '');
+  const start = [...text].findIndex((char) => char === '{' || char === '[');
+  if (start < 0) return '';
+  const opener = text[start];
+  const closer = opener === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === opener) depth += 1;
+    if (char === closer) depth -= 1;
+    if (depth === 0) return text.slice(start, index + 1);
+  }
+
+  return '';
 }
 
 function parseDraftSamplePayload(provider, payload, draftPrompt = '') {

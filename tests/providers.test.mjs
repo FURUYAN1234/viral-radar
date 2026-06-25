@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  maskKey,
   getProviderStatus,
   createProviderAnalysisRequest,
   getProviderModelChain,
@@ -20,17 +19,17 @@ const OPENAI_TEST_KEY = `sk-${'proj'}-abcdefghijklmnopqrstuvwxyz`;
 const OPENAI_SECRET_KEY = `sk-${'proj'}-secret`;
 const GEMINI_TEST_KEY = `AI${'zaSy'}DUMMY1234567890`;
 
-test('maskKey hides secrets while preserving recognizable provider prefix', () => {
-  assert.equal(maskKey(OPENAI_TEST_KEY), `sk-${'proj'}...wxyz`);
-  assert.equal(maskKey(GEMINI_TEST_KEY), `AI${'zaSy'}...7890`);
-  assert.equal(maskKey('short'), '未設定');
-});
-
 test('getProviderStatus detects provider from a single API key field', () => {
-  assert.equal(getProviderStatus({ apiKey: OPENAI_TEST_KEY }).mode, 'openai');
-  assert.equal(getProviderStatus({ apiKey: GEMINI_TEST_KEY }).mode, 'gemini');
+  const openaiStatus = getProviderStatus({ apiKey: OPENAI_TEST_KEY });
+  const geminiStatus = getProviderStatus({ apiKey: GEMINI_TEST_KEY });
+  assert.equal(openaiStatus.mode, 'openai');
+  assert.equal(geminiStatus.mode, 'gemini');
   assert.equal(getProviderStatus({ apiKey: '' }).mode, 'fixture');
   assert.equal(getProviderStatus({ apiKey: 'not-a-real-provider-key' }).mode, 'unknown');
+  assert.equal(openaiStatus.provider.label, 'OpenAI gpt-4.1');
+  assert.equal(geminiStatus.provider.label, 'Gemini gemini-3.5-flash');
+  assert.equal(openaiStatus.provider.label.includes('sk-'), false);
+  assert.equal(geminiStatus.provider.label.includes('AIza'), false);
 });
 
 test('provider request includes report schema instructions and excludes API keys', () => {
@@ -188,6 +187,48 @@ test('runProviderAnalysis removes markdown decoration from display fields', asyn
   assert.equal(result.risk_note, '固有名詞を主役にしない');
   assert.deepEqual(result.next_actions, ['冒頭: 損失を見せる']);
   assert.doesNotMatch(JSON.stringify(result), /\*\*/);
+});
+
+test('runProviderAnalysis extracts Gemini fenced JSON before display normalization', async () => {
+  const result = await runProviderAnalysis({
+    provider: 'gemini',
+    apiKey: GEMINI_TEST_KEY,
+    report: { category: { label: 'ストーリー漫画' }, evidenceCards: [] },
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: [
+                      '```json',
+                      JSON.stringify({
+                        summary: '日常の理不尽を小道具で見せる',
+                        strongest_signal: '読者が自分ごと化できる違和感',
+                        practical_revision: '冒頭に異常な通知欄を置く',
+                        risk_note: '実在企業を黒幕化しない',
+                        next_actions: [{ title: '1ページ目', detail: '損失を絵で見せる' }],
+                      }),
+                      '```',
+                    ].join('\n'),
+                  },
+                ],
+              },
+            },
+          ],
+        };
+      },
+    }),
+  });
+
+  assert.equal(result.summary, '日常の理不尽を小道具で見せる');
+  assert.equal(result.strongest_signal, '読者が自分ごと化できる違和感');
+  assert.deepEqual(result.next_actions, ['1ページ目: 損失を絵で見せる']);
+  assert.doesNotMatch(result.summary, /\{\s*"summary"/);
+  assert.doesNotMatch([result.summary, result.strongest_signal, result.practical_revision, result.risk_note].join('\n'), /```|\{\s*"summary"/);
 });
 
 test('runDraftSample sends a paste-ready prompt without exposing the key in the body', async () => {

@@ -1,6 +1,6 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
-![Version](https://img.shields.io/badge/version-1.1.5-0f766e)
+![Version](https://img.shields.io/badge/version-1.1.6-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -795,6 +795,13 @@ npm run deploy
 ---
 
 ## Changelog / 更新履歴
+
+### v1.1.6 (2026-06-25)
+
+- API未設定時は初回にAPI入力パネルを開いて待機し、公開Web/RSS検索やAPI分析を開始しないよう修正。
+- API詳細分析ボタン押下時に根拠データが空なら、先に公開Web/RSS取得を再試行してから分析するよう修正。
+- Gemini/OpenAIのJSON応答がコードフェンスや余計な本文付きで返っても、JSON本文をそのまま表示せず各項目へ展開するよう強化。
+- 画面上のAPI接続表示からキー断片を完全に外し、API名と使用モデル名だけを表示するよう修正。
 
 ### v1.1.5 (2026-06-25)
 
