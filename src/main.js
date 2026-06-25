@@ -13,7 +13,7 @@ const STORAGE_KEY = 'viral-radar-settings-v1';
 const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
-const APP_VERSION = '1.1.9';
+const APP_VERSION = '1.2.0';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -27,6 +27,7 @@ const state = {
   searchSeed: 0,
   variantSeed: 0,
   observations: null,
+  analysisSessionId: 0,
   providerRunSignature: null,
   providerSummary: null,
   actionMessage: null,
@@ -123,6 +124,34 @@ function createReport() {
     providerMode: getReportProviderMode(getProviderStatus(state.settings).mode),
     variantSeed: state.variantSeed,
   });
+}
+
+function resetAnalysisSessionForApiChange() {
+  state.analysisSessionId += 1;
+  state.searchSeed += 1;
+  state.variantSeed = state.searchSeed;
+  state.providerRunSignature = null;
+  state.providerSummary = null;
+  state.planSamples = {};
+  state.observations = [];
+  state.report = createReport();
+}
+
+function currentProviderRunSignature(providerStatus) {
+  const report = state.report;
+  const cluster = report.trendClusters[0];
+  return [
+    state.analysisSessionId,
+    providerStatus.mode,
+    providerStatus.provider.model,
+    report.category.id,
+    report.timeWindow,
+    report.audience,
+    state.searchSeed,
+    state.variantSeed,
+    cluster.label,
+    latestObservationTimestamp(report),
+  ].join('|');
 }
 
 function render() {
@@ -454,8 +483,7 @@ async function connectApiKey() {
     state.apiKeyDraft = '';
     state.apiPanelOpen = false;
     state.apiGateMessage = '';
-    state.providerRunSignature = null;
-    state.report = createReport();
+    resetAnalysisSessionForApiChange();
   } finally {
     state.apiSaving = false;
     showActionMessage({
@@ -840,6 +868,8 @@ async function runProviderDeepening() {
     return;
   }
 
+  const runSignature = currentProviderRunSignature(providerStatus);
+  state.providerRunSignature = runSignature;
   state.providerSummary = {
     summary: 'API稼働中',
     risk_note: `${providerStatus.provider.name}で分析を生成しています。`,
@@ -850,8 +880,10 @@ async function runProviderDeepening() {
 
   try {
     const results = await Promise.allSettled([runOneProvider(providerStatus.mode, providerStatus.apiKey)]);
+    if (state.providerRunSignature !== runSignature) return;
     state.providerSummary = ensureReadableProviderSummary(mergeProviderResults(results), state.report, providerStatus);
   } finally {
+    if (state.providerRunSignature !== runSignature) return;
     state.providerBusy = false;
     render();
   }
