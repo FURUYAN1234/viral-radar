@@ -7,16 +7,18 @@ import { exportTimestamp } from './lib/fileNames.js';
 import { buildReport } from './lib/reportEngine.js';
 import { getProviderStatus, runDraftSample, runProviderAnalysis } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
-import { loadSettingsFromStorage, settingsForStorage } from './lib/settings.js';
+import { loadSettingsFromStorage } from './lib/settings.js';
 
 const STORAGE_KEY = 'viral-radar-settings-v1';
 const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
-const APP_VERSION = '1.2.0';
+const API_INPUT_AUTOFILL_CLEAR_MS = 250;
+const APP_VERSION = '1.2.1';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
+let apiInputUserTouched = false;
 const initialSettings = loadSettings();
 const initialProviderStatus = getProviderStatus(initialSettings);
 
@@ -59,12 +61,16 @@ function bootstrapApp() {
 }
 
 function loadSettings() {
-  return loadSettingsFromStorage(localStorage.getItem(STORAGE_KEY));
+  forgetPersistedSettings();
+  return loadSettingsFromStorage(null);
 }
 
-function persistSettings() {
-  state.settings.rememberKeys = true;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsForStorage(state.settings)));
+function forgetPersistedSettings() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore private browsing or storage access failures; the runtime key still stays in memory only.
+  }
 }
 
 function clearActionMessage() {
@@ -107,8 +113,17 @@ function hasLiveObservations() {
 
 function focusApiInputSoon() {
   window.requestAnimationFrame(() => {
-    document.querySelector('#api-key')?.focus();
+    const input = document.querySelector('#api-key');
+    if (!input) return;
+    input.focus();
+    clearRestoredApiInput(input);
   });
+  window.setTimeout(() => clearRestoredApiInput(), API_INPUT_AUTOFILL_CLEAR_MS);
+}
+
+function clearRestoredApiInput(input = document.querySelector('#api-key')) {
+  if (!input || apiInputUserTouched || state.apiKeyDraft) return;
+  input.value = '';
 }
 
 function wait(ms) {
@@ -353,7 +368,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
       <form class="api-connect-form" id="api-connect-form" autocomplete="off">
         <label for="api-key">APIキー</label>
         <div class="api-connect-row">
-          <input id="api-key" type="password" value="${escapeAttr(draftKey)}" placeholder="OpenAI または Gemini のAPIキー" autocomplete="off" data-lpignore="true" ${inputDisabled} />
+          <input id="api-key" name="viral-radar-runtime-api-key" type="password" value="${escapeAttr(draftKey)}" placeholder="OpenAI または Gemini のAPIキー" autocomplete="new-password" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" ${inputDisabled} />
           <button class="primary-action compact" id="connect-api" type="submit" ${connectDisabled}>${state.apiSaving ? '接続中' : '接続'}</button>
         </div>
         <small class="${draftStatus.provider.connected ? 'ok' : ''}">${escapeHtml(draftProviderHint)}</small>
@@ -429,6 +444,7 @@ function bindApiControls(showApiPanel = false) {
   if (closeButton) closeButton.addEventListener('click', closeApiSettings);
   if (!apiInput || !connectButton) return;
   apiInput.addEventListener('input', (event) => {
+    apiInputUserTouched = true;
     state.apiKeyDraft = event.target.value;
     state.apiGateMessage = '';
     render();
@@ -450,8 +466,10 @@ function openApiSettings() {
   state.apiPanelOpen = true;
   state.apiKeyDraft = '';
   state.apiGateMessage = '';
+  apiInputUserTouched = false;
   clearActionMessage();
   render();
+  focusApiInputSoon();
 }
 
 function closeApiSettings() {
@@ -459,6 +477,7 @@ function closeApiSettings() {
   state.apiPanelOpen = false;
   state.apiKeyDraft = '';
   state.apiGateMessage = '';
+  apiInputUserTouched = false;
   render();
 }
 
@@ -479,15 +498,16 @@ async function connectApiKey() {
   try {
     await wait(API_SAVE_BUSY_MS);
     state.settings.apiKey = cleanKey;
-    persistSettings();
+    forgetPersistedSettings();
     state.apiKeyDraft = '';
+    apiInputUserTouched = false;
     state.apiPanelOpen = false;
     state.apiGateMessage = '';
     resetAnalysisSessionForApiChange();
   } finally {
     state.apiSaving = false;
     showActionMessage({
-      summary: 'APIキーを保存しました。公開Web/RSS検索を開始します。',
+      summary: 'APIキーを接続しました。公開Web/RSS検索を開始します。',
     });
     render();
   }
@@ -983,9 +1003,9 @@ function categoryFallbackAngle(categoryId) {
 }
 
 function renderAnalysisBusyBanner(report, providerStatus) {
-  const label = state.searchBusy ? '公開Web検索中' : state.apiSaving ? 'API保存中' : state.draftBusy ? 'API稼働中' : 'API分析中';
+  const label = state.searchBusy ? '公開Web検索中' : state.apiSaving ? 'API接続中' : state.draftBusy ? 'API稼働中' : 'API分析中';
   const detail = state.apiSaving
-    ? 'APIキーを保存しています'
+    ? 'APIキーを確認しています'
     : state.searchBusy
       ? `${report.category.label}の公開RSSを取得しています`
       : state.draftBusy

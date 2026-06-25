@@ -101,14 +101,11 @@ function registerProviderProxyRoute(middlewares) {
 
       const upstream =
         provider === 'gemini'
-          ? await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-              },
-            )
+          ? await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+              body: JSON.stringify(body),
+            })
           : await fetch('https://api.openai.com/v1/responses', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },

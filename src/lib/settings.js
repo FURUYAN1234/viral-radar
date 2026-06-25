@@ -1,17 +1,17 @@
 export function loadSettingsFromStorage(serializedSettings) {
-  const stored = parseStoredSettings(serializedSettings);
+  // Parse legacy payloads only to tolerate malformed values; secret fields are intentionally discarded.
+  parseStoredSettings(serializedSettings);
   return {
-    apiKey: stored.apiKey ?? stored.openaiKey ?? stored.geminiKey ?? '',
-    rememberKeys: true,
+    apiKey: '',
+    rememberKeys: false,
     openaiKey: '',
     geminiKey: '',
   };
 }
 
-export function settingsForStorage(settings) {
+export function settingsForStorage() {
   return {
-    apiKey: settings.apiKey ?? '',
-    rememberKeys: true,
+    rememberKeys: false,
   };
 }
 

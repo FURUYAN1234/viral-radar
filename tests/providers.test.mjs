@@ -91,6 +91,32 @@ test('runProviderAnalysis uses Authorization header without exposing key in body
   assert.equal(result.used_model, 'gpt-4.1');
 });
 
+test('runProviderAnalysis sends Gemini keys in a header without URL query exposure', async () => {
+  let captured;
+  const result = await runProviderAnalysis({
+    provider: 'gemini',
+    apiKey: GEMINI_TEST_KEY,
+    report: { category: { label: 'ストーリー漫画' }, evidenceCards: [] },
+    fetchImpl: async (url, init) => {
+      captured = { url, init };
+      return {
+        ok: true,
+        async json() {
+          return {
+            candidates: [{ content: { parts: [{ text: '{"summary":"gemini ok"}' }] } }],
+          };
+        },
+      };
+    },
+  });
+
+  assert.equal(result.summary, 'gemini ok');
+  assert.doesNotMatch(captured.url, /\?key=/);
+  assert.equal(captured.init.headers['x-goog-api-key'], GEMINI_TEST_KEY);
+  assert.equal(captured.init.body.includes(GEMINI_TEST_KEY), false);
+  assert.equal(result.used_model, 'gemini-3.5-flash');
+});
+
 test('runProviderAnalysis falls back to the next Nano Banana Pro model on provider failure', async () => {
   const attemptedModels = [];
   const result = await runProviderAnalysis({

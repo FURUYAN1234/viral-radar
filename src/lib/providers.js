@@ -222,14 +222,11 @@ async function callProviderModel({ provider, apiKey, model, body, fetchImpl, pro
         body: JSON.stringify({ provider, model, apiKey, body: JSON.parse(body) }),
       })
     : provider === 'gemini'
-      ? await fetchImpl(
-          `${GEMINI_MODEL_ENDPOINT_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body,
-          },
-        )
+      ? await fetchImpl(`${GEMINI_MODEL_ENDPOINT_BASE}/${encodeURIComponent(model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body,
+        })
       : await fetchImpl(OPENAI_ENDPOINT, {
           method: 'POST',
           headers: {
