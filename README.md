@@ -2,7 +2,7 @@
 
 <img width="1672" height="941" alt="ChatGPT Image 2026年6月25日 22_19_30" src="https://github.com/user-attachments/assets/d850ac7f-aa1c-40cc-a378-b8c6673c726c" />
 
-[!['AI_Creative_Studio'](https://github.com/user-attachments/assets/d850ac7f-aa1c-40cc-a378-b8c6673c726c)](https://youtu.be/Ik59dL_zG1s?si=VduXBkmCTGfz51aJ)
+[!['ChatGPT Image 2026年6月25日 22_19_30'](https://github.com/user-attachments/assets/d850ac7f-aa1c-40cc-a378-b8c6673c726c)](https://youtu.be/Ik59dL_zG1s?si=VduXBkmCTGfz51aJ)
 
 ![Version](https://img.shields.io/badge/version-1.2.0-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
