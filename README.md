@@ -1,5 +1,8 @@
 # 物語バズメーカー / Monogatari Buzz Maker
 
+<img width="1672" height="941" alt="ChatGPT Image 2026年6月25日 22_19_30" src="https://github.com/user-attachments/assets/d850ac7f-aa1c-40cc-a378-b8c6673c726c" />
+
+
 ![Version](https://img.shields.io/badge/version-1.2.0-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
