@@ -54,6 +54,8 @@ GitHub Pages:
 https://FURUYAN1234.github.io/viral-radar/
 ```
 
+GitHub Pages版は静的プレビューです。公開Web/RSS取得、OpenAI CORS回避、DOCX/JSONのネイティブ保存ダイアログはローカルViteサーバーの中継機能を使います。
+
 ローカル開発:
 
 ```text

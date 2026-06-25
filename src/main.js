@@ -9,7 +9,7 @@ import { getProviderStatus, maskKey, runDraftSample, runProviderAnalysis } from 
 import { loadSettingsFromStorage, settingsForStorage } from './lib/settings.js';
 
 const STORAGE_KEY = 'viral-radar-settings-v1';
-const PROVIDER_PROXY = '/api/provider-generate';
+const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const app = document.querySelector('#app');
@@ -444,6 +444,11 @@ function rebuildReport({ advanceSearch = false } = {}) {
 }
 
 async function fetchTrendObservations() {
+  if (isStaticPagesRuntime()) {
+    throw new Error(
+      'GitHub Pages版は静的プレビューです。公開Web/RSS取得とAPI中継を使う場合は、ローカル起動版を http://127.0.0.1:5180/ で開いてください。',
+    );
+  }
   const params = new URLSearchParams({
     categoryId: state.selectedCategoryId,
     timeWindow: state.timeWindow,
@@ -459,6 +464,10 @@ async function fetchTrendObservations() {
     throw new Error('公開Web検索から有効な結果を取得できませんでした。');
   }
   return payload.observations;
+}
+
+function isStaticPagesRuntime() {
+  return globalThis.location?.hostname?.endsWith('github.io') ?? false;
 }
 
 async function refreshTrendObservations({ runProvider = false, announce = false } = {}) {

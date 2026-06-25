@@ -22,6 +22,8 @@ assert.match(main, /id="connect-api"/);
 assert.match(main, /接続/);
 assert.match(main, /id="api-settings"/);
 assert.match(main, /API設定/);
+assert.match(main, /function isStaticPagesRuntime/);
+assert.match(main, /GitHub Pages版は静的プレビュー/);
 assert.match(main, /function openApiSettings/);
 assert.match(main, /state\.apiPanelOpen = true/);
 assert.match(main, /現在の接続/);
