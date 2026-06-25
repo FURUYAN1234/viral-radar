@@ -782,15 +782,15 @@ npm run deploy
 
 ### Ecosystem Components / 構成システム
 
-| App | Role |
-|---|---|
-| Nano Banana Pro | 4コマ漫画・画像生成プロンプト生成 |
-| AI Voice Comic Maker | 漫画素材からショート動画・音声動画を生成 |
-| 360° AI Panorama Generator | 背景・パノラマ素材生成 |
-| Character Sheet Maker | キャラクター設定と画像プロンプト支援 |
-| AI Comic Translation Tool | 漫画翻訳・翻訳画像処理支援 |
-| AI Story Maker | 物語本文・脚本・短編・中編生成 |
-| Monogatari Buzz Maker | 公開Web/RSSトレンドを創作企画へ変換 |
+| App | Role | Links |
+|---|---|---|
+| Nano Banana Pro | 4コマ漫画・画像生成プロンプト生成 | [Explanation / 解説](https://note.com/happy_duck780/n/ndf063558c1f5) / [Demo / デモ](https://furuyan1234.github.io/nano-banana-pro/) / [Code / コード](https://github.com/FURUYAN1234/nano-banana-pro) |
+| AI Story Maker | 物語本文・脚本・短編・中編生成 | [Explanation / 解説](https://note.com/happy_duck780/n/nd3d972922868) / [Demo / デモ](https://furuyan1234.github.io/story-maker/) / [Code / コード](https://github.com/FURUYAN1234/story-maker) |
+| AI Character Sheet Maker | キャラクター設定と画像プロンプト支援 | [Explanation / 解説](https://note.com/happy_duck780/n/neccbebd7d957) / [Demo / デモ](https://furuyan1234.github.io/character-sheet-maker/) / [Code / コード](https://github.com/FURUYAN1234/character-sheet-maker) |
+| AI Comic Translation Tool | 漫画翻訳・翻訳画像処理支援 | [Explanation / 解説](https://note.com/happy_duck780/n/nbdf826604ce7) / [Demo / デモ](https://furuyan1234.github.io/comic-translation/) / [Code / コード](https://github.com/FURUYAN1234/comic-translation) |
+| 360° AI Panorama Generator | 背景・パノラマ素材生成 | [Explanation / 解説](https://note.com/happy_duck780/n/nb53b121fef88) / [Demo / デモ](https://furuyan1234.github.io/panoforge/) / [Code / コード](https://github.com/FURUYAN1234/panoforge) |
+| AI Voice Comic Maker | 漫画素材からショート動画・音声動画を生成 | [Explanation / 解説](https://note.com/happy_duck780/n/ndc6533c1512f) / [Code / コード](https://github.com/FURUYAN1234/ai-voice-comic-maker) |
+| Monogatari Buzz Maker / 物語バズメーカー | 公開Web/RSSトレンドを創作企画へ変換 | [Explanation / 解説](https://note.com/happy_duck780/n/ncc593101d77f) / [Demo / デモ](https://furuyan1234.github.io/viral-radar/) / [Code / コード](https://github.com/FURUYAN1234/viral-radar) |
 
 ---
 
