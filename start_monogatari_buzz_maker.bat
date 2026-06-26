@@ -47,7 +47,7 @@ exit /b
 
 :UPSTREAM_CHECK_ERROR
 echo [ERROR] Upstream sync check failed.
-echo [INFO] Run npm run sync:story-maker or npm run sync:nano-fallback, then try again.
+echo [INFO] Run npm run sync:nano-fallback, then try again.
 pause
 exit /b
 

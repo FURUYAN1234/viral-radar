@@ -4,7 +4,7 @@ import { copyTextToClipboard } from './lib/clipboard.js';
 import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from './lib/docxExporter.js';
 import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
-import { buildReport } from './lib/reportEngine.js';
+import { buildPlanDraftPrompt, buildReport } from './lib/reportEngine.js';
 import { getProviderStatus, runDraftSample, runPlanDesignGeneration, runProviderAnalysis } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
 import { loadSettingsFromStorage } from './lib/settings.js';
@@ -14,7 +14,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.2.4';
+const APP_VERSION = '1.2.5';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -182,6 +182,7 @@ function render() {
   const selectedCategory = report.category;
   const dataTimestamp = latestObservationTimestamp(report);
   const disabled = disabledAttr(isLocked);
+  const planState = planSectionState(report);
 
   app.innerHTML = `
     <main class="app-shell ${isLocked ? 'locked-shell' : ''} ${uiWorking ? 'busy-shell' : ''}">
@@ -192,7 +193,7 @@ function render() {
             <h1>物語バズメーカー</h1>
             <span class="version-badge" aria-label="アプリバージョン">v${APP_VERSION}</span>
           </div>
-          <p class="lead">根拠、ウケる理由、具体企画、他AIに貼る執筆プロンプトまでをカテゴリ別にまとめます。</p>
+          <p class="lead">取得根拠、制作案、本文生成用プロンプトをカテゴリ別にまとめます。</p>
         </div>
         <div class="header-api-block">
           <div class="status-strip" aria-label="API接続状態">
@@ -244,9 +245,9 @@ function render() {
       </section>
 
       <section class="action-row ${isLocked ? 'is-disabled' : ''}" aria-label="操作" ${isLocked ? 'aria-disabled="true"' : ''}>
-        <button class="secondary-action" id="run-provider" type="button" ${disabled}>API詳細分析を更新</button>
+        <button class="secondary-action" id="run-provider" type="button" ${disabled}>AI分析サマリーを更新</button>
         <button class="secondary-action" id="copy-markdown" type="button" ${disabled}>レポートをコピー</button>
-        <button class="secondary-action" id="download-docx" type="button" ${disabled}>企画書DOCX保存</button>
+        <button class="secondary-action" id="download-docx" type="button" ${disabled}>資料DOCX保存</button>
         <button class="secondary-action" id="download-json" type="button" ${disabled}>JSON保存</button>
         <button class="secondary-action" id="import-json" type="button" ${disabled}>JSON読み込み</button>
         <input id="json-file-input" class="visually-hidden" type="file" accept="application/json,.json" />
@@ -258,22 +259,21 @@ function render() {
           : `<div class="${isLocked ? 'is-disabled' : ''}" ${isLocked ? 'aria-disabled="true"' : ''}>
       ${renderInsightDashboard(report)}
       ${state.providerSummary && !uiWorking ? renderProviderSummary(state.providerSummary, dataTimestamp) : ''}
-      ${renderBeginnerGuide(report, dataTimestamp)}
 
       <section class="report-layout" aria-live="polite">
         <aside class="panel summary-panel">
-          ${renderDataLabel('現在の分析', dataTimestamp)}
+          ${renderDataLabel('取得根拠', dataTimestamp)}
           <h2>${selectedCategory.label}</h2>
           <p>${selectedCategory.description}</p>
           <div class="cluster-name">${cluster.label}</div>
-          <h3>このカテゴリで決めること</h3>
+          <h3>このカテゴリの取得根拠</h3>
           <div class="signal-list">${cluster.creatorSignals.map(renderCreatorSignal).join('')}</div>
           <h3>取得元</h3>
           <div class="tag-row">${cluster.sourceSignals.map((signal) => `<span>${escapeHtml(signal.label)}</span>`).join('')}</div>
           ${
             distinctSearchQueries(report).length
               ? `<h3>今回の検索クエリ</h3>
-          <p class="query-note">再検索するとクエリと取得元が入れ替わり、別の取得結果から企画を作り直します。</p>
+          <p class="query-note">再検索するとクエリと取得元が入れ替わり、別の取得結果から制作案を作り直します。</p>
           <div class="tag-row query-tags">${distinctSearchQueries(report).map((query) => `<span>${escapeHtml(query)}</span>`).join('')}</div>`
               : ''
           }
@@ -283,32 +283,38 @@ function render() {
 
         <section class="analysis-column">
           <div class="panel">
-            ${renderDataLabel('カテゴリ別の制作判断', dataTimestamp)}
-            <h2>${selectedCategory.label}に落とすなら何を変えるか</h2>
-            <div class="fit-grid">
-              ${report.categoryFitCards.map(renderCategoryFitCard).join('')}
-            </div>
-          </div>
-
-          <div class="panel">
-            ${renderDataLabel('取得データの読み替え', dataTimestamp)}
-            <h2>外部話題を作品材料に変換する</h2>
+            ${renderDataLabel('AI読み取り', dataTimestamp)}
+            <h2>取得データの読み取り</h2>
             <div class="evidence-list">
               ${report.evidenceCards.map(renderEvidenceCard).join('')}
             </div>
             <p class="category-insight">${escapeHtml(report.deepAnalysis.categoryInsight)}</p>
           </div>
+
+          <div class="panel">
+            ${renderDataLabel('制作判断', dataTimestamp)}
+            <h2>媒体別の制作判断</h2>
+            <div class="fit-grid">
+              ${
+                report.categoryFitCards.length
+                  ? report.categoryFitCards.map(renderCategoryFitCard).join('')
+                  : renderAiDesignPlaceholder('未生成')
+              }
+            </div>
+          </div>
         </section>
       </section>
 
-      <section class="plan-section" aria-label="具体企画案">
+      ${renderBeginnerGuide(report, dataTimestamp)}
+
+      <section class="plan-section" aria-label="${escapeAttr(planState.label)}">
         <div class="plan-toolbar">
           <div class="section-heading">
-            ${renderDataLabel('具体例', dataTimestamp)}
-            <h2>そのまま企画に使える案</h2>
-            <p>各案の下に、他AIへ貼り付けるための本文生成プロンプトを付けています。</p>
+            ${renderDataLabel(planState.label, dataTimestamp)}
+            <h2>${escapeHtml(planState.heading)}</h2>
+            ${planState.description ? `<p>${escapeHtml(planState.description)}</p>` : ''}
           </div>
-          <button class="secondary-action plan-refresh" id="suggest-more" type="button" ${disabled}>再検索して別案を出す</button>
+          <button class="secondary-action plan-refresh" id="suggest-more" type="button" ${disabled}>再検索して別根拠を出す</button>
         </div>
         <div class="plan-grid">
           ${report.creativePlans.map(renderCreativePlan).join('')}
@@ -328,8 +334,8 @@ function renderApiStartGate() {
   return `
     <section class="panel api-start-gate" aria-live="polite">
       ${renderDataLabel('開始待機')}
-      <h2>APIキーを入力すると公開Web/RSS検索を開始します。</h2>
-      <p>OpenAIまたはGeminiのAPIキーを接続するまで、検索と分析は実行しません。</p>
+      <h2>APIキーを入力すると公開Web/RSS取得を開始します。</h2>
+      <p>OpenAIまたはGeminiのAPIキーを接続するまで、取得と分析は実行しません。</p>
       <p>キーはこのブラウザの保存領域にだけ保存し、レポートやDOCX/JSONには含めません。</p>
     </section>
   `;
@@ -728,9 +734,9 @@ async function importJson(event) {
   try {
     applyLoadedReport(fromJson(await file.text()));
     state.providerSummary = {
-      summary: 'JSON企画書を読み込みました。',
+      summary: '根拠JSONを読み込みました。',
       risk_note: 'APIキーは読み込み対象ではありません。キーらしい文字列は赤字化しています。',
-      next_actions: ['必要ならAPI詳細分析を更新して、現在のキーで再レビューできます。'],
+      next_actions: ['必要ならAI分析サマリーを更新して、現在のキーで再レビューできます。'],
     };
     clearActionMessage();
   } catch (error) {
@@ -764,7 +770,7 @@ async function saveExportFile(kind) {
   const bytes = isDocx ? new Uint8Array(toDocxArrayBuffer(state.report)) : new TextEncoder().encode(toJson(state.report));
 
   showActionMessage({
-    summary: `${isDocx ? '企画書DOCX' : 'JSON'}を保存中です。`,
+      summary: `${isDocx ? '資料DOCX' : '根拠JSON'}を保存中です。`,
   });
   render();
 
@@ -777,13 +783,13 @@ async function saveExportFile(kind) {
     showActionMessage({
       summary:
         result.mode === 'download'
-          ? `${isDocx ? '企画書DOCX' : 'JSON'}のダウンロードを開始しました。`
-          : `${isDocx ? '企画書DOCX' : 'JSON'}を指定先に保存しました。`,
+          ? `${isDocx ? '資料DOCX' : '根拠JSON'}のダウンロードを開始しました。`
+          : `${isDocx ? '資料DOCX' : '根拠JSON'}を指定先に保存しました。`,
     });
   } catch (error) {
     const cancelled = error instanceof DOMException && error.name === 'AbortError';
     showActionMessage({
-      summary: cancelled ? '保存をキャンセルしました。' : `${isDocx ? '企画書DOCX' : 'JSON'}を保存できませんでした。`,
+      summary: cancelled ? '保存をキャンセルしました。' : `${isDocx ? '資料DOCX' : '根拠JSON'}を保存できませんでした。`,
       risk_note: cancelled
         ? 'ファイルは作成していません。'
         : error instanceof Error
@@ -904,6 +910,18 @@ async function runProviderDeepening() {
       runOnePlanDesign(providerStatus.mode, providerStatus.apiKey),
     ]);
     if (state.providerRunSignature !== runSignature) return;
+    if ([summaryResult, designResult].some(resultHasProviderAuthError)) {
+      state.providerBusy = false;
+      handleProviderAuthFailure(providerStatus);
+      return;
+    }
+    const reportAnalysisStatus =
+      summaryResult.status === 'fulfilled'
+        ? applyProviderReportAnalysis(summaryResult.value.summary)
+        : {
+            applied: 0,
+            risk_note: summaryResult.reason?.message ?? 'AI読み取り生成に失敗しました。',
+          };
     const designStatus =
       designResult.status === 'fulfilled'
         ? applyProviderPlanDesigns(designResult.value.design, providerStatus)
@@ -915,13 +933,38 @@ async function runProviderDeepening() {
       mergeProviderResults([summaryResult]),
       state.report,
       providerStatus,
-      designStatus,
+      combineProviderStatuses(reportAnalysisStatus, designStatus),
     );
   } finally {
     if (state.providerRunSignature !== runSignature) return;
     state.providerBusy = false;
     render();
   }
+}
+
+function resultHasProviderAuthError(result) {
+  return result.status === 'rejected' && isProviderAuthError(result.reason);
+}
+
+function isProviderAuthError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return /HTTP\s*401|Incorrect API key|invalid_api_key|API key provided|認証|拒否/.test(message);
+}
+
+function handleProviderAuthFailure(providerStatus) {
+  state.settings.apiKey = '';
+  state.apiKeyDraft = '';
+  apiInputUserTouched = false;
+  state.apiPanelOpen = true;
+  state.apiGateMessage = `${providerStatus.provider.name}がAPIキーを認証できませんでした。API設定欄で有効なキーを入力し直してください。`;
+  resetAnalysisSessionForApiChange();
+  clearActionMessage();
+  showActionMessage({
+    summary: 'APIキーが認証されませんでした。',
+    risk_note: `${providerStatus.provider.name}からHTTP 401が返りました。途中レポートは表示せず、入力画面に戻します。`,
+    next_actions: ['API設定欄に有効なキーを入力して、接続し直してください。'],
+  });
+  render();
 }
 
 async function runOneProvider(provider, apiKey) {
@@ -944,10 +987,81 @@ async function runOnePlanDesign(provider, apiKey) {
   return { provider, design };
 }
 
+function applyProviderReportAnalysis(summary) {
+  let applied = 0;
+  const nextReport = { ...state.report };
+
+  if (summary.deepAnalysis) {
+    nextReport.deepAnalysis = {
+      ...(state.report.deepAnalysis ?? {}),
+      ...summary.deepAnalysis,
+      status: 'done',
+      source: 'provider',
+    };
+    applied += 1;
+  }
+
+  if (Array.isArray(summary.categoryFitCards) && summary.categoryFitCards.length > 0) {
+    nextReport.categoryFitCards = summary.categoryFitCards;
+    applied += summary.categoryFitCards.length;
+  }
+
+  if (summary.beginnerGuide) {
+    nextReport.beginnerGuide = summary.beginnerGuide;
+    applied += 1;
+  }
+
+  if (Array.isArray(summary.evidenceCards) && summary.evidenceCards.length > 0) {
+    const merged = mergeProviderEvidenceCards(state.report.evidenceCards, summary.evidenceCards);
+    nextReport.evidenceCards = merged.cards;
+    applied += merged.applied;
+  }
+
+  if (applied > 0) {
+    state.report = refreshPlanDraftPrompts(nextReport);
+  }
+
+  return {
+    applied,
+    risk_note:
+      applied > 0
+        ? ''
+        : '表示できる読み取り、判断、手順がありませんでした。',
+  };
+}
+
+function mergeProviderEvidenceCards(currentCards = [], generatedCards = []) {
+  let applied = 0;
+  const byClaim = new Map(
+    generatedCards
+      .filter((card) => card.claim)
+      .map((card) => [normalizeMatchKey(card.claim), card]),
+  );
+  const cards = currentCards.map((card, index) => {
+    const generated = generatedCards.find((item) => item.index === index) ?? byClaim.get(normalizeMatchKey(card.claim));
+    if (!generated) return card;
+    const nextCard = {
+      ...card,
+      whyItMatters: generated.whyItMatters || card.whyItMatters,
+      meaningForCreator: generated.meaningForCreator || card.meaningForCreator,
+      creativeUse: generated.creativeUse || card.creativeUse,
+    };
+    if (
+      nextCard.whyItMatters !== card.whyItMatters ||
+      nextCard.meaningForCreator !== card.meaningForCreator ||
+      nextCard.creativeUse !== card.creativeUse
+    ) {
+      applied += 1;
+    }
+    return nextCard;
+  });
+  return { cards, applied };
+}
+
 function applyProviderPlanDesigns(design, providerStatus) {
   const designById = new Map((design?.plans ?? []).map((plan) => [plan.id, plan]));
   let applied = 0;
-  state.report = {
+  const nextReport = {
     ...state.report,
     creativePlans: state.report.creativePlans.map((plan) => {
       const generated = designById.get(plan.id);
@@ -955,6 +1069,7 @@ function applyProviderPlanDesigns(design, providerStatus) {
       applied += 1;
       return {
         ...plan,
+        ...providerPlanVisibleFields(plan, generated),
         craftNotes: generated.craftNotes,
         storyArchitecture: generated.storyArchitecture,
         aiDesign: {
@@ -965,14 +1080,58 @@ function applyProviderPlanDesigns(design, providerStatus) {
       };
     }),
   };
+  state.report = refreshPlanDraftPrompts(nextReport);
   return {
     applied,
     used_model: design.used_model,
     risk_note:
       applied > 0
-        ? `${providerStatus.provider.name}で${applied}件のプロ向け設計メモと物語・台本設計を生成しました。`
-        : 'API応答に使える設計メモがありませんでした。',
+        ? ''
+        : '表示できる設計メモがありませんでした。',
   };
+}
+
+function combineProviderStatuses(...statuses) {
+  return {
+    risk_note: statuses
+      .map((status) => status?.risk_note)
+      .filter(Boolean)
+      .join(' / '),
+  };
+}
+
+function refreshPlanDraftPrompts(report) {
+  return {
+    ...report,
+    creativePlans: (report.creativePlans ?? []).map((plan) => ({
+      ...plan,
+      aiDraftPrompt: buildPlanDraftPrompt(plan, report.category.id, report.trendClusters?.[0]),
+    })),
+  };
+}
+
+function normalizeMatchKey(value) {
+  return String(value ?? '').replace(/\s+/g, '').slice(0, 80);
+}
+
+function providerPlanVisibleFields(plan, generated) {
+  const fields = {};
+  if (Array.isArray(generated.titleCandidates) && generated.titleCandidates.length > 0) {
+    fields.titleCandidates = generated.titleCandidates;
+  }
+  for (const field of ['audiencePromise', 'emotionalHook', 'premise', 'exampleDetail', 'opening', 'differentiation']) {
+    if (generated[field]) fields[field] = generated[field];
+  }
+  if (Array.isArray(generated.outline) && generated.outline.length > 0) {
+    fields.outline = generated.outline;
+  }
+  if (generated.creatorBrief) {
+    fields.creatorBrief = {
+      ...(plan.creatorBrief ?? {}),
+      ...generated.creatorBrief,
+    };
+  }
+  return fields;
 }
 
 function mergeProviderResults(results) {
@@ -982,7 +1141,7 @@ function mergeProviderResults(results) {
 
   if (successes.length === 0) {
     return {
-      summary: 'API詳細分析に失敗しました。',
+      summary: 'AI分析サマリーに失敗しました。',
       risk_note: failures.map((result) => result.reason?.message ?? 'APIエラー').join(' / '),
       next_actions: ['キー、クォータ、ブラウザからのAPI到達性を確認してください。'],
     };
@@ -1002,7 +1161,7 @@ function mergeProviderResults(results) {
     ),
     strongest_signal: successes.map((item) => item.summary.strongest_signal).filter(Boolean).join(' / '),
     practical_revision: successes.map((item) => item.summary.practical_revision).filter(Boolean).join(' / '),
-    risk_note: riskNotes.join(' / ') || 'APIキー全文は画面に表示していません。',
+    risk_note: riskNotes.join(' / '),
     next_actions: successes.flatMap((item) => item.summary.next_actions ?? []),
   };
 }
@@ -1030,12 +1189,12 @@ function ensureReadableProviderSummary(summary, report, providerStatus, designSt
   }
 
   return {
-    summary: 'API詳細分析は具体性不足のため表示しません。',
+    summary: 'AI分析サマリーは具体性不足のため表示しません。',
     strongest_signal: '',
     practical_revision: '',
-    risk_note: [summary.risk_note, designStatus?.risk_note, 'ローカル定型文での代替表示は行いません。'].filter(Boolean).join(' / '),
+    risk_note: [summary.risk_note, designStatus?.risk_note].filter(Boolean).join(' / '),
     next_actions: [
-      'APIキー、クォータ、またはモデル応答を確認して、もう一度API詳細分析を更新してください。',
+      'APIキー、クォータ、またはモデル応答を確認して、もう一度AI分析サマリーを更新してください。',
     ],
   };
 }
@@ -1083,10 +1242,10 @@ function renderInsightDashboard(report) {
   const opportunityScore = calculateOpportunityScore(cluster);
 
   return `
-    <section class="insight-dashboard" aria-label="制作判断チャート">
+    <section class="insight-dashboard" aria-label="取得状況">
       <div class="dashboard-lead">
-        ${renderDataLabel('制作判断チャート', dataTimestamp)}
-        <h2>${escapeHtml(report.category.label)}で先に決めること</h2>
+        ${renderDataLabel('取得状況', dataTimestamp)}
+        <h2>${escapeHtml(report.category.label)}の取得状況</h2>
         <p>${escapeHtml(decisionNarrative(report, decisionScores))}</p>
       </div>
       <div class="opportunity-meter" role="img" aria-label="総合狙い目 ${opportunityScore}点">
@@ -1100,7 +1259,7 @@ function renderInsightDashboard(report) {
         ${renderDecisionTable(report, decisionScores)}
       </div>
       <div class="chart-notes">
-        <span>この数値で決めること: 題材、主人公、小道具、冒頭、差別化</span>
+        <span>確認項目: 取得量、鮮度、重なり、飽和</span>
         <span>取得元: ${cluster.sourceSignals.map((signal) => signal.label).slice(0, 4).map(escapeHtml).join(' / ')}</span>
       </div>
     </section>
@@ -1135,25 +1294,25 @@ function buildDecisionScores(report) {
 
 function decisionNarrative(report, scores) {
   const categoryMoves = {
-    'story-manga': '数値を見る目的は、1ページ目の小道具、人物の弱点、最後の一コマの救済を決めることです。',
-    'short-video': '数値を見る目的は、冒頭0秒の画、保存理由、コメント誘導を決めることです。',
-    'trend-explainer': '数値を見る目的は、どの外部話題を根拠にし、どこから制作手順へ翻訳するかを決めることです。',
-    'long-novel': '数値を見る目的は、第1章の痛み、章末の謎、長期アークの救済対象を決めることです。',
+    'story-manga': '数値は漫画向け取得根拠の量、鮮度、重なりを確認するためのものです。',
+    'short-video': '数値は短尺動画向け取得根拠の量、鮮度、重なりを確認するためのものです。',
+    'trend-explainer': '数値は解説動画向け取得根拠の量、鮮度、重なりを確認するためのものです。',
+    'long-novel': '数値は小説向け取得根拠の量、鮮度、重なりを確認するためのものです。',
   };
   if (scores.competition >= 70) {
-    return `${categoryMoves[report.category.id]} 競合が多いので、下の企画案では表層ワードを避け、小道具と主人公の選択で差別化します。`;
+    return `${categoryMoves[report.category.id]} 類似話題が多いので、AI生成時に出典と固有名詞の扱いを確認してください。`;
   }
-  return `${categoryMoves[report.category.id]} 下の企画案は、この5項目をもとに題材から具体場面へ変換しています。`;
+  return categoryMoves[report.category.id];
 }
 
 function mediumFitNote(categoryId) {
   const notes = {
-    'story-manga': 'ページ上の発見と連載の引きに落とせる度合い',
-    'short-video': '冒頭画、字幕、保存理由へ落とせる度合い',
-    'trend-explainer': '根拠提示、章立て、安全な応用へ落とせる度合い',
-    'long-novel': '章ごとの謎、伏線、長期救済へ落とせる度合い',
+    'story-manga': '漫画カテゴリの取得語と公開根拠の一致度',
+    'short-video': '短尺動画カテゴリの取得語と公開根拠の一致度',
+    'trend-explainer': '解説カテゴリの取得語と公開根拠の一致度',
+    'long-novel': '小説カテゴリの取得語と公開根拠の一致度',
   };
-  return notes[categoryId] ?? '作品形式へ落とせる度合い';
+  return notes[categoryId] ?? 'カテゴリと公開根拠の一致度';
 }
 
 function renderRadarChart(scores) {
@@ -1203,7 +1362,7 @@ function renderDecisionTable(report, scores) {
         <tr>
           <th>見る項目</th>
           <th>点</th>
-          <th>企画で決めること</th>
+          <th>確認すること</th>
         </tr>
       </thead>
       <tbody>
@@ -1235,31 +1394,31 @@ function radarAxes(scores) {
       label: '題材の鮮度',
       shortLabel: '鮮度',
       value: clampScore(scores.freshness),
-      decision: '今扱う理由を冒頭の題材にする。',
+      decision: '取得時刻と反応量を確認する。',
     },
     {
-      label: '物語化しやすさ',
-      shortLabel: '物語化',
+      label: 'カテゴリ一致',
+      shortLabel: '一致',
       value: clampScore(scores.storyFit),
-      decision: '主人公、事件、結末へ落とせるかを見る。',
+      decision: 'カテゴリ語と取得語の重なりを確認する。',
     },
     {
-      label: '読者の痛みの具体度',
-      shortLabel: '痛み',
+      label: '取得語の具体度',
+      shortLabel: '具体度',
       value: clampScore(scores.painClarity),
-      decision: '読者が自分ごとにできる損失や不安を選ぶ。',
+      decision: '見出し、タグ、検索語の具体性を確認する。',
     },
     {
-      label: '差別化余地',
+      label: '類似話題の少なさ',
       shortLabel: '余地',
       value: competitionRoom,
-      decision: '似た企画を避ける小道具、視点、結末を決める。',
+      decision: '同種ソースに偏っていないか確認する。',
     },
     {
-      label: '媒体適性',
+      label: '媒体カテゴリ一致',
       shortLabel: '媒体',
       value: clampScore(scores.mediumFit),
-      decision: '漫画、動画、小説の形式へ無理なく変換できるかを見る。',
+      decision: '選択カテゴリと取得語の近さを確認する。',
     },
   ];
 }
@@ -1323,11 +1482,11 @@ function renderEvidenceCard(card) {
           <dd>${escapeHtml(card.observation)}</dd>
         </div>
         <div>
-          <dt>読み取り</dt>
+          <dt>AI読み取り</dt>
           <dd>${escapeHtml(card.meaningForCreator)}</dd>
         </div>
         <div>
-          <dt>企画への使い方</dt>
+          <dt>AI企画判断</dt>
           <dd>${escapeHtml(card.creativeUse)}</dd>
         </div>
       </dl>
@@ -1356,7 +1515,7 @@ function renderCategoryFitCard(card) {
       <p>${escapeHtml(card.whyThisMedium)}</p>
       <dl>
         <div>
-          <dt>制作でやること</dt>
+          <dt>制作時に確認すること</dt>
           <dd>${escapeHtml(card.creatorMove)}</dd>
         </div>
         <div>
@@ -1367,6 +1526,21 @@ function renderCategoryFitCard(card) {
       <small>${escapeHtml(card.evidenceAnchor)}</small>
     </article>
   `;
+}
+
+function planSectionState(report) {
+  const hasGeneratedPlans = (report.creativePlans ?? []).some(isGeneratedPlan);
+  return hasGeneratedPlans
+    ? {
+        label: '企画案',
+        heading: '制作案',
+        description: '',
+      }
+    : {
+        label: '取得根拠',
+        heading: '制作案の根拠',
+        description: '',
+      };
 }
 
 function renderCreativePlan(plan, index) {
@@ -1382,7 +1556,7 @@ function renderCreativePlan(plan, index) {
       <p class="promise">${escapeHtml(plan.audiencePromise)}</p>
 
       <div class="brief-panel">
-        <h4>創作ブリーフ</h4>
+        <h4>${escapeHtml(planBriefHeading(plan))}</h4>
         <dl>
           <div><dt>主人公</dt><dd>${escapeHtml(brief.protagonist)}</dd></div>
           <div><dt>舞台</dt><dd>${escapeHtml(brief.setting)}</dd></div>
@@ -1399,13 +1573,13 @@ function renderCreativePlan(plan, index) {
 
       ${renderRetentionDesign(plan.retentionDesign)}
 
-      <h4>この案で描く場面</h4>
+      <h4>初回具体例</h4>
       <p>${escapeHtml(plan.exampleDetail)}</p>
 
-      <h4>ウケそうな理由</h4>
+      <h4>取得根拠</h4>
       <ul>${plan.reasonToWin.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
 
-      <h4>流れ</h4>
+      <h4>本文・台本の流れ</h4>
       <ol>${plan.outline.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>
 
       <h4>冒頭例</h4>
@@ -1413,7 +1587,7 @@ function renderCreativePlan(plan, index) {
 
       <div class="prompt-box">
         <div class="prompt-head">
-          <h4>他AIに貼る本文生成プロンプト</h4>
+          <h4>本文生成用プロンプト</h4>
           <button class="secondary-action compact" type="button" data-copy-plan-id="${escapeAttr(plan.id)}" ${disabled}>このプロンプトをコピー</button>
         </div>
         <textarea readonly>${escapeTextarea(plan.aiDraftPrompt)}</textarea>
@@ -1424,6 +1598,14 @@ function renderCreativePlan(plan, index) {
   `;
 }
 
+function planBriefHeading(plan) {
+  return '案の要点';
+}
+
+function isGeneratedPlan(plan) {
+  return plan?.aiDesign?.status === 'done';
+}
+
 function renderCraftNotes(plan) {
   const notes = plan.craftNotes ?? [];
   return `
@@ -1432,7 +1614,7 @@ function renderCraftNotes(plan) {
       ${
         notes.length
           ? `<dl>${notes.map((note) => `<div><dt>${escapeHtml(note.label)}</dt><dd>${escapeHtml(note.detail)}</dd></div>`).join('')}</dl>`
-          : renderAiDesignPlaceholder('API応答がまだないため未生成です。ローカル定型文では埋めません。')
+          : renderAiDesignPlaceholder('未生成')
       }
     </div>
   `;
@@ -1443,7 +1625,7 @@ function renderStoryArchitecture(architecture) {
     return `
       <div class="architecture-panel">
         <h4>物語・台本設計</h4>
-        ${renderAiDesignPlaceholder('API応答がまだないため未生成です。固定テンプレや単語差し替え文は表示しません。')}
+        ${renderAiDesignPlaceholder('未生成')}
       </div>
     `;
   }
@@ -1461,26 +1643,32 @@ function renderStoryArchitecture(architecture) {
 }
 
 function renderAiDesignPlaceholder(message) {
-  const busyText = state.providerBusy ? 'AIで生成中です。固定テンプレは表示しません。' : message;
+  const busyText = state.providerBusy ? '生成中' : message;
   return `<p class="ai-design-placeholder">${escapeHtml(busyText)}</p>`;
 }
 
 function renderBeginnerGuide(report, timestamp = '') {
   const guide = report.beginnerGuide;
-  if (!guide) return '';
+  if (!guide) {
+    return `
+      <section class="beginner-guide panel">
+        ${renderDataLabel('制作メモ', timestamp)}
+        ${renderAiDesignPlaceholder('未生成')}
+      </section>
+    `;
+  }
 
   return `
     <section class="beginner-guide panel">
-      ${renderDataLabel('制作ロードマップ', timestamp)}
+      ${renderDataLabel('制作メモ', timestamp)}
       <div class="beginner-guide-head">
-        <div>
-          <h2>${escapeHtml(guide.headline)}</h2>
-          <p>${escapeHtml(guide.promise)}</p>
-        </div>
-        <div class="beginner-output">
-          <strong>最初に作るもの</strong>
-          <span>${escapeHtml(guide.firstOutput)}</span>
-        </div>
+        <h2>制作メモ</h2>
+        <p class="beginner-guide-title">${escapeHtml(guide.headline)}</p>
+        <p>${escapeHtml(guide.promise)}</p>
+      </div>
+      <div class="beginner-output">
+        <strong>初稿の出発点</strong>
+        <span>${escapeHtml(guide.firstOutput)}</span>
       </div>
       <div class="beginner-step-grid">
         ${guide.steps
@@ -1515,7 +1703,7 @@ function renderRetentionDesign(retentionDesign) {
 
   return `
     <div class="retention-panel">
-      <h4>読者維持設計</h4>
+      <h4>長編維持項目（AI生成後）</h4>
       <dl>
         <div><dt>尺</dt><dd>${escapeHtml(retentionDesign.lengthGoal)}</dd></div>
         <div><dt>冒頭</dt><dd>${escapeHtml(retentionDesign.openingHook)}</dd></div>
@@ -1530,7 +1718,7 @@ function renderRetentionDesign(retentionDesign) {
 function renderPlanSample(plan) {
   const sample = state.planSamples[plan.id];
   const isLocked = !isApiReady() || isUiWorking();
-  const text = sample?.text ?? 'この企画プロンプトを、このアプリに入れたAPIでも実際に参考文章へ変換できます。';
+  const text = sample?.text ?? '未生成';
   const className = sample ? `sample-output ${sample.status}` : 'sample-output empty';
   return `
     <div class="sample-box">
@@ -1565,8 +1753,9 @@ function renderActionMessage(message) {
 function renderProviderSummary(summary, timestamp = '') {
   return `
     <section class="provider-summary panel">
-      ${renderDataLabel('API詳細分析', timestamp)}
-      <h2>${escapeHtml(summary.summary ?? '追加分析')}</h2>
+      ${renderDataLabel('AI分析', timestamp)}
+      <h2>AI分析サマリー</h2>
+      ${summary.summary ? `<p class="summary-copy">${escapeHtml(summary.summary)}</p>` : ''}
       ${summary.used_model ? `<p><strong>使用モデル:</strong> ${escapeHtml(summary.used_model)}</p>` : ''}
       ${summary.strongest_signal ? `<p><strong>最も強いシグナル:</strong> ${escapeHtml(summary.strongest_signal)}</p>` : ''}
       ${summary.practical_revision ? `<p><strong>実用的な修正案:</strong> ${escapeHtml(summary.practical_revision)}</p>` : ''}
@@ -1599,30 +1788,12 @@ function option(value, label, selected) {
   return `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`;
 }
 
-function scoreItem(label, value) {
-  return `<div><dt>${label}</dt><dd>${value}</dd></div>`;
-}
-
 function calculateOpportunityScore(cluster) {
   return clampScore(
     Math.round(
       (cluster.momentumScore + cluster.noveltyScore + cluster.confidenceScore + (100 - cluster.saturationScore)) / 4,
     ),
   );
-}
-
-function calculateEvidenceStrength(cluster) {
-  return clampScore(Math.round(cluster.evidenceCount * 14 + cluster.sourceCount * 10));
-}
-
-function opportunityNarrative(opportunityScore, saturationRisk) {
-  if (opportunityScore >= 78 && saturationRisk <= 58) {
-    return '勢いと確度があり、まだ似た企画で埋まりきっていないため、早めに企画化する価値があります。';
-  }
-  if (saturationRisk >= 70) {
-    return '反応はありますが似た見せ方が増えやすい状態です。下の企画案では切り口と設定の差別化を優先してください。';
-  }
-  return '大きな流行語を追うより、根拠を小さな具体場面へ落とすと企画化しやすい状態です。';
 }
 
 function clampScore(value) {

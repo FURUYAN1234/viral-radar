@@ -19,15 +19,16 @@ test('docx export creates an editor meeting brief with tables instead of a JSON-
 
   assert.equal(bytes.subarray(0, 2).toString('utf8'), 'PK');
   assert.match(raw, /word\/document\.xml/);
-  assert.match(raw, /編集者打ち合わせ用企画書/);
-  assert.match(raw, /制作ロードマップ/);
-  assert.match(raw, /最初に作るもの/);
-  assert.match(raw, /編集判断チャート/);
-  assert.match(raw, /企画比較表/);
-  assert.match(raw, /推奨企画/);
-  assert.match(raw, /AI未生成/);
-  assert.match(raw, /ローカル定型文では埋めません/);
+  assert.match(raw, /制作案確認資料/);
+  assert.match(raw, /取得根拠の要点/);
+  assert.match(raw, /制作メモ/);
+  assert.match(raw, /取得状況/);
+  assert.match(raw, /制作案/);
+  assert.match(raw, /媒体別の制作判断/);
+  assert.match(raw, /未生成/);
+  assert.doesNotMatch(raw, /AI生成手順|取得指標チャート|AI生成待ち項目|取得根拠パック|AI制作判断|AI未生成|ローカル定型文では埋めません|AI生成後の最初の作業/);
   assert.match(raw, /打ち合わせで決めたいこと/);
+  assert.doesNotMatch(raw, /編集者打ち合わせ用企画書|最初に作るもの|編集判断チャート|企画比較表|推奨企画/);
   assert.ok((raw.match(/<w:tbl>/g) ?? []).length >= 3);
   assert.ok((raw.match(/<w:tblGrid>/g) ?? []).length >= 3);
   assert.doesNotMatch(raw, /<w:shd w:fill=/);

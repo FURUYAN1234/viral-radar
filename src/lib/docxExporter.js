@@ -37,75 +37,74 @@ function documentXml(report) {
   const primaryPlan = report.creativePlans?.[0];
   const plans = report.creativePlans ?? [];
   const decisionItems = [
-    'この企画を読み切りで試すか、連載第1話として設計するか。',
-    '主人公の年齢、職業、生活圏をどこまで具体化するか。',
-    '第1話の最後に残す謎と、次回で回収する情報。',
-    '実在サービス名を資料上の根拠に留め、本編ではどの架空表現へ置き換えるか。',
-    '次回打ち合わせまでに用意するもの：ネーム、編集用プロット、本文サンプルの優先順位。',
+    'AIに渡す取得根拠が足りているか。',
+    '本文・台本・企画判断をどう仕上げるか。',
+    '実在サービス名や人物名を根拠欄だけに留められているか。',
+    '制作時にプロ向け設計メモと物語・台本設計を人間が確認するか。',
   ];
   const lines = [
-    paragraph(`${categoryLabel} 編集者打ち合わせ用企画書`, 'Title'),
+    paragraph(`${categoryLabel} 制作案確認資料`, 'Title'),
     paragraph(
-      '採否判断、修正方針、次に作る原稿サンプルを決めるための会議資料です。Webアプリ画面の丸写しではなく、編集判断に必要な材料だけに絞っています。',
+      '公開Web/RSSの取得結果、制作案、確認項目をまとめた資料です。',
       'Subtitle',
     ),
     table([
       ['項目', '内容'],
       [
         '資料の目的',
-        '企画の勝ち筋、読者仮説、初回の見せ場、リスクを編集者と確認する。',
+        '取得根拠、制作案、リスクを確認する。',
       ],
       ['対象カテゴリ', categoryLabel],
       ['分析期間', report.timeWindow ?? '未設定'],
       ['作成日時', report.generatedAt ?? '未設定'],
     ]),
-    heading1('1. 提案の要点'),
+    heading1('1. 取得根拠の要点'),
     table([
-      ['判断項目', '提案内容'],
-      ['推奨企画', primaryPlan?.titleCandidates?.[0] ?? '未設定'],
+      ['項目', '内容'],
+      ['根拠', primaryPlan?.titleCandidates?.[0] ?? '未設定'],
       [
-        '読者への約束',
+        '制作案',
         primaryPlan?.audiencePromise ?? report.deepAnalysis?.categoryInsight ?? '未設定',
       ],
-      ['初回の見せ場', primaryPlan?.opening ?? '未設定'],
+      ['本文・台本', primaryPlan?.opening ?? '未設定'],
       ['中心シグナル', cluster.label ?? '未設定'],
       [
-        '編集上の狙い',
-        primaryPlan?.craftNotes?.[0]?.detail ?? 'AI設計メモは未生成です。ローカル定型文では埋めません。',
+        'プロ向け設計メモ',
+        primaryPlan?.craftNotes?.[0]?.detail ?? '未生成',
       ],
     ]),
     paragraph(
-      '根拠データは企画判断の補助として扱います。実際の作品内では、固有名詞や実在の事件をそのまま使わず、架空の制度、UI、場所、人物へ置き換える前提です。',
+      '根拠データはAI生成に渡す材料です。固有名詞や実在の事件は取得根拠としてのみ扱い、本文・台本で必要な置き換えはAI生成時に行います。',
     ),
-    heading1('2. 制作ロードマップ'),
-    ...(report.beginnerGuide ? beginnerGuideParagraphs(report.beginnerGuide) : [paragraph('制作ロードマップは未生成です。')]),
-    heading1('3. 編集判断チャート'),
+    heading1('2. 制作メモ'),
+    ...(report.beginnerGuide ? beginnerGuideParagraphs(report.beginnerGuide) : [paragraph('未生成')]),
+    heading1('3. 取得状況'),
     table([
-      ['指標', '見立て', '編集判断への使い方'],
+      ['指標', '値', '確認すること'],
       [
         '勢い',
         scoreBar(cluster.momentumScore),
-        'いま反応が起きている強さ。初回フックを強くする根拠にする。',
+        '公開取得結果の反応量として確認する。',
       ],
       [
         '飽和リスク',
         scoreBar(cluster.saturationScore),
-        '高いほど似た企画が増えやすい。先に差別化を設計する。',
+        '似た話題が多い場合は、制作時に差別化を確認する。',
       ],
       [
         '確度',
         scoreBar(cluster.confidenceScore),
-        '根拠から企画へ落とす信頼度。弱い場合は追加調査する。',
+        '根拠が弱い場合は追加取得する。',
       ],
       [
         '根拠量',
         `${cluster.evidenceCount ?? 0}件 / ${cluster.sourceCount ?? 0}系統`,
-        '複数ソースで重なるかを確認し、単発ネタ化を避ける。',
+        '複数ソースで重なるかを確認する。',
       ],
     ]),
-    heading1('4. 企画比較表'),
+    heading1('4. 制作案'),
     table([
-      ['案', 'タイトル', '読者フック', '第1話の核', '編集メモ'],
+      ['案', '根拠', '読者フック', '本文・台本', '設計メモ'],
       ...plans.map((plan, index) => [
         `案${index + 1}`,
         plan.titleCandidates?.[0] ?? '',
@@ -116,20 +115,22 @@ function documentXml(report) {
           '',
       ]),
     ]),
-    heading1('5. 推奨企画の打ち合わせメモ'),
-    ...(primaryPlan ? editorPlanParagraphs(primaryPlan) : [paragraph('推奨企画がありません。')]),
-    heading1('6. 読者仮説と動き筋'),
+    heading1('5. 制作案の詳細'),
+    ...(primaryPlan ? editorPlanParagraphs(primaryPlan) : [paragraph('制作案がありません。')]),
+    heading1('6. 媒体別の制作判断'),
     table([
-      ['読者反応の仮説', '企画でやること', '作品への落とし方'],
-      ...(report.categoryFitCards ?? []).map((card) => [
-        card.title,
-        card.creatorMove,
-        card.example,
-      ]),
+      ['項目', '状態', '備考'],
+      ...((report.categoryFitCards ?? []).length
+        ? (report.categoryFitCards ?? []).map((card) => [
+            card.title,
+            card.creatorMove,
+            card.example,
+          ])
+        : [['媒体別判断', '未生成', '未生成']]),
     ]),
     heading1('7. 根拠の扱い'),
     table([
-      ['根拠', '読み取り', '企画への使い方', '注意'],
+      ['根拠', 'AI読み取り', 'AI企画判断', '注意'],
       ...(report.evidenceCards ?? []).slice(0, 4).map((card) => [
         `${card.claim}\n${card.source}`,
         card.meaningForCreator,
@@ -142,15 +143,15 @@ function documentXml(report) {
       ['リスク', '編集段階での対応'],
       [
         '実在人物、企業、作品の連想が強くなる',
-        '本文では架空制度、架空サービス、架空企業へ変換する。資料上の根拠名を作品設定へ移植しない。',
+        '実在名は取得根拠としてのみ扱う。本文・台本で必要な置き換えはAI生成時に行い、資料上の根拠名を作品設定へ移植しない。',
       ],
       [
         '流行語追いだけに見える',
-        '人物の弱点、選択、代償を先に決め、トレンドは感情の入口に留める。',
+        '制作時に、取得語の丸写しではなく根拠固有の判断になっているか確認する。',
       ],
       [
         '説明が多くなる',
-        '第1話では一つの異常表示、一つの選択、一つの引きに絞る。',
+        '本文・台本では、説明文だけでなく場面として読めるか確認する。',
       ],
       ...(report.limitations ?? []).map((item) => [
         item,
@@ -176,11 +177,11 @@ function documentXml(report) {
 
 function beginnerGuideParagraphs(guide) {
   return [
-    heading2(guide.headline ?? '制作ロードマップ'),
+    heading2(guide.headline ?? '制作メモ'),
     paragraph(guide.promise ?? ''),
     table([
       ['項目', '内容'],
-      ['最初に作るもの', guide.firstOutput ?? '未設定'],
+      ['初稿の出発点', guide.firstOutput ?? '未設定'],
       ...((guide.steps ?? []).map((step, index) => [
         `${index + 1}. ${step.label ?? ''}`,
         `${step.action ?? ''}\n出力: ${step.output ?? ''}`,
@@ -201,9 +202,9 @@ function editorPlanParagraphs(plan) {
       ['項目', '内容'],
       ['形式', plan.formatLabel],
       ['別タイトル案', (plan.titleCandidates ?? []).slice(1, 4).join(' / ')],
-      ['ログライン', plan.audiencePromise],
-      ['読者の感情フック', plan.emotionalHook],
-      ['差別化', plan.differentiation],
+      ['AIログライン', plan.audiencePromise],
+      ['AI感情フック', plan.emotionalHook],
+      ['AI差別化', plan.differentiation],
     ]),
     heading3('物語の骨格'),
     table([
@@ -220,14 +221,14 @@ function editorPlanParagraphs(plan) {
       ['設計項目', '打ち合わせで見る内容'],
       ...designRowsForDocx(plan.storyArchitecture?.notes),
     ]),
-    heading3('第1話で見せる順番'),
+    heading3('本文・台本の流れ'),
     table([
       ['順番', '内容'],
       ...(plan.outline ?? []).map((item, outlineIndex) => [`${outlineIndex + 1}`, item]),
     ]),
-    heading3('なぜ通す価値があるか'),
+    heading3('取得根拠'),
     ...(plan.reasonToWin ?? []).map((item) => bullet(item)),
-    heading3('打ち合わせ用サンプル'),
+    heading3('案の要点'),
     labelParagraph('企画の核', plan.premise),
     labelParagraph('初回具体例', plan.exampleDetail),
     labelParagraph('冒頭の見せ場', plan.opening),
@@ -238,7 +239,7 @@ function designRowsForDocx(notes) {
   if (Array.isArray(notes) && notes.length > 0) {
     return notes.map((note) => [note.label, note.detail]);
   }
-  return [['AI未生成', 'API応答がまだないため未生成です。ローカル定型文では埋めません。']];
+  return [['未生成', '未生成']];
 }
 
 function heading1(text) {
@@ -409,10 +410,10 @@ function coreXml(report) {
   const now = new Date().toISOString();
   return xmlDoc(`
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${escapeXml(`${categoryLabel} 企画書`)}</dc:title>
+  <dc:title>${escapeXml(`${categoryLabel} 制作案確認資料`)}</dc:title>
   <dc:creator>物語バズメーカー</dc:creator>
-  <cp:keywords>企画書, 漫画, 動画, 小説</cp:keywords>
-  <dc:description>トレンド分析から創作企画へ落とすための提案書</dc:description>
+  <cp:keywords>取得根拠, 制作案, 漫画, 動画, 小説</cp:keywords>
+  <dc:description>公開Web/RSSの取得根拠と制作案を確認する資料</dc:description>
   <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>
 </cp:coreProperties>`);
