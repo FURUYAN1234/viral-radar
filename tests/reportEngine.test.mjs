@@ -50,7 +50,7 @@ test('fiction reports keep platform names out of story-facing analysis', () => {
   assert.ok(report.creativePlans[0].sourceSimilarityFlags.some((flag) => flag.severity === 'safe'));
 });
 
-test('buildReport regenerates alternate paste-ready concepts instead of only reordering them', () => {
+test('buildReport varies the creative angle without rotating the evidence queue', () => {
   const firstBatch = buildReport({
     categoryId: 'long-novel',
     observations: PUBLIC_OBSERVATIONS,
@@ -66,21 +66,17 @@ test('buildReport regenerates alternate paste-ready concepts instead of only reo
 
   assert.ok(firstBatch.creativePlans.length >= 3);
   assert.notEqual(firstBatch.creativePlans[0].id, secondBatch.creativePlans[0].id);
-  assert.equal(
-    firstBatch.creativePlans.some((firstPlan) =>
-      secondBatch.creativePlans.some((secondPlan) => secondPlan.id === firstPlan.id),
-    ),
-    false,
-  );
-  assert.equal(
-    firstBatch.creativePlans.some((firstPlan) =>
-      secondBatch.creativePlans.some((secondPlan) => secondPlan.titleCandidates[0] === firstPlan.titleCandidates[0]),
-    ),
-    false,
+  assert.deepEqual(
+    firstBatch.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl),
+    secondBatch.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl),
   );
   assert.notEqual(
     JSON.stringify(firstBatch.creativePlans.map((plan) => plan.creatorBrief)),
     JSON.stringify(secondBatch.creativePlans.map((plan) => plan.creatorBrief)),
+  );
+  assert.notEqual(
+    JSON.stringify(firstBatch.creativePlans.map((plan) => plan.opening)),
+    JSON.stringify(secondBatch.creativePlans.map((plan) => plan.opening)),
   );
   assert.ok(secondBatch.creativePlans.every((plan) => plan.id.includes('-search-1-')));
 
@@ -132,6 +128,201 @@ test('deep analysis changes with the selected evidence round instead of staying 
 
     assert.ok(new Set(analyses).size >= 3, `${categoryId} should produce at least three analysis angles`);
   }
+});
+
+test('same evidence is not treated as a rotation queue when only the variation salt changes', () => {
+  const observations = [
+    {
+      id: 'stable-a',
+      categoryId: 'story-manga',
+      source: 'Local RSS A',
+      sourceType: 'public-web-rss',
+      title: '携帯電話に060番号が追加され番号不足への不安が話題に',
+      snippet: '複数回線、番号不足、本人確認の手間に反応が集まっている。',
+      tags: ['番号不足', '本人確認', '複数回線'],
+      query: '番号不足 本人確認 複数回線',
+      queryUsed: '番号不足 本人確認 複数回線 / public Web/RSS round 1',
+      metrics: { rank: 1, recencyScore: 90, sourceWeight: 92 },
+      sourceUrl: 'https://example.com/stable-a',
+      observedAt: '2026-06-26T10:00:00+09:00',
+      publishedAt: '2026-06-26T09:30:00+09:00',
+    },
+    {
+      id: 'stable-b',
+      categoryId: 'story-manga',
+      source: 'Local RSS B',
+      sourceType: 'public-web-rss',
+      title: '医療記録で女性の痛みが軽視されがちという議論',
+      snippet: '痛みの訴え、記録の偏り、診察で言い出せない不安が共有されている。',
+      tags: ['医療記録', '痛み', '偏見'],
+      query: '医療記録 痛み 偏見',
+      queryUsed: '医療記録 痛み 偏見 / public Web/RSS round 1',
+      metrics: { rank: 2, recencyScore: 88, sourceWeight: 90 },
+      sourceUrl: 'https://example.com/stable-b',
+      observedAt: '2026-06-26T10:01:00+09:00',
+      publishedAt: '2026-06-26T09:20:00+09:00',
+    },
+    {
+      id: 'stable-c',
+      categoryId: 'story-manga',
+      source: 'Local RSS C',
+      sourceType: 'public-web-rss',
+      title: '追悼式の野次をめぐり言葉の重さが賛否に',
+      snippet: '公的な場での発言、沈黙できない怒り、式典の空気に議論が起きている。',
+      tags: ['式典', '野次', '言葉'],
+      query: '式典 野次 言葉',
+      queryUsed: '式典 野次 言葉 / public Web/RSS round 1',
+      metrics: { rank: 3, recencyScore: 86, sourceWeight: 88 },
+      sourceUrl: 'https://example.com/stable-c',
+      observedAt: '2026-06-26T10:02:00+09:00',
+      publishedAt: '2026-06-26T09:10:00+09:00',
+    },
+  ];
+  const first = buildReport({ categoryId: 'story-manga', observations, variantSeed: 0 });
+  const salted = buildReport({ categoryId: 'story-manga', observations, variantSeed: 9 });
+
+  assert.deepEqual(
+    first.creativePlans.map((plan) => plan.evidenceAnchor.sourceUrl),
+    salted.creativePlans.map((plan) => plan.evidenceAnchor.sourceUrl),
+  );
+  assert.notDeepEqual(
+    first.creativePlans.map((plan) => plan.storyArchitecture.mediumExecution.focus),
+    salted.creativePlans.map((plan) => plan.storyArchitecture.mediumExecution.focus),
+  );
+});
+
+test('non-household evidence does not collapse into shopping notification memo concepts', () => {
+  const observations = [
+    {
+      id: 'hardcoded-a',
+      categoryId: 'story-manga',
+      source: 'Google News RSS',
+      sourceType: 'public-web-rss',
+      title: '携帯電話に060番号が追加され番号不足への不安が話題に',
+      snippet: '複数回線、番号不足、本人確認の手間に反応が集まっている。',
+      tags: ['番号不足', '本人確認', '複数回線'],
+      query: '番号不足 本人確認 複数回線',
+      queryUsed: '番号不足 本人確認 複数回線 / public Web/RSS round 1',
+      metrics: { rank: 1, recencyScore: 90, sourceWeight: 92 },
+      sourceUrl: 'https://example.com/hardcoded-a',
+      observedAt: '2026-06-26T10:00:00+09:00',
+      publishedAt: '2026-06-26T09:30:00+09:00',
+    },
+    {
+      id: 'hardcoded-b',
+      categoryId: 'story-manga',
+      source: 'はてな 世の中',
+      sourceType: 'public-web-rss',
+      title: '医療記録で女性の痛みが軽視されがちという議論',
+      snippet: '痛みの訴え、記録の偏り、診察で言い出せない不安が共有されている。',
+      tags: ['医療記録', '痛み', '偏見'],
+      query: '医療記録 痛み 偏見',
+      queryUsed: '医療記録 痛み 偏見 / public Web/RSS round 1',
+      metrics: { rank: 2, recencyScore: 88, sourceWeight: 90 },
+      sourceUrl: 'https://example.com/hardcoded-b',
+      observedAt: '2026-06-26T10:01:00+09:00',
+      publishedAt: '2026-06-26T09:20:00+09:00',
+    },
+    {
+      id: 'hardcoded-c',
+      categoryId: 'story-manga',
+      source: 'Bing News RSS',
+      sourceType: 'public-web-rss',
+      title: '追悼式の野次をめぐり言葉の重さが賛否に',
+      snippet: '公的な場での発言、沈黙できない怒り、式典の空気に議論が起きている。',
+      tags: ['式典', '野次', '言葉'],
+      query: '式典 野次 言葉',
+      queryUsed: '式典 野次 言葉 / public Web/RSS round 1',
+      metrics: { rank: 3, recencyScore: 86, sourceWeight: 88 },
+      sourceUrl: 'https://example.com/hardcoded-c',
+      observedAt: '2026-06-26T10:02:00+09:00',
+      publishedAt: '2026-06-26T09:10:00+09:00',
+    },
+  ];
+  const report = buildReport({ categoryId: 'story-manga', observations, providerMode: 'public-web-rss' });
+  const storyFacingText = JSON.stringify({
+    label: report.trendClusters[0].label,
+    topTags: report.trendClusters[0].topTags,
+    creatorSignals: report.trendClusters[0].creatorSignals,
+    deepAnalysis: report.deepAnalysis,
+    beginnerGuide: report.beginnerGuide,
+    creativePlans: report.creativePlans.map((plan) => ({
+      titleCandidates: plan.titleCandidates,
+      brief: plan.creatorBrief,
+      craftNotes: plan.craftNotes,
+      storyArchitecture: plan.storyArchitecture,
+      reasonToWin: plan.reasonToWin,
+      outline: plan.outline,
+      opening: plan.opening,
+      prompt: plan.aiDraftPrompt,
+    })),
+  });
+
+  assert.match(storyFacingText, /060|番号不足|本人確認|医療記録|痛み|式典|野次|言葉/);
+  assert.doesNotMatch(storyFacingText, /買い物|冷蔵庫|レシート|家計簿|生活通知|未来の自分|明日の自分|生活メモ/);
+});
+
+test('each plan changes brief, notes, architecture, scene, reason, flow, opening, and prompt wording', () => {
+  const observations = [
+    {
+      id: 'distinct-a',
+      categoryId: 'story-manga',
+      source: 'Google News RSS',
+      sourceType: 'public-web-rss',
+      title: '携帯電話に060番号が追加され番号不足への不安が話題に',
+      snippet: '複数回線、番号不足、本人確認の手間に反応が集まっている。',
+      tags: ['番号不足', '本人確認', '複数回線'],
+      query: '番号不足 本人確認 複数回線',
+      queryUsed: '番号不足 本人確認 複数回線 / public Web/RSS round 1',
+      metrics: { rank: 1, recencyScore: 90, sourceWeight: 92 },
+      sourceUrl: 'https://example.com/distinct-a',
+      observedAt: '2026-06-26T10:00:00+09:00',
+      publishedAt: '2026-06-26T09:30:00+09:00',
+    },
+    {
+      id: 'distinct-b',
+      categoryId: 'story-manga',
+      source: 'はてな 世の中',
+      sourceType: 'public-web-rss',
+      title: '医療記録で女性の痛みが軽視されがちという議論',
+      snippet: '痛みの訴え、記録の偏り、診察で言い出せない不安が共有されている。',
+      tags: ['医療記録', '痛み', '偏見'],
+      query: '医療記録 痛み 偏見',
+      queryUsed: '医療記録 痛み 偏見 / public Web/RSS round 1',
+      metrics: { rank: 2, recencyScore: 88, sourceWeight: 90 },
+      sourceUrl: 'https://example.com/distinct-b',
+      observedAt: '2026-06-26T10:01:00+09:00',
+      publishedAt: '2026-06-26T09:20:00+09:00',
+    },
+    {
+      id: 'distinct-c',
+      categoryId: 'story-manga',
+      source: 'Bing News RSS',
+      sourceType: 'public-web-rss',
+      title: '追悼式の野次をめぐり言葉の重さが賛否に',
+      snippet: '公的な場での発言、沈黙できない怒り、式典の空気に議論が起きている。',
+      tags: ['式典', '野次', '言葉'],
+      query: '式典 野次 言葉',
+      queryUsed: '式典 野次 言葉 / public Web/RSS round 1',
+      metrics: { rank: 3, recencyScore: 86, sourceWeight: 88 },
+      sourceUrl: 'https://example.com/distinct-c',
+      observedAt: '2026-06-26T10:02:00+09:00',
+      publishedAt: '2026-06-26T09:10:00+09:00',
+    },
+  ];
+  const report = buildReport({ categoryId: 'story-manga', observations, providerMode: 'public-web-rss', variantSeed: 4 });
+  const valuesFor = (selector) => report.creativePlans.map(selector);
+
+  assert.equal(new Set(valuesFor((plan) => plan.titleCandidates[0])).size, 3);
+  assert.equal(new Set(valuesFor((plan) => JSON.stringify(plan.creatorBrief))).size, 3);
+  assert.equal(new Set(valuesFor((plan) => JSON.stringify(plan.craftNotes))).size, 3);
+  assert.equal(new Set(valuesFor((plan) => JSON.stringify(plan.storyArchitecture))).size, 3);
+  assert.equal(new Set(valuesFor((plan) => plan.exampleDetail)).size, 3);
+  assert.equal(new Set(valuesFor((plan) => plan.reasonToWin.join('\n'))).size, 3);
+  assert.equal(new Set(valuesFor((plan) => plan.outline.join('\n'))).size, 3);
+  assert.equal(new Set(valuesFor((plan) => plan.opening)).size, 3);
+  assert.equal(new Set(valuesFor((plan) => plan.aiDraftPrompt)).size, 3);
+  assert.doesNotMatch(report.creativePlans.map((plan) => plan.opening).join('\n'), /誰にも見えないはずの欄にだけ残っていた/);
 });
 
 test('regenerated plans bind visible briefs to distinct evidence anchors, not only concept rotations', () => {
@@ -197,9 +388,13 @@ test('regenerated plans bind visible briefs to distinct evidence anchors, not on
 
   assert.equal(firstRound.creativePlans.length, 3);
   assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl)).size, 3);
-  assert.notDeepEqual(
+  assert.deepEqual(
     firstRound.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl),
     secondRound.creativePlans.map((plan) => plan.evidenceAnchor?.sourceUrl),
+  );
+  assert.notDeepEqual(
+    firstRound.creativePlans.map((plan) => plan.opening),
+    secondRound.creativePlans.map((plan) => plan.opening),
   );
   assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.premise)).size, 3);
   assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.creatorBrief.protagonist)).size, 3);
@@ -285,7 +480,8 @@ test('creative plans are actionable story briefs, not only analysis notes', () =
 
   const plan = report.creativePlans[0];
   assert.ok(plan.creatorBrief);
-  assert.match(plan.titleCandidates[0], /欄|通知|レシート|検索|時間|評価|説明書|ログ|街|夜|朝/);
+  assert.match(plan.titleCandidates[0], new RegExp(plan.evidenceAnchor.focusTerm));
+  assert.doesNotMatch(plan.titleCandidates[0], /分析|取得根拠|への反応/);
   assert.doesNotMatch(plan.titleCandidates.join(' / '), /最低評価の理由だけが見える/);
   for (const key of ['protagonist', 'setting', 'incitingIncident', 'conflict', 'choice', 'payoff']) {
     assert.ok(plan.creatorBrief[key], `${key} should be present`);

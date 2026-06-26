@@ -50,16 +50,17 @@ function buildCluster(categoryId, observations) {
     tags: ['創作'],
   };
   const rawTags = [...new Set(observations.flatMap((item) => item.tags))].slice(0, 8);
-  const topTags = displayTopTagsForCategory(categoryId, rawTags);
+  const topTags = displayTopTagsForCategory(categoryId, rawTags, observations);
+  const label = buildEvidenceClusterLabel(categoryId, topTags, observations, base.label);
   const cluster = {
     id: `${categoryId}-cluster-1`,
-    label: base.label,
+    label,
     categoryId,
     evidenceCount: observations.length,
     sourceCount: new Set(observations.map((item) => item.source)).size,
     topQueries: observations.map((item) => item.queryUsed).slice(0, 4),
     topTags,
-    creatorSignals: buildCreatorSignals(categoryId),
+    creatorSignals: buildCreatorSignals(categoryId, observations, topTags),
     sourceSignals: buildSourceSignals(observations, rawTags, categoryId),
     tags: base.tags,
     observations,
@@ -74,92 +75,74 @@ function buildCluster(categoryId, observations) {
   };
 }
 
-function displayTopTagsForCategory(categoryId, rawTags) {
-  const displayTags = {
-    'story-manga': ['生活不安', '評価不安', '見えない仕組み', 'ページ上の異常表示', '小さな救済'],
-    'long-novel': ['評価制度', '章ごとの謎', '長期アーク', '伏線', '救済'],
-    'short-video': ['冒頭1秒', '字幕', '保存理由', 'コメント誘発', 'BeforeAfter'],
+function displayTopTagsForCategory(categoryId, rawTags, observations = []) {
+  const evidenceTerms = observations.flatMap((observation) => evidenceTermsForObservation(observation));
+  const filteredTags = (rawTags ?? [])
+    .map(cleanFocusTerm)
+    .filter((tag) => isUsableEvidenceTerm(tag))
+    .filter((tag) => categoryId === 'trend-explainer' || !isSourceTag(tag));
+  const fallbackTags = {
+    'story-manga': ['人物の選択', '画面化できる違和感', '1ページ目の事件'],
+    'short-video': ['冒頭の変化', '字幕化できる損失', 'コメント余白'],
+    'trend-explainer': ['観測根拠', '視聴心理', '制作判断'],
+    'long-novel': ['章をまたぐ問い', '記録化できる証拠', '人物の誤解'],
   };
-  return displayTags[categoryId] ?? rawTags;
+  return uniqueList([...filteredTags, ...evidenceTerms, ...(fallbackTags[categoryId] ?? fallbackTags['story-manga'])]).slice(0, 6);
 }
 
-function buildCreatorSignals(categoryId) {
-  const signals = {
-    'story-manga': [
-      {
-        label: '冒頭で損失を見せる',
-        detail: '通知、レシート、検索候補、点数欄など、読者が1コマで理解できる小道具に不安を置く。',
-      },
-      {
-        label: '見えない仕組みを読む',
-        detail: '個人の悪意ではなく、評価欄、共有メモ、審査表などの仕組みが人を追い詰める構造にする。',
-      },
-      {
-        label: '小さな救済で終える',
-        detail: '復讐ではなく、読者が自分の生活に持ち帰れる一言、手順、視点の回復で読後感を作る。',
-      },
-    ],
-    'short-video': [
-      {
-        label: '0秒目に変化後を置く',
-        detail: '結論の画を先に見せ、途中で原因と手順を回収すると離脱されにくい。',
-      },
-      {
-        label: '保存理由を一文にする',
-        detail: '最後に「明日使う場面」が残るよう、生活の小ワザや判断基準を短く置く。',
-      },
-      {
-        label: 'コメントで次案を作る',
-        detail: '二択、失敗例募集、別パターン希望など、視聴者の反応が次の台本になる余地を残す。',
-      },
-    ],
-    'trend-explainer': [
-      {
-        label: '現象を先に見せる',
-        detail: 'バズった事実ではなく、視聴者がなぜ見続けたかを先に提示する。',
-      },
-      {
-        label: '制作手順へ翻訳する',
-        detail: '根拠を「冒頭」「保存理由」「コメント誘発」「炎上回避」の実務項目に落とす。',
-      },
-      {
-        label: '固有名詞は根拠に留める',
-        detail: '作品化では架空の制度や画面へ置き換え、実在対象への断定や攻撃にしない。',
-      },
-    ],
-    'long-novel': [
-      {
-        label: '長く残る痛みに変換する',
-        detail: '短尺の不安を、誤解、未返信、評価ログ、返せなかった言葉など章をまたぐ傷にする。',
-      },
-      {
-        label: '章ごとに謎を増やす',
-        detail: '各章末に新しい証拠や別人物の痛みを置き、読者が次章を読む理由を作る。',
-      },
-      {
-        label: '救済を急がない',
-        detail: 'すぐ逆転させず、主人公の誤解が少しずつほどける過程で中長編の厚みを出す。',
-      },
-    ],
+function buildEvidenceClusterLabel(categoryId, topTags, observations, fallbackLabel) {
+  const focus = uniqueList([...(topTags ?? []), ...observations.flatMap((observation) => evidenceTermsForObservation(observation))]).slice(0, 2);
+  if (focus.length === 0) return fallbackLabel;
+  const mediumMove = {
+    'story-manga': '漫画の入口に読み替える制作判断',
+    'short-video': '短尺の冒頭に変える制作判断',
+    'trend-explainer': '解説の章立てに分解する制作判断',
+    'long-novel': '章をまたぐ問いへ広げる制作判断',
   };
+  return `${focus.join('と')}を${mediumMove[categoryId] ?? '企画へ変換する制作判断'}`;
+}
 
-  return signals[categoryId] ?? signals['story-manga'];
+function buildCreatorSignals(categoryId, observations = [], topTags = []) {
+  const anchors = planObservationsForCluster(observations, 3).map((observation, index) => {
+    const insight = classifyObservationInsight(observation ?? {});
+    return deriveEvidenceAnchor(observation, insight, 0, index, categoryId);
+  });
+  if (anchors.length === 0) {
+    return (topTags.length ? topTags : ['取得語', '読者心理', '制作角度']).slice(0, 3).map((tag, index) => ({
+      label: `${tag}を企画要素にする`,
+      detail: `取得結果の${index + 1}番目の論点を、媒体に合わせて人物、場面、最初の事件へ分解する。`,
+    }));
+  }
+
+  const labels = {
+    'story-manga': ['絵で読める具体物にする', '主人公の誤解へ落とす', '最後の選択を変える'],
+    'short-video': ['0秒目の変化にする', '字幕で損失を切る', 'コメント余白を残す'],
+    'trend-explainer': ['根拠と推測を分ける', '視聴心理に翻訳する', '制作手順へ落とす'],
+    'long-novel': ['章の証拠にする', '人物ごとに読み替える', '回収前の余白を残す'],
+  }[categoryId] ?? ['見せ場にする', '心理へ翻訳する', '安全に架空化する'];
+
+  return anchors.map((anchor, index) => ({
+    label: labels[index] ?? `${anchor.focusTerm}を別視点で扱う`,
+    detail: `「${anchor.focusTerm}」を起点に、${anchor.scene}で${anchor.artifact}を見せる。判断軸は「${anchor.tension}」。`,
+  }));
 }
 
 function buildSourceSignals(observations, topTags, categoryId) {
   if (!observations.length) return [];
   if (categoryId === 'story-manga') {
+    const terms = uniqueList(observations.flatMap((observation) => evidenceTermsForObservation(observation))).slice(0, 4);
     return [
-      { label: '公開Web/RSS取得', detail: '取得した記事・急上昇語・ホットエントリーを、漫画の冒頭場面へ変換する根拠。' },
-      { label: '読者反応の周辺文脈', detail: '単独タイトルではなく、複数ソースで近い不安や関心が出ているかを見る根拠。' },
-      { label: '企画化できる具体語', detail: 'タイトルや説明文から、小道具、舞台、最初の事件に落とせる語を拾う根拠。' },
+      { label: '取得語の具体性', detail: `今回拾った語は「${terms.join(' / ') || '具体語不足'}」。漫画では人物名ではなく画面上の手がかりへ変換する。` },
+      { label: '周辺文脈の近さ', detail: `${new Set(observations.map((item) => item.sourceUrl || item.title)).size}件の取得結果から、同じ不安ではなく近い構造を持つ反応を比較する。` },
+      { label: '架空化の余地', detail: '実在対象を出さず、取得語を人物の選択、確認欄、記録票、場面の違和感へ読み替える。' },
     ];
   }
   if (categoryId === 'long-novel') {
+    const terms = uniqueList(observations.flatMap((observation) => evidenceTermsForObservation(observation))).slice(0, 4);
     return [
-      { label: '公開Web/RSS取得', detail: '取得した話題を、長期的な謎、伏線、章ごとの発見へ広げる根拠。' },
-      { label: '読者維持の周辺文脈', detail: '一時的な話題ではなく、章をまたいで扱える痛みや問いがあるかを見る根拠。' },
-      { label: '世界観化できる具体語', detail: '取得タイトルや説明文から、架空制度、町、記録文書へ変換できる語を拾う根拠。' },
+      { label: '章に残せる取得語', detail: `「${terms.join(' / ') || '取得語'}」を、章ごとの証拠、人物の誤解、後半で意味が変わる記録へ広げる。` },
+      { label: '読者維持の周辺文脈', detail: `${observations.length}件の取得結果から、単発の話題ではなく読み進める問いに変わるかを見る。` },
+      { label: '世界観化の余地', detail: '固有名詞ではなく、架空の町、組織、受付票、記録庫、章末の余白へ変換する。' },
     ];
   }
   const sourceNames = observations.map((observation) => normalizeSourceName(observation.source));
@@ -277,10 +260,10 @@ function craftForInsight(categoryId, insightType) {
 const CRAFT_TABLE = {
   'story-manga': {
     relation: { read: '関係のこじれは、既読・未返信・並んだ吹き出しなど1コマで見える形にすると、説明なしで主人公の孤立が伝わる。', use: '第1ページで関係の歪みを画面表示や小道具に置き換え、最後のコマで距離が縮む/壊れる瞬間を見せる。' },
-    regret: { read: '後悔は、過去のコマと現在のコマの対比、消せない通知、戻れない分岐として描くと刺さる。', use: '冒頭で「戻れない選択」を1枚の絵にし、終盤で主人公が今できる小さな一手を選ぶ。' },
+    regret: { read: '後悔は、過去のコマと現在のコマの対比、消せない記録、戻れない分岐として描くと刺さる。', use: '冒頭で「戻れない選択」を1枚の絵にし、終盤で主人公が今できる小さな一手を選ぶ。' },
     unfairness: { read: '理不尽は、抗議できないまま流れる評価欄・張り紙・画面として見せ、最後の一コマで小さく反転させる。', use: '前半で言い返せない理不尽を画面表現で積み、ラストで読者がスッとする視点の逆転を置く。' },
-    relatable: { read: 'あるあるは、読者が自分の生活で見た小道具（レシート・通知・家電）に置き換えると1ページ目で共感が立つ。', use: '冒頭1ページに「自分も見たことがある」小道具を置き、そこに小さな異常を1つ足す。' },
-    evaluation: { read: '見えない評価は、架空の採点表・通知・検索候補として可視化すると、怒りでなく発見の漫画になる。', use: '主人公に「評価が見える」能力や小道具を与え、隠れた採点理由を1話ごとに暴く。' },
+    relatable: { read: 'あるあるは、取得語に近い具体物へ置き換えると1ページ目で共感が立つ。', use: '冒頭1ページに読者が見覚えのある具体物を置き、そこに小さな異常を1つ足す。' },
+    evaluation: { read: '見えない評価は、架空の採点表・確認欄・記録票として可視化すると、怒りでなく発見の漫画になる。', use: '主人公に「評価が見える」能力や小道具を与え、隠れた採点理由を1話ごとに暴く。' },
     saving: { read: '役立つ知は、各話の最後に読者が生活へ持ち帰れる一言・手順として置くと保存・共有されやすい。', use: 'ラストのコマに「明日試せる一手」を1つだけ残し、説教でなく主人公の行動で見せる。' },
     life: { read: '生きづらさは、家賃・残高・シフト表など生活の数字が見える小道具に落とすと一目で伝わる。', use: '第1ページに生活の数字を小道具で見せ、その重さを主人公の選択で動かす。' },
     continuity: { read: '長く続く問いは、章をまたぐ謎として1話目の隅に仕込むと連載の引きになる。', use: '初回の背景に回収前提の違和感を1つ置き、各話末で別の証拠を足していく。' },
@@ -406,12 +389,12 @@ function categoryInterpretationView(categoryId, insight) {
   const byCategory = {
     'story-manga': {
       lossMeaning: '読者は説明より先に、1コマで分かる損失や違和感を見たい状態です。',
-      evaluationMeaning: '評価や選考を、通知欄・採点表・検索候補として見せると、怒りではなく発見の漫画になります。',
+      evaluationMeaning: '評価や選考を、確認欄・採点表・記録票として見せると、怒りではなく発見の漫画になります。',
       saveMeaning: '保存や共有の欲求は、各話の最後に読者が持ち帰れる一言や小さな手順へ変換できます。',
       beforeAfterMeaning: '変化前後の差は、ページ前半とラスト1コマの反転にすると読み切りでも伝わります。',
       explainerMeaning: '仕組みへの関心は、黒幕説明ではなく、画面や書類の矛盾を読者に発見させる材料になります。',
       meaningForCreator: `この話題は「${material}」として扱い、主人公が最初に見つける小道具や画面表示へ変換できます。`,
-      creativeUse: `第1ページに「${hit}」を連想させる架空の通知・レシート・検索候補を置き、最後のコマで意味を反転させる。`,
+      creativeUse: `第1ページに「${hit}」を連想させる架空の確認欄・記録票・入力フォームを置き、最後のコマで意味を反転させる。`,
     },
     'short-video': {
       lossMeaning: '視聴者は背景説明より、最初の画で困りごとが分かる映像を待っています。',
@@ -448,7 +431,7 @@ function creativeUseByCategory(categoryId) {
   const uses = {
     'story-manga': {
       lossHook: '第1ページに「評価不能」「家賃更新」「却下理由」など、損失が一目でわかる画面を置く。',
-      evaluationHook: '見えない評価欄、隠しメモ、検索候補などを可視化する能力に変換する。',
+      evaluationHook: '見えない評価欄、保留記録、確認語などを可視化する能力に変換する。',
       saveHook: '読者が自分の生活にも置き換えられる小さな救済を、各話の結末に置く。',
       beforeAfterHook: '1話の前半で理不尽な状態、後半で構造の見え方が変わる反転を作る。',
       explainerHook: '物語内の架空制度を通じて、現実の視聴習慣や評価不安を安全に抽象化する。',
@@ -456,7 +439,7 @@ function creativeUseByCategory(categoryId) {
     },
     'short-video': {
       lossHook: '0秒目に困りごとの映像、1秒目に損失字幕、最後に真似できる解決を置く。',
-      evaluationHook: '点数化や通知疲れを、1画面のビフォーアフターとして見せる。',
+      evaluationHook: '点数化や確認疲れを、1画面のビフォーアフターとして見せる。',
       saveHook: '最後に「明日使う場面」を1行で出し、保存理由を明確にする。',
       beforeAfterHook: '完成後を先に見せ、途中で原因と手順を3カットだけ回収する。',
       explainerHook: '制作者向けの短いチェックリストとして、保存・コメント・冒頭設計に落とす。',
@@ -500,134 +483,42 @@ function summarizeMetrics(metrics = {}) {
 }
 
 function buildDeepAnalysis(categoryId, cluster, variantSeed = 0) {
-  const analysis = {
-    'story-manga': {
-      surfacePattern: [
-        '生活不安、評価不安、見えない仕組みを、ページ上の異常表示として見せる構造が強いです。',
-        '読者が1コマで理解できる小道具に落とすと、説明より先に感情が立ち上がります。',
-        '根拠名ではなく、通知、レシート、査定欄、吹き出し外の文字へ変換して使います。',
-      ],
-      humanMotivation: ['不安の言語化', '見えない理不尽を読みたい欲求', '自分にも起きそうな怖さ', '小さな救済を見たい気持ち'],
-      narrativeMechanism: ['1ページ目の異常表示', '隠れた仕組みの発見', 'コマ上の反転', '次話へ残す小さな謎'],
-      productionMechanism: ['冒頭1ページ', '縦読みの余白', '吹き出し外テキスト', '架空UI'],
-      opportunityGap: ['外部サービス名を出さず、読者の生活感に近い架空制度へ変換すると漫画企画として扱いやすいです。'],
-      categoryInsight: '読者が感じている不公平を、架空の評価制度として可視化すると連載の引きになります。',
-    },
-    'short-video': {
-      surfacePattern: [
-        '冒頭1秒、字幕、Before/After、保存理由を先に見せる構造が強いです。',
-        '視聴者は説明を待つより、変化後の画と損失字幕で続きを判断します。',
-        'コメント欄で次の失敗例や別パターンを回収できる形式が伸ばしやすいです。',
-      ],
-      humanMotivation: ['すぐ役に立つ', '失敗を避けたい', '誰かに共有したい', '自分も試せそう'],
-      narrativeMechanism: ['0秒目の結論画', '1秒目の損失字幕', '3カットの理由回収', '保存したくなる締め'],
-      productionMechanism: ['冒頭1秒', '大きい字幕', '手元カット', 'コメント誘発'],
-      opportunityGap: ['流行語ではなく、保存される理由とコメントされる余白まで設計すると短尺動画化しやすいです。'],
-      categoryInsight: 'Before/Afterを冒頭で先に見せ、途中で理由を回収する構成が保存に向きます。',
-    },
-    'trend-explainer': {
-      surfacePattern: [
-        `${cluster.topTags.slice(0, 4).join(' / ')} が共起しています。`,
-        '現象名ではなく、なぜ見続けられたかを根拠、視聴心理、制作手順に分ける構造が強いです。',
-        '固有名詞は証拠として扱い、特定企業や個人の内部事情の断定は避けます。',
-      ],
-      humanMotivation: ['裏側を知りたい', '自分の制作に応用したい', '炎上を避けたい', '根拠つきで理解したい'],
-      narrativeMechanism: ['冒頭の問い', '根拠提示', '章立て解説', '安全な応用'],
-      productionMechanism: ['ナレーション', '引用風カード', '比較表', '締めのチェックリスト'],
-      opportunityGap: ['外部サービス名は根拠として使いつつ、断定ではなく観測から制作判断へ翻訳すると信頼を保てます。'],
-      categoryInsight: '固有名詞は証拠として使い、特定企業への断定は避けます。',
-    },
-    'long-novel': {
-      surfacePattern: [
-        '評価制度、章ごとの謎、伏線、長期的な救済へ広げやすい構造です。',
-        '冒頭の不安を単発の逆転にせず、主人公以外の痛みへ連鎖させると読者維持につながります。',
-        '根拠名ではなく、架空の町、組織、制度、記録文書へ変換して世界観化します。',
-      ],
-      humanMotivation: ['長く残る不安を読み解きたい', '理不尽の正体を知りたい', '誤解がほどける快感', '救われる人が増える期待'],
-      narrativeMechanism: ['章ごとの証拠', '伏線の再解釈', '救済対象の連鎖', '制度の真相'],
-      productionMechanism: ['章末の引き', '記録文書', '複数視点', '長期アーク'],
-      opportunityGap: ['短期の復讐ではなく、読み解き、誤解、救済を積み上げると長編小説として伸ばしやすいです。'],
-      categoryInsight: '短期的な復讐より、制度を読み解いて周囲を救う長期アークが伸ばしやすいです。',
-    },
+  const fallback = {
+    surfacePattern: ['取得根拠が不足しているため、制作判断はまだ確定しません。'],
+    humanMotivation: ['根拠語が取れたら読者・視聴者の欲求へ分解する'],
+    narrativeMechanism: ['根拠不足時は仮説を表示せず、取得できた語から再分析する'],
+    productionMechanism: ['媒体、冒頭、回収点を取得語から決める'],
+    opportunityGap: ['根拠が空の時は、固定例を本分析として出さない。'],
+    categoryInsight: '取得根拠が空のため、カテゴリ固有の分析は未確定です。',
   };
-
-  const base = analysis[categoryId] ?? analysis['story-manga'];
-  return enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed);
+  return enrichDeepAnalysisWithEvidence(fallback, categoryId, cluster, variantSeed);
 }
 
-function buildCategoryReasons(categoryId) {
-  const reasons = {
-    'story-manga': [
-      {
-        title: '感情を一目で絵にできる',
-        detail: '評価不安、生活不安、SNS疲れのような見えない痛みを、通知、点数、レシート、検索窓などの画面表現に変換できます。',
-        example: '「評価不能」の通知の下に、本当の却下理由だけが灰色で見える。',
-      },
-      {
-        title: '毎話の引きを作りやすい',
-        detail: '隠れた理由、誤記された評価、誰かの本音など、1話ごとに小さな謎と回収を置けます。',
-        example: '次回は同僚の評価欄にだけ「本人のせいではない」と表示される。',
-      },
-      {
-        title: '実名を使わず現代性を出せる',
-        detail: '実在サービス名は根拠側に置き、物語本編は架空UIにすれば、炎上告発ではなく安全な構造ドラマになります。',
-        example: 'LINE風ではなく架空の社内チャットで、共有される不安だけを描く。',
-      },
-    ],
-    'short-video': [
-      {
-        title: '最初の1秒で悩みが伝わる',
-        detail: 'つまずく、探す、迷う、通知に邪魔されるなど、説明前に不便を映像で見せられます。',
-        example: '充電ケーブルに足を引っかける瞬間を冒頭に置く。',
-      },
-      {
-        title: '保存する理由を作りやすい',
-        detail: '無料で真似できる配置変更、時短手順、判断基準は、あとで実行するために保存されやすい構造です。',
-        example: '最後に「明日の朝ここだけ変えて」と1行で保存理由を出す。',
-      },
-      {
-        title: 'コメントが企画の続きになる',
-        detail: 'A/B選択、代替食材、片づけ判断など、視聴者の経験が次回案になります。',
-        example: '「あなたならどっちを残す？」で終わり、次回に理由を分類する。',
-      },
-    ],
-    'trend-explainer': [
-      {
-        title: '固有名詞を根拠として扱える',
-        detail: 'TikTok、YouTube Shorts、Netflixなどは作品化せず、視聴行動や配信形式を説明する材料にできます。',
-        example: '特定企業の内情ではなく、短尺視聴で反転が効く理由を説明する。',
-      },
-      {
-        title: '視聴者の自分ごと化が早い',
-        detail: '「なぜ次を見てしまうのか」「なぜ保存するのか」のように、自分の行動を分析対象にできます。',
-        example: '冒頭で「1分なのに続きを待った経験」を問いかける。',
-      },
-      {
-        title: '創作者向けの実用に落とせる',
-        detail: '炎上解説ではなく、冒頭設計、保存理由、コメント誘発などの制作手順へ変換できます。',
-        example: '最後に漫画、ショート動画、小説へ応用するチェックリストを出す。',
-      },
-    ],
-    'long-novel': [
-      {
-        title: '長期的な痛みを追える',
-        detail: '評価されない、選ばれない、返せないなどの痛みは、短い復讐より長い成長と救済に向きます。',
-        example: '却下理由を読む能力で、最初は自分、次に他者を救う。',
-      },
-      {
-        title: '章ごとの謎を積める',
-        detail: '理由、ログ、説明書、ランキングなどの形式を使うと、各章に発見と次の疑問を置けます。',
-        example: '章末に「自分の説明書」だけ白紙で出てくる。',
-      },
-      {
-        title: '現実批評を架空制度に変換できる',
-        detail: '実在企業やサービスを告発せず、架空の制度や町で構造だけを描けます。',
-        example: '採用サービス名は出さず、架空組織の却下ログとして扱う。',
-      },
-    ],
-  };
-
-  return reasons[categoryId] ?? [];
+function buildCategoryReasons(categoryId, cluster = null) {
+  const anchors = analysisAnchorsForCluster(cluster, 0);
+  const medium = {
+    'story-manga': { unit: '1ページ目のコマ', move: '読者が先に気づく画面上の違和感', output: '冒頭コマ' },
+    'short-video': { unit: '0秒目の画', move: '視聴者が手元で試せる変化', output: '秒数つき台本' },
+    'trend-explainer': { unit: '冒頭の問い', move: '根拠と推測を分ける章立て', output: '解説構成' },
+    'long-novel': { unit: '第1章の証拠', move: '章をまたいで意味が変わる記録', output: '章末フック' },
+  }[categoryId] ?? { unit: '冒頭', move: '媒体に合う見せ場', output: '構成' };
+  const baseAnchors = anchors.length > 0 ? anchors : [0, 1, 2].map((index) => ({
+    focusTerm: ['取得語', '別視点', '安全な架空化'][index],
+    artifact: ['確認欄', '記録票', '比較表'][index],
+    tension: '根拠が不足しているため、人間が取得状態を確認する必要がある',
+    perspective: ['観測事実', '別人物', '媒体差'][index],
+    readerNeed: '根拠が取れてから判断したい',
+    productionAngle: '取得語を媒体別の見せ場へ変える',
+  }));
+  return baseAnchors.slice(0, 3).map((anchor, index) => ({
+    title: index === 0 ? `${anchor.focusTerm}を${medium.unit}に置ける` : index === 1 ? `${anchor.focusTerm}で視点を変えられる` : `実在名を出さず${medium.move}へ変換できる`,
+    detail: index === 0
+      ? `取得語を説明で並べず、「${anchor.artifact}」として見せると、${anchor.tension}が最初の判断材料になります。`
+      : index === 1
+        ? `同じ方向の話題でも、${anchor.perspective}から入ることで、構成、主人公、回収点を別案にできます。`
+        : `${cluster?.label ?? anchor.focusTerm}を根拠に留め、本文や台本では架空の人物、場面、記録へ置き換えます。`,
+    example: index === 0 ? `${medium.output}: ${anchor.perspective}で始める。` : `${anchor.focusTerm}を${anchor.productionAngle}として扱う。`,
+  }));
 }
 
 const PLAN_BATCH_SIZE = 3;
@@ -746,84 +637,44 @@ function storyMakerCategoryKey(categoryId) {
 function buildCreatorBrief(plan, categoryId) {
   if (plan.creatorBrief) return plan.creatorBrief;
 
-  const overrides = {
-    'story-manga-hidden-review': {
-      protagonist: '契約社員の真白。自分を守るだけで精一杯だったが、同僚の評価改ざんを見て黙れなくなる。',
-      setting: '社員証、評価画面、会議メモがすべて点数で管理される架空企業。',
-      incitingIncident: '朝の通知に「評価不能」と出て、その下に誰にも見えない灰色の査定理由が浮かぶ。',
-      conflict: '上司個人を責めれば終わる話ではなく、評価入力そのものが人を低く見せる仕組みになっている。',
-      choice: '自分だけ評価を直すか、同僚の不利益まで表に出すか。',
-      payoff: '怒りよりも、見えなかった仕組みを読者が理解する救済感で終える。',
-    },
-    'story-manga-receipt-ghost': {
-      protagonist: '節約を笑いに変えて生きている会社員。自分の我慢を大したことがないと思い込んでいる。',
-      setting: '夜のコンビニ、狭い台所、家計簿アプリ風の架空UI。',
-      incitingIncident: 'レシートの合計欄に金額ではなく「諦めた理由」が印字される。',
-      conflict: '便利な節約術に見えた現象が、周囲の言えなかった我慢まで暴いてしまう。',
-      choice: '本当に欲しかったものを一つだけ買うか、いつものように棚へ戻すか。',
-      payoff: '派手な逆転ではなく、小さく自分を許す読後感にする。',
-    },
-    'story-manga-comment-weather': {
-      protagonist: '投稿前にコメント欄の空気だけ天気として見える高校生または若手社会人。',
-      setting: '実名SNSではない架空投稿アプリと、雨や霧が重なる縦読み画面。',
-      incitingIncident: '親友の投稿予定画面にだけ赤い警報が出る。',
-      conflict: '傷つく未来が見えるから止めたいが、本人には言う必要がある言葉がある。',
-      choice: '親友の投稿を止めるか、言葉を整える手伝いをするか。',
-      payoff: '言葉を怖がる話ではなく、届き方を選び直す話にする。',
-    },
-    'story-manga-family-cache': {
-      protagonist: '家族とは普通に仲がいいと思っていた学生または若手社会人。',
-      setting: '深夜のリビング、家族共用Wi-Fi、架空検索窓。',
-      incitingIncident: '誰も触っていない検索窓に、家族の悩みらしい候補語が出る。',
-      conflict: '心配して覗くほど、家族を監視している後ろめたさが増す。',
-      choice: '検索語を追い続けるか、本人に言葉で聞くか。',
-      payoff: '謎解きの快感より、近い人に聞き直す勇気を残す。',
-    },
-  };
-
-  if (overrides[plan.id]) return overrides[plan.id];
-
+  const anchor = plan.evidenceAnchor ?? {};
+  const focus = anchor.focusTerm ?? plan.titleCandidates?.[0] ?? '取得語';
+  const object = anchor.artifact ?? inferRecurringMotif(plan);
+  const scene = anchor.scene ?? plan.outline?.[0] ?? plan.opening ?? '冒頭場面';
+  const tension = anchor.tension ?? plan.emotionalHook ?? '説明されない違和感が残る';
+  const readerNeed = anchor.readerNeed ?? plan.audiencePromise ?? '根拠を自分ごととして確かめたい';
   const categoryDefaults = {
     'short-video': {
-      protagonist: '視聴者の代わりに小さな不便を試す投稿者。',
-      setting: 'スマホで撮れる部屋、台所、机まわりなどの生活空間。',
-      incitingIncident: plan.outline[0] ?? plan.opening,
-      conflict: plan.emotionalHook,
-      choice: '一番簡単な改善だけを選び、最後に視聴者が真似できる形で見せる。',
-      payoff: '保存して後で試したくなる実用感を残す。',
+      protagonist: `${focus}で迷う視聴者の代わりに、1つだけ試す投稿者。`,
+      setting: `縦画面で撮れる${scene}。`,
+      choice: `${object}を増やさず、最初の変化だけを見せる。`,
+      payoff: '視聴後に同じ場面で試せる一手を残す。',
     },
     'trend-explainer': {
-      protagonist: '視聴者の疑問を代弁する語り手。',
-      setting: '自作モック画面、チャート、章立てテロップで進む解説動画。',
-      incitingIncident: plan.outline[0] ?? plan.opening,
-      conflict: plan.emotionalHook,
-      choice: '告発や断定ではなく、構造を分解して制作者が使える教訓に変える。',
-      payoff: '見終わった人が自分の企画へ応用できる理解を残す。',
+      protagonist: `${focus}を企画に使いたいが、根拠と推測を分けたい語り手。`,
+      setting: `観測結果と${object}を並べる解説画面。`,
+      choice: '断定ではなく、観測、心理、制作手順へ分けて話す。',
+      payoff: '見終わった人が自分の媒体へ置き換えられる判断軸を残す。',
     },
     'long-novel': {
-      protagonist: '読者が長く追える痛みと欠点を持つ主人公。',
-      setting: '現実の不安を抽象化した架空の町、制度、図書館、職場。',
-      incitingIncident: plan.outline[0] ?? plan.opening,
-      conflict: plan.emotionalHook,
-      choice: '能力や謎を自分のためだけに使うか、他者の救済へ広げるか。',
-      payoff: '章を重ねるほど世界と人物の見え方が変わる余韻を残す。',
+      protagonist: `${readerNeed}主人公。最初は${focus}を自分だけの問題だと思っている。`,
+      setting: `${object}が章ごとに意味を変える架空の町や記録庫。`,
+      choice: `${object}を自分のためだけに使うか、他者の誤解をほどくために使うか。`,
+      payoff: '章を重ねるほど人物と世界の見え方が変わる余韻を残す。',
     },
     'story-manga': {
-      protagonist: '読者が自分を重ねやすい生活者。',
-      setting: '現実に近いが固有名詞を避けた架空の生活空間。',
-      incitingIncident: plan.outline[0] ?? plan.opening,
-      conflict: plan.emotionalHook,
-      choice: '違和感を見なかったことにするか、誰かと共有して動くか。',
-      payoff: '小さな救済と次話への謎を残す。',
+      protagonist: `${readerNeed}主人公。最初は${tension}を自分の弱さだと思い込む。`,
+      setting: `${scene}。`,
+      choice: `${object}を見なかったことにするか、意味を読み替えて誰かに返すか。`,
+      payoff: '小さな救済と次話へ残る問いを置く。',
     },
   };
-
   const defaults = categoryDefaults[categoryId] ?? categoryDefaults['story-manga'];
   return {
     protagonist: defaults.protagonist,
     setting: defaults.setting,
-    incitingIncident: defaults.incitingIncident,
-    conflict: defaults.conflict,
+    incitingIncident: plan.outline?.[0] ?? plan.opening ?? `${object}が冒頭で見つかる。`,
+    conflict: tension,
     choice: defaults.choice,
     payoff: defaults.payoff,
   };
@@ -895,7 +746,7 @@ function buildRetentionDesign(plan, categoryId) {
       openingHook: `冒頭章は「${firstBeat}」で損失を見せ、主人公の誤解を読者が追える形にする。`,
       middleKeep: `中盤は「${middleBeat}」を転換点にし、味方、対立者、制度の3方向から同じ謎を見せ直す。`,
       payoff: `最終章で「${lastBeat}」を回収し、主人公の選択が周囲の見え方を変える余韻を作る。`,
-      continuationHook: '各章末に「まだ読まれていない通知」「誰かの保留された言葉」など次章の具体物を残す。',
+      continuationHook: '各章末に「まだ読まれていない記録」「誰かの保留された言葉」など次章の具体物を残す。',
     };
   }
 
@@ -1021,7 +872,7 @@ function buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign)
 
   const mediumExecution = {
     method: '媒体実装',
-    focus: `${medium.execution} 具体物は「${anchorArtifact}」、場面は「${anchorScene}」、根拠焦点は「${anchorFocus}」に固定する。`,
+    focus: `${medium.execution} 具体物は「${anchorArtifact}」、場面は「${anchorScene}」、根拠焦点は「${anchorFocus}」。視点は「${anchor.perspective ?? '別視点'}」から入り、同じ根拠でも見せ方を変える。`,
     firstOutput: categoryId === 'short-video' ? '秒数つき台本' : categoryId === 'trend-explainer' ? '章立て台本' : categoryId === 'long-novel' ? '第1章と章末フック' : '第1ページのネーム',
     revisionTarget: plan.draftInstructions,
   };
@@ -1098,10 +949,14 @@ function buildBeginnerGuide(categoryId, primaryPlan, cluster) {
   const opening = primaryPlan?.opening ?? '冒頭で異常や損失を見せる';
   const promise = primaryPlan?.audiencePromise ?? '読者が自分ごと化できる企画にする';
   const brief = primaryPlan?.creatorBrief ?? {};
+  const anchor = primaryPlan?.evidenceAnchor ?? {};
+  const anchorObject = anchor.artifact ?? '画面上の具体物';
+  const anchorFocus = anchor.focusTerm ?? cluster?.topTags?.[0] ?? '取得語';
+  const anchorPerspective = anchor.perspective ?? '別視点';
   const sharedChecklist = [
-    `タイトルは仮でよいので「${planTitle}」を置いて、冒頭と結末を先に固定する。`,
+    `タイトルは仮でよいので「${planTitle}」を置いて、冒頭と結末の役割を先に決める。`,
     `実在名は根拠欄に留め、本文では架空の人物、架空UI、架空制度、架空の町へ置き換える。`,
-    `根拠シグナル「${cluster?.label ?? '取得シグナル'}」を、説明ではなく主人公の困りごとへ変換する。`,
+    `根拠シグナル「${cluster?.label ?? '取得シグナル'}」を、説明ではなく主人公の困りごとと${anchorObject}へ変換する。`,
   ];
 
   const guides = {
@@ -1112,17 +967,17 @@ function buildBeginnerGuide(categoryId, primaryPlan, cluster) {
       steps: [
         {
           label: '1コマ目に異常を置く',
-          action: `「${opening}」を、通知、レシート、検索窓、欄外文字のどれか1つに絞って描く。`,
+          action: `「${opening}」を、${anchorObject}として描く。${anchorFocus}を説明語ではなく、読者が見て気づける変化にする。`,
           output: '読者が1秒で「何かおかしい」と分かる絵。',
         },
         {
           label: '主人公の困りごとへ落とす',
           action: `${brief.protagonist ?? '主人公'}が、その異常で今日どんな損をするかを1場面で見せる。`,
-          output: '仕事、家族、買い物、投稿など生活上の具体被害。',
+          output: `${anchorPerspective}から見た具体的な損失と、主人公が隠したい弱点。`,
         },
         {
           label: '仕組みの違和感を増やす',
-          action: '悪役を出す前に、画面、表、メモ、吹き出し外の文字で矛盾を1つ増やす。',
+          action: `悪役を出す前に、${anchorObject}の意味が1つずれる瞬間を増やす。`,
           output: '読者が先に気づける小さな証拠。',
         },
         {
@@ -1144,7 +999,7 @@ function buildBeginnerGuide(categoryId, primaryPlan, cluster) {
     },
     'short-video': {
       headline: '撮影前に30秒台本へ落とす順番',
-      promise: `${promise} 最初に秒数と保存理由を固定します。`,
+      promise: `${promise} 最初に秒数と見返す理由を決めます。`,
       firstOutput: '0秒、1秒、ラスト3秒の字幕',
       steps: [
         {
@@ -1154,7 +1009,7 @@ function buildBeginnerGuide(categoryId, primaryPlan, cluster) {
         },
         {
           label: '1秒目に悩みを字幕化',
-          action: `視聴者の損失を「${primaryPlan?.emotionalHook ?? '毎日の小さな不便'}」として13字前後で出す。`,
+          action: `視聴者の損失を「${primaryPlan?.emotionalHook ?? `${anchorFocus}で迷う瞬間`}」として13字前後で出す。`,
           output: 'スクロールを止める短い字幕。',
         },
         {
@@ -1164,7 +1019,7 @@ function buildBeginnerGuide(categoryId, primaryPlan, cluster) {
         },
         {
           label: '最後に保存理由を置く',
-          action: '「明日使う場面」か「コメントで聞く二択」を1行で出す。',
+          action: `「${anchorFocus}で次に試す場面」か「コメントで聞く二択」を1行で出す。`,
           output: '保存またはコメントの行動理由。',
         },
       ],
@@ -1238,7 +1093,7 @@ function buildBeginnerGuide(categoryId, primaryPlan, cluster) {
         },
         {
           label: '長編なら制度謎を残す',
-          action: '各章末に記録、通知、説明書、未返信などの未解決物を1つ置く。',
+          action: `各章末に${anchorObject}の未解決点を1つ置き、次章で別人物から意味を変える。`,
           output: '連載で追える主謎と章末フック。',
         },
       ],
@@ -1273,122 +1128,36 @@ function evidenceAnchorForCategory(categoryId, cluster) {
 
 function buildCategoryFitCards(categoryId, cluster) {
   const evidenceAnchor = evidenceAnchorForCategory(categoryId, cluster);
-  const cards = {
-    'story-manga': [
-      {
-        title: '漫画なら「見えない不安」を1ページで見せられる',
-        whyThisMedium:
-          '評価、家計、SNSの空気のような抽象的な不安を、灰色の欄、吹き出し外の文字、通知画面、縦読みの余白としてコマに置けます。',
-        creatorMove: '第1ページで異常な表示を見せ、2ページ目で主人公の生活被害へ落とす。',
-        example: '通知の下にだけ本当の査定理由が浮かび、主人公以外にはただの空白に見える。',
-        evidenceAnchor,
-      },
-      {
-        title: '連載の引きを毎話作りやすい',
-        whyThisMedium:
-          '毎話ひとつのメモ、レシート、検索語、コメント欄を解く形式にできるため、短い読後でも次の謎を残せます。',
-        creatorMove: '最後のコマに次の人物の隠しメモや未読通知を置く。',
-        example: '第1話の最後に、優しい先輩の評価欄にも同じ灰色の理由が出る。',
-        evidenceAnchor,
-      },
-      {
-        title: '読者の怒りを人物攻撃ではなく構造の発見に変えられる',
-        whyThisMedium:
-          '悪役の顔ではなく、入力欄、表、タグ、吹き出し外の小文字を積み上げると、理不尽の仕組みを安全に描けます。',
-        creatorMove: '黒幕を出す前に、画面や書類の矛盾で読者に気づかせる。',
-        example: '会議室の全員が普通に話しているのに、評価タグだけが主人公を低く塗り替えている。',
-        evidenceAnchor,
-      },
-    ],
-    'short-video': [
-      {
-        title: '冒頭1秒で「自分の不便だ」とわかる',
-        whyThisMedium:
-          'ショート動画は説明前に共感を取る媒体なので、家計、通知疲れ、部屋の動線などを最初の映像で見せるほど強いです。',
-        creatorMove: '失敗カット、困った手元、散らかった画面を先に出してから字幕で理由を言う。',
-        example: 'ケーブルにつまずく0.7秒の映像から入り、「この3秒、毎朝やってませんか？」と出す。',
-        evidenceAnchor,
-      },
-      {
-        title: '保存される理由を動画内に作れる',
-        whyThisMedium:
-          '生活改善・節約・設定変更は、視聴後すぐ試せない人が保存するため、再利用できる字幕と手順が武器になります。',
-        creatorMove: '最後に「明日やる1手順」を1行で固定表示する。',
-        example: '冷蔵庫の半端食材を3つだけ並べ、完成品より「買い足さない条件」を字幕に残す。',
-        evidenceAnchor,
-      },
-      {
-        title: 'コメントで次回案を作れる',
-        whyThisMedium:
-          '視聴者が自分の生活に置き換えられるテーマは、A/B選択や代替案コメントを誘発しやすいです。',
-        creatorMove: '結論を一つ残しつつ、最後に「あなたならどっち？」を具体的に聞く。',
-        example: '捨てる物をA/Bで見せ、次回はコメント理由を分類して判断する。',
-        evidenceAnchor,
-      },
-    ],
-    'trend-explainer': [
-      {
-        title: '固有名詞を物語化せず、根拠として扱える',
-        whyThisMedium:
-          '解説動画ならTikTok、YouTube Shorts、LINEなどを市場例として出しつつ、特定企業の内部告発にしない形で深掘りできます。',
-        creatorMove: '実在名は導入と根拠欄に限定し、本文は自作モックと構造図で説明する。',
-        example: '「特定企業の話ではなく、短尺視聴が物語の形を変えた話です」と最初に置く。',
-        evidenceAnchor,
-      },
-      {
-        title: '章立てで複数カテゴリへ応用できる',
-        whyThisMedium:
-          '漫画、ショート、小説へ横展開したい制作者に、フック、反転、保存、コメントという部品で渡せます。',
-        creatorMove: '1章1論点にし、各章の最後に制作チェックを置く。',
-        example: '「冒頭の損失」「中盤の反転」「最後の保存理由」を3章で分ける。',
-        evidenceAnchor,
-      },
-      {
-        title: 'ナレーションとチャートで深情報分析にできる',
-        whyThisMedium:
-          '単なるバズ紹介ではなく、なぜ人が反応するかを欲求、媒体形式、安全な応用の順に整理できます。',
-        creatorMove: '数字を断定せず、観測シグナルと創作判断を分けて見せる。',
-        example: 'グラフで勢いと飽和リスクを出し、最後に使える企画型へ落とす。',
-        evidenceAnchor,
-      },
-    ],
-    'long-novel': [
-      {
-        title: '長期的な痛みを章で積み上げられる',
-        whyThisMedium:
-          '評価不安や生活の我慢は一発解決より、誤解、発見、救済を章ごとに重ねる方が読者維持に向きます。',
-        creatorMove: '第1章は主人公個人の痛み、第2章以降は他者の痛みへ広げる。',
-        example: '却下理由を読む能力が、最初は自分の救済、次に他者の救済へ変わる。',
-        evidenceAnchor,
-      },
-      {
-        title: '伏線を「ログ」や「説明書」として残せる',
-        whyThisMedium:
-          '小説は情報の遅延が強いので、理由、説明書、検索語、図書館の本などを章末の伏線にできます。',
-        creatorMove: '章末に一行だけ、次章で意味が変わる記録を置く。',
-        example: '主人公の説明書だけ白紙で出てきて、読者が次章を待つ理由になる。',
-        evidenceAnchor,
-      },
-      {
-        title: '現実批評を架空制度に変換しやすい',
-        whyThisMedium:
-          '長編なら世界観や制度を育てられるため、実在企業を出さずに評価社会やランキング疲れを扱えます。',
-        creatorMove: '実在名を避け、架空の町・組織・図書館にルールを持たせる。',
-        example: '一晩だけ順位が消える街で、主人公が初めて自分の基準で選ぶ。',
-        evidenceAnchor,
-      },
-    ],
-  };
-
-  return cards[categoryId] ?? cards['story-manga'];
+  const anchors = analysisAnchorsForCluster(cluster, 0);
+  const medium = {
+    'story-manga': { nouns: ['ページ', 'コマ', '吹き出し', '縦読み'], moves: ['冒頭の画面変化', '主人公の誤解', 'ラストの選択'] },
+    'short-video': { nouns: ['冒頭1秒', '字幕', '保存', 'コメント'], moves: ['最初の変化', '短い理由回収', '視聴後の一手'] },
+    'trend-explainer': { nouns: ['解説', '根拠', '章立て', 'ナレーション'], moves: ['観測事実', '心理の分解', '制作チェック'] },
+    'long-novel': { nouns: ['章', '伏線', '読者維持', '長期'], moves: ['第1章の証拠', '別人物の読み替え', '終盤の回収'] },
+  }[categoryId] ?? { nouns: ['冒頭', '構成', '回収', '注意点'], moves: ['冒頭', '中盤', '結末'] };
+  const cardAnchors = anchors.length > 0 ? anchors.slice(0, 3) : [0, 1, 2].map((index) => ({
+    focusTerm: ['取得語', '別視点', '安全な架空化'][index],
+    artifact: ['確認欄', '記録票', '比較表'][index],
+    tension: '取得根拠が空のため、確定判断は保留する',
+    perspective: ['観測事実', '別人物', '媒体差'][index],
+    readerNeed: '根拠を確認してから企画化したい',
+    actionLabel: '取得語を読み替える',
+    scene: '取得後の企画画面',
+  }));
+  return cardAnchors.map((anchor, index) => ({
+    title: `${anchor.focusTerm}を${medium.moves[index] ?? medium.moves[0]}に使う`,
+    whyThisMedium: `${medium.nouns.join('、')}の中で「${anchor.artifact}」を見せると、${anchor.tension}を説明に頼らず伝えられます。`,
+    creatorMove: `${anchor.perspective}から入り、${anchor.readerNeed}へつなげる。`,
+    example: `${anchor.scene}で${anchor.actionLabel}場面を作る。`,
+    evidenceAnchor,
+  }));
 }
-
 
 function regeneratePlans(plans, seed = 1, cluster = null) {
   if (!Array.isArray(plans) || plans.length === 0) return [];
   const categoryId = plans[0]?.id?.split('-').slice(0, 2).join('-') ?? 'story-manga';
   const numericSeed = Number(seed) || 0;
-  const observations = rotatePlanObservations(cluster?.observations, numericSeed, PLAN_BATCH_SIZE);
+  const observations = planObservationsForCluster(cluster?.observations, PLAN_BATCH_SIZE);
   if (observations.length === 0) return [];
   const searchFrames = Array.from({ length: PLAN_BATCH_SIZE }).map((_, index) =>
     buildSearchDrivenFrame(categoryId, observations[index], numericSeed, index),
@@ -1427,19 +1196,18 @@ function regeneratePlans(plans, seed = 1, cluster = null) {
 
 function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   const insight = classifyObservationInsight(observation ?? {});
-  const anchor = deriveEvidenceAnchor(observation, insight, seed, index);
-  const concept = conceptForInsight(anchor.conceptType || insight.type, seed + (stableHash(anchor.sourceUrl || anchor.title || anchor.focusTerm) % 97), index);
+  const anchor = deriveEvidenceAnchor(observation, insight, seed, index, categoryId);
   const signalAnchor = categoryId === 'trend-explainer' ? anchor : { ...anchor, title: anchor.focusTerm };
   const signal = observationSignalForPlan(observation, insight, signalAnchor);
-  const keyword = anchor.focusTerm || concept.keyword;
-  const artifact = anchor.artifact || concept.artifact;
+  const keyword = anchor.focusTerm;
+  const artifact = anchor.artifact;
   const planAnchor = evidenceAnchorForPlan(anchor, categoryId);
-  const lens = pickVariant(['基点', '別視点', '余白', '反転', '深層', '再読'], (Number(seed) || 0) * 5 + index);
-  const moment = pickVariant(['朝', '夜', '記録', '街', '章', '窓'], (Number(seed) || 0) * 5 + index + 1);
+  const lens = anchor.perspective;
+  const opening = openingForPlan(categoryId, anchor, seed, index);
 
   if (categoryId === 'short-video') {
     return {
-      titleCandidates: titleCandidatesForCategory(categoryId, concept, anchor, seed, index),
+      titleCandidates: titleCandidatesForCategory(categoryId, null, anchor, seed, index),
       protagonist: `${keyword}に反応した視聴者自身。${anchor.readerNeed}を、顔出し人物ではなく手元と生活動線で見せる。`,
       setting: `縦画面の${anchor.scene}。スマホだけで撮れ、視聴者が同じ場所で試せる。`,
       incitingIncident: `${artifact}を冒頭0秒に置き、説明前に「困った瞬間」か「改善後」を見せる。`,
@@ -1456,7 +1224,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
       premise: `取得根拠から抽出した「${keyword}」を、${lens}の視点で${artifact}と${anchor.tension}に落とし、視聴者が${anchor.scene}で${anchor.actionLabel}を1つだけ試せる短尺動画にする。`,
       exampleDetail: `冒頭は${artifact}を説明せずに見せる。次に${anchor.tension}を短字幕で分解し、最後に${anchor.actionLabel}を1つだけ改善した画を置く。`,
       outline: ['0秒: 結論か困りごとを見せる', '1-7秒: 原因を短字幕で分解', '8-24秒: 1つだけ直す', 'ラスト: 保存理由とコメント誘導'],
-      opening: `「${keyword}、毎日ちょっと損してませんか？」`,
+      opening,
       productionNotes: ['縦画面固定', '実在サービス名や個人情報を映さない', '効果を盛らず1つの改善に絞る'],
       differentiation: `総まとめ動画ではなく、観測データ1件から${anchor.scene}の1場面へ落とす。`,
       riskNotes: ['健康・金銭効果を断定しない'],
@@ -1467,7 +1235,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
 
   if (categoryId === 'trend-explainer') {
     return {
-      titleCandidates: titleCandidatesForCategory(categoryId, concept, anchor, seed, index),
+      titleCandidates: titleCandidatesForCategory(categoryId, null, anchor, seed, index),
       protagonist: `${keyword}を企画に使いたいが、根拠と安全な変換方法を知りたい制作者向けの語り手。`,
       setting: '観測データ、架空UI、ホワイトボード、媒体別作例を並べる解説画面。',
       incitingIncident: `${signal} そこから、なぜ反応が起きるのかを問いにする。`,
@@ -1484,7 +1252,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
       premise: `取得データを起点に、伸びた表層ではなく、${lens}の視点で${anchor.tension}を読み、${anchor.readerNeed}と${anchor.productionAngle}を解説する。`,
       exampleDetail: `前半で${anchor.title}の観測を示し、中盤で${anchor.tension}を分解し、後半で漫画・短尺・小説への変換例を出す。`,
       outline: ['導入: 観測結果', '理由: 反応した心理', '変換: 媒体別の作り方', '注意: 実在名と断定を避ける'],
-      opening: `「今日は、${keyword}がなぜ企画に使えるのかを分解します。」`,
+      opening,
       productionNotes: ['実在人物を告発対象にしない', '画面例は自作モックにする', '出典と推測を分ける'],
       differentiation: 'ニュース解説ではなく、創作者の制作判断へ落とす。',
       riskNotes: ['内部事情や因果関係を断定しない'],
@@ -1495,7 +1263,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
 
   if (categoryId === 'long-novel') {
     return {
-      titleCandidates: titleCandidatesForCategory(categoryId, concept, anchor, seed, index),
+      titleCandidates: titleCandidatesForCategory(categoryId, null, anchor, seed, index),
       protagonist: `${anchor.readerNeed}を避けて生きてきた主人公。最初は自分の問題だけを解決したいが、${anchor.tension}に巻き込まれる。`,
       setting: `${artifact}が、${anchor.scene}を起点に架空の町・図書館・記録庫・職場制度として広がる世界。`,
       incitingIncident: `主人公が${artifact}に触れ、自分だけの悩みだと思っていたものが町全体の記録だと知る。`,
@@ -1517,7 +1285,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
         `第3部: ${anchor.tension}の誤読を暴く`,
         `終盤: ${anchor.actionLabel}を救済として連鎖させる`,
       ],
-      opening: `${artifact}には、主人公の名前だけが空白で残されていた。`,
+      opening,
       productionNotes: ['実在サービス名は出さない', '章末ごとに新しい証拠を置く', '救済を急がない'],
       differentiation: '単発の能力ものではなく、記録を読む長期ミステリーにする。',
       riskNotes: ['実在企業や特定制度の告発にしない'],
@@ -1527,7 +1295,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   }
 
   return {
-    titleCandidates: titleCandidatesForCategory('story-manga', concept, anchor, seed, index),
+    titleCandidates: titleCandidatesForCategory('story-manga', null, anchor, seed, index),
     protagonist: `${anchor.readerNeed}を抱えた主人公。最初は${anchor.tension}を自分の弱さだと思い込んでいる。`,
     setting: `${artifact}が、${anchor.scene}の中で漫画で一目で読める小道具として現れる世界。`,
     incitingIncident: `主人公が${artifact}を1ページ目で目撃し、日常の見え方が変わる。`,
@@ -1549,7 +1317,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
       `転機: ${anchor.tension}の仕組みを見抜く`,
       `結末: ${anchor.actionLabel}で小さな救済を返す`,
     ],
-    opening: `${artifact}は、誰にも見えないはずの欄にだけ残っていた。`,
+    opening,
     productionNotes: ['実在サービス名は出さない', '固有名詞を架空UIへ変換する', '1話1つの小道具に絞る'],
     differentiation: `既存トレンド名ではなく、観測された${anchor.focusTerm}を漫画的な見せ場へ変換する。`,
     riskNotes: ['実在人物や企業への告発にしない'],
@@ -1558,161 +1326,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   };
 }
 
-function conceptForInsight(insightType, seed, index) {
-  const offset = Math.abs((Number(seed) || 0) * PLAN_BATCH_SIZE + index);
-  const bank = {
-    relation: {
-      keyword: '届かなかった本音',
-      actionNoun: '返事の整え方',
-      readerNeed: '近い相手ほど言葉を飲み込んでしまう不安',
-      emotionalHook: '本当は悪意ではなかった言葉が、届かないまま関係を変えてしまう痛み。',
-      artifact: '未送信の返事が届く改札',
-      artifactVariants: ['未送信の返事が届く改札', '相手に届かなかった一文だけが光る通知欄', '返せなかった言葉を預かる駅の窓口', '既読にならない手紙の束', '送信前で止まった返信箱', '終電後だけ開く連絡帳'],
-      visualCue: '送れなかった一文だけが光る通知欄',
-      shortSetting: '玄関、駅前、スマホの通知画面',
-      storyTitles: ['未送信改札', '返事のない夜行線', '届かなかった窓口', '既読にならない朝', '言えない切符', '終電後の返信箱'],
-      shortTitles: ['その返事、まだ送れます', '未返信を3秒でほどく', '気まずい一言の直し方', '返信前の深呼吸', '届く言葉の作り方', '既読の前に見る動画'],
-      explainerTitles: ['未返信が刺さる理由', '関係フックの作り方', '本音の遅延を企画にする', 'すれ違いが読まれる構造', 'コメントが増える関係設計', '対話の引きを分解する'],
-      novelTitles: ['未送信通知局', '返事を預かる駅', '既読にならない町', '届かなかった言葉の図書館', '夜間返信係', '返信箱の番人'],
-    },
-    regret: {
-      keyword: '取り戻せない時間',
-      actionNoun: '予定の見直し方',
-      readerNeed: '時間だけが早く過ぎてしまう後悔',
-      emotionalHook: 'まだ間に合うと思っていた予定が、気づいた時には遠く過ぎている怖さ。',
-      artifact: '明日だけが先に届くカレンダー',
-      artifactVariants: ['明日だけが先に届くカレンダー', '三年後の予定だけが印字されるレシート', '過ぎた日付を配達する郵便受け', '一晩で月が進む予定表', '昨日の予定だけが残るスマホ通知', '未来の自分から届く不在票'],
-      visualCue: '予定表の日付だけが勝手にめくれる画面',
-      shortSetting: '机のカレンダー、スマホ予定表、朝の部屋',
-      storyTitles: ['明日だけが届く部屋', '置き去りカレンダー', '時間差通知の夜', '三年後のレシート', '遅れてきた予定表', '昨日を配る郵便受け'],
-      shortTitles: ['時間が消える前にやる1つ', '予定表の見直し3カット', '明日を取り戻す30秒', '後悔を減らす朝の一手', '先延ばしを止める字幕', '一日を拾い直す動画'],
-      explainerTitles: ['時間不安が刺さる理由', '後悔フックを企画に変える', 'なぜ時間喪失は読まれるのか', '予定表モチーフの作り方', '共感される後悔の設計', '時間感覚を物語化する方法'],
-      novelTitles: ['明日配達局', '置き去り暦の町', '時間差郵便の夜', '昨日を読む図書館', '予定表の空白', '一年を返す記録係'],
-    },
-    unfairness: {
-      keyword: '言い返せない理不尽',
-      actionNoun: 'かわす一言',
-      readerNeed: 'その場で言い返せなかった悔しさ',
-      emotionalHook: '正しいことを言うほど立場が悪くなる理不尽さ。',
-      artifact: '言えなかった台詞が貼られる掲示板',
-      artifactVariants: ['言えなかった台詞が貼られる掲示板', '反論だけが赤字で残る回覧板', '悔しさを印字する職場メモ', '声にできなかった一文の貼り紙', '沈黙だけが採点される申請欄', '赤線で消された抗議文'],
-      visualCue: '赤線の引かれた言い返せない一言',
-      shortSetting: '職場の机、レジ前、学校の廊下',
-      storyTitles: ['反論掲示板', '赤線のついた沈黙', '言えなかった欄外', '悔しさの貼り紙', '声にならない通知', '理不尽の回覧板'],
-      shortTitles: ['言い返せない時の一手', '理不尽をかわす3秒', 'その場で折れない字幕', '赤線の消し方', '悔しさを持ち帰らない方法', '反論しない反撃'],
-      explainerTitles: ['理不尽あるあるが伸びる理由', '怒りを煽らず企画にする方法', '共感と救済の設計', '反論フックの作り方', 'スカッとしすぎない物語術', '不公平感の扱い方'],
-      novelTitles: ['反論掲示板の町', '沈黙係の記録', '赤線都市', '言えなかった手紙', '理不尽を預かる役所', '欄外の抗議文'],
-    },
-    relatable: {
-      keyword: '生活の小さな違和感',
-      actionNoun: '違和感の直し方',
-      readerNeed: '自分だけだと思っていた小さなあるある',
-      emotionalHook: '誰にも説明するほどではない違和感が、毎日少しずつ積もる感覚。',
-      artifact: '違和感だけに赤丸が付くレシート',
-      artifactVariants: ['違和感だけに赤丸が付くレシート', '日用品の横にだけ浮く赤い丸', '生活のズレを記録する買い物メモ', '朝だけ光る違和感タグ', '小さな不便を告げる家計簿', 'あるあるだけを拾う通知欄'],
-      visualCue: '日用品の横に浮く小さな赤丸',
-      shortSetting: '台所、洗面所、バッグの中',
-      storyTitles: ['赤丸レシート', '違和感だけが残る朝', '生活欄の赤い丸', '小さなズレの通知', 'あるある採集帳', '日用品の告げ口'],
-      shortTitles: ['その違和感これです', '生活のズレを3秒で直す', 'あるあるを1つ消す', '朝のモヤモヤ保存版', '小さな不便の正体', '毎日の赤丸を消す'],
-      explainerTitles: ['あるあるが共有される理由', '共感フックの作り方', '生活違和感を企画にする', '小さな不便が伸びる構造', 'なぜ日用品は物語になるのか', '共感を雑にしない設計'],
-      novelTitles: ['赤丸商店街', '違和感採集帳', '日用品の声がする町', '小さなズレの図書館', '生活欄の番人', '朝だけ赤くなる部屋'],
-    },
-    evaluation: {
-      keyword: '見えない評価',
-      actionNoun: '判断基準の見直し方',
-      readerNeed: '理由の見えない点数に振り回される不安',
-      emotionalHook: '点数だけが先に届き、理由だけが誰にも見えない怖さ。',
-      artifact: '理由だけが浮かぶ評価欄',
-      artifactVariants: ['理由だけが浮かぶ評価欄', '点数の下にだけ出る灰色メモ', '採点理由を隠す通知票', '自分だけ読める査定ログ', '比較結果だけが届く封筒', '評価不能と書かれた空白欄'],
-      visualCue: '点数の下にだけ出る灰色の理由',
-      shortSetting: 'スマホ画面、通知欄、提出物の横',
-      storyTitles: ['灰色の評価欄', '点数の裏メモ', '理由だけが見える朝', '評価不能通知', '採点表の余白', '見えない理由欄'],
-      shortTitles: ['比較で疲れた時の一手', '点数に飲まれない3秒', '評価欄の見方を変える', '比べすぎを止める字幕', '理由のない点数から降りる', '判断基準の保存版'],
-      explainerTitles: ['評価不安が伸びる理由', '点数化社会を企画にする', '見えない評価の描き方', '比較疲れの分析', 'AI評価不安の扱い方', 'ランキング疲れを物語にする'],
-      novelTitles: ['理由欄の読者', '灰色評価局', '点数のない朝', '採点表の町', '評価不能の記録係', '選ばれなかった理由書'],
-    },
-    saving: {
-      keyword: 'あとで助かる知恵',
-      actionNoun: '保存される一手',
-      readerNeed: '今すぐは無理でもあとで見返したい安心感',
-      emotionalHook: '自分だけで抱えていた不便に、小さな逃げ道が見つかる安心。',
-      artifact: '未来の自分から届くメモ',
-      artifactVariants: ['未来の自分から届くメモ', '明日の自分宛ての付箋', '困った時だけ開く生活ノート', 'あとで助かる一行が増える冷蔵庫', '保存した覚えのない手順メモ', '小さな逃げ道を書いたカード'],
-      visualCue: '明日の自分宛ての付箋',
-      shortSetting: '机、冷蔵庫、玄関、メモアプリ',
-      storyTitles: ['明日の付箋', '未来メモの貼られる部屋', '助け舟ノート', '保存された小さな逃げ道', 'あとで読む冷蔵庫', '自分宛ての生活メモ'],
-      shortTitles: ['保存して明日やる1つ', 'あとで助かる3カット', '生活メモの作り方', '明日の自分に渡す動画', '不便を減らす保存版', '1手順だけ残す'],
-      explainerTitles: ['保存される企画の条件', '共有したくなる知恵の作り方', '役立つ情報が伸びる理由', '保存動機を設計する', 'ノウハウを物語に変える', '実用フックの分解'],
-      novelTitles: ['明日の付箋係', '未来メモ図書館', '助け舟ノートの町', '保存された逃げ道', '自分宛ての棚', 'あとで読む手紙'],
-    },
-    life: {
-      keyword: '生活不安',
-      actionNoun: '我慢の減らし方',
-      readerNeed: '生活の数字に追われる不安',
-      emotionalHook: '残高や予定表を見るたび、自分の選択肢が少しずつ削られる感覚。',
-      artifact: '我慢の回数が印字されるレシート',
-      artifactVariants: ['我慢の回数が印字されるレシート', '買えなかった理由だけが残る棚札', '残高ではなく諦めた数が出る家計簿', '夜だけ赤字になる生活通知', '戻した商品の理由を書くレジ', '自分に使わなかった金額のメモ'],
-      visualCue: '金額の代わりに我慢回数が出る紙片',
-      shortSetting: '財布、コンビニ、台所、帰宅後の机',
-      storyTitles: ['我慢レシート', '残高のない家計簿', '諦めた理由欄', '生活通知の赤字', '夜の家計簿', '買えなかったものの棚'],
-      shortTitles: ['今日の我慢を1つ減らす', '家計モヤモヤ3カット', '買い足さない夜の工夫', '生活不安の小さな逃げ道', '節約疲れをほどく字幕', '明日ラクになる一手'],
-      explainerTitles: ['生活不安が刺さる理由', '家計フックを安全に使う', '我慢の物語化', '節約疲れを企画にする', '生活数字の見せ方', '不安を煽らない構成'],
-      novelTitles: ['我慢レシート図書館', '夜の家計簿係', '買えなかったものの町', '生活通知局', '諦めた理由の棚', '残高のない商店街'],
-    },
-    continuity: {
-      keyword: '章をまたぐ謎',
-      actionNoun: '次回の残し方',
-      readerNeed: '答えを急がず追い続けたい問い',
-      emotionalHook: '一度ではわからない違和感が、読み進めるほど別の意味に変わる快感。',
-      artifact: '章末だけに現れる白紙ログ',
-      artifactVariants: ['章末だけに現れる白紙ログ', '最後の欄だけ空いた記録票', '次話の証拠だけが消えたノート', '回収前の伏線を預かる引き出し', '読了後に一行増える目次', '空欄のまま届く章末メモ'],
-      visualCue: '最後の欄だけ空白の記録',
-      shortSetting: 'ノート、動画のラスト字幕、未完成の図',
-      storyTitles: ['白紙ログ', '最後の欄だけ空いた日', '回収待ちノート', '次話の余白', '空欄の記録係', '続きのないメモ'],
-      shortTitles: ['次回を見たくなる残し方', '最後の1秒に置く謎', 'コメントで続く仕掛け', '回収待ち字幕', '次を見る理由の作り方', 'ラストの空欄テク'],
-      explainerTitles: ['読者維持の作り方', '章末フックを分析する', '続きが見たくなる構造', '伏線と回収の設計', '連載企画の伸ばし方', '未解決を残す技術'],
-      novelTitles: ['白紙ログの記録係', '章末図書館', '回収待ちの町', '最後の欄の読者', '空欄年代記', '続きのない手紙'],
-    },
-    system: {
-      keyword: '見えない仕組み',
-      actionNoun: '構造の見抜き方',
-      readerNeed: '自分のせいに見える不利益の裏側を知りたい欲求',
-      emotionalHook: '自分の失敗だと思っていたことが、実は仕組みで誘導されていたと知る衝撃。',
-      artifact: '見えないルールだけが出る掲示板',
-      artifactVariants: ['見えないルールだけが出る掲示板', '細則だけが増える駅の貼り紙', '自分の行動を誘導する透明な規約欄', '選択肢の裏側を示す導線図', '誰も読まないルールブックの余白', '街の動きを変える隠し回覧'],
-      visualCue: '誰も見ていない掲示板に増える細則',
-      shortSetting: 'アプリ画面、駅掲示板、職場の貼り紙',
-      storyTitles: ['見えない規約掲示板', 'ルールの裏窓', '細則だけが増える朝', '仕組みの張り紙', '誘導線の街', '透明な規約欄'],
-      shortTitles: ['その仕組みを3秒で見る', '損する導線を直す', '見えないルールの見分け方', 'なぜそうなるのか字幕', '構造を1画面で分解', '誘導に気づく動画'],
-      explainerTitles: ['見えない仕組みの解説', 'アルゴリズム不安を安全に扱う', '制度を物語化する方法', '構造分析の作り方', '炎上せずに分解する', '仕組みを企画に変える'],
-      novelTitles: ['透明規約の町', '細則掲示板の夜', '見えないルール係', '誘導線都市', '規約欄の読者', '仕組みを読む図書館'],
-    },
-    topic: {
-      keyword: '世の中で動いた感情',
-      actionNoun: '感情の見せ方',
-      readerNeed: '言葉にしにくい違和感を誰かに代弁してほしい欲求',
-      emotionalHook: '何に反応したのか自分でもわからない感情が、画面上に形を持つ瞬間。',
-      artifact: '感情だけが残る通知欄',
-      artifactVariants: ['感情だけが残る通知欄', '本文が消えて気持ちだけ残ったメモ', '名前のない反応を集める画面', '言えない言葉だけが光る窓', '誰のものでもない感情タグ', '匿名の本音が浮かぶ掲示板'],
-      visualCue: '本文が消えて感情だけが残った通知',
-      shortSetting: 'スマホ画面、机、移動中の手元',
-      storyTitles: ['感情通知欄', '言えない言葉の窓', '反応だけが残る朝', '匿名の感情メモ', '心だけが光る画面', '名前のない通知'],
-      shortTitles: ['その感情を1秒で見せる', 'モヤモヤを3カットにする', '共感の正体を字幕にする', '言えない気持ちの見せ方', '反応が増える冒頭', '感情フックの保存版'],
-      explainerTitles: ['感情フックの作り方', '話題を企画に変える方法', '共感が動く理由', '反応の正体を分解する', '流行語に頼らない設計', '世の中の感情を読む'],
-      novelTitles: ['感情通知局', '名前のない反応録', '言えない言葉の町', '匿名感情図書館', '心だけが光る夜', '反応を預かる人'],
-    },
-  };
-  const concept = bank[insightType] ?? bank.topic;
-  const artifact = pickVariant(concept.artifactVariants ?? concept.storyTitles ?? [concept.artifact], offset);
-  return {
-    ...concept,
-    artifact,
-    storyTitle: pickVariant(concept.storyTitles, offset),
-    shortTitle: pickVariant(concept.shortTitles, offset),
-    explainerTitle: pickVariant(concept.explainerTitles, offset),
-    novelTitle: pickVariant(concept.novelTitles, offset),
-  };
-}
+
 
 function pickVariant(items, offset) {
   if (!Array.isArray(items) || items.length === 0) return '物語の種';
@@ -1720,39 +1334,78 @@ function pickVariant(items, offset) {
 }
 
 function titleCandidatesForCategory(categoryId, concept, anchor, seed, index) {
-  const fallbackTitles = {
+  const focus = cleanFocusTerm(anchor?.focusTerm ?? concept?.keyword ?? '取得語');
+  const secondary = cleanFocusTerm(anchor?.secondaryTerm ?? anchor?.terms?.[1] ?? '別視点');
+  const pair = uniqueList([focus, secondary]).join('・');
+  const rawSurface = anchor?.artifact ?? pickVariant(anchorSurfacesForCategory(categoryId), stableHash(`${focus}|${seed}|${index}`));
+  const surface = compactEvidenceText(
+    String(rawSurface)
+      .replace(`${pair}だけが残る`, '')
+      .replace(`${focus}だけが残る`, '')
+      .replace(`${secondary}だけが残る`, '')
+      .trim() || rawSurface,
+    22,
+  );
+  const titleShapes = {
     'story-manga': [
-      concept?.storyTitle,
-      anchor?.artifact,
-      ...(concept?.storyTitles ?? []),
-    ],
-    'long-novel': [
-      concept?.novelTitle,
-      anchor?.artifact,
-      ...(concept?.novelTitles ?? []),
+      `${focus}の${surface}`,
+      `${secondary}だけが残る確認欄`,
+      `${pair}を読む第1ページ`,
     ],
     'short-video': [
-      concept?.shortTitle,
-      `${anchor?.actionLabel ?? concept?.actionNoun ?? '一手'}を3カットで見せる`,
-      `保存用・${anchor?.artifact ?? concept?.artifact ?? '生活メモ'}`,
-      ...(concept?.shortTitles ?? []),
+      `${focus}を3カットで見る`,
+      `${secondary}の前後比較`,
+      `${pair}の短尺チェック`,
     ],
     'trend-explainer': [
-      concept?.explainerTitle,
-      `${anchor?.focusTerm ?? concept?.keyword ?? '話題'}が刺さる理由`,
-      `${anchor?.productionAngle ?? '制作判断'}を企画に変える方法`,
-      `${compactEvidenceText(anchor?.title, 24)}の反応を読む`,
-      ...(concept?.explainerTitles ?? []),
+      `${focus}が反応された理由`,
+      `${pair}を制作判断に変える`,
+      `${compactEvidenceText(anchor?.title ?? focus, 22)}の読み方`,
+    ],
+    'long-novel': [
+      `${focus}の記録庫`,
+      `${secondary}が残る町`,
+      `${pair}の章末記録`,
     ],
   };
-  return rotatedTitleCandidates(fallbackTitles[categoryId] ?? fallbackTitles['story-manga'], seed, index);
+  return uniqueList(titleShapes[categoryId] ?? titleShapes['story-manga']).slice(0, 3);
 }
 
-function rotatedTitleCandidates(candidates, seed, index) {
-  const items = uniqueList(candidates);
-  if (items.length === 0) return ['物語の種'];
-  const start = Math.abs((Number(seed) || 0) * (PLAN_BATCH_SIZE + 2) + index) % items.length;
-  return Array.from({ length: Math.min(3, items.length) }).map((_, candidateIndex) => items[(start + candidateIndex) % items.length]);
+
+
+function openingForPlan(categoryId, anchor, seed, index) {
+  const focus = anchor?.focusTerm ?? '取得語';
+  const secondary = anchor?.secondaryTerm ?? '別視点';
+  const artifact = anchor?.artifact ?? '確認欄';
+  const perspective = anchor?.perspective ?? '別視点';
+  const offset = stableHash(`${anchor?.sourceUrl ?? anchor?.id ?? focus}|${seed}|${index}`);
+  const openings = {
+    'story-manga': [
+      `${artifact}の端に、${focus}だけが薄く浮かんだ。`,
+      `${secondary}の列だけ、主人公には別の意味で読めた。`,
+      `${perspective}を見た瞬間、${focus}はただの話題ではなくなった。`,
+      `${artifact}を閉じようとした指が、${secondary}の一行で止まった。`,
+    ],
+    'short-video': [
+      `最初の画面に出すのは、${focus}ではなく${secondary}が変わる瞬間。`,
+      `${artifact}を0秒目に置き、${perspective}から字幕を入れる。`,
+      `${focus}で迷う前と後を、同じ手元で並べる。`,
+      `「${secondary}、ここで止まってない？」から始める。`,
+    ],
+    'trend-explainer': [
+      `今日は${focus}そのものではなく、${secondary}が反応された理由を分けて見ます。`,
+      `まず観測事実、次に${perspective}、最後に制作への置き換えです。`,
+      `${artifact}に整理すると、${focus}の使いどころが見えてきます。`,
+      `${secondary}を煽らず使うには、どこまでが根拠でどこからが解釈かを分けます。`,
+    ],
+    'long-novel': [
+      `${artifact}の最初のページに、${focus}という語だけが残されていた。`,
+      `${secondary}を記した台帳は、主人公の名前だけを空けていた。`,
+      `${perspective}から始まった章は、${focus}の意味を少しだけ変えた。`,
+      `町の記録庫で、${artifact}だけがまだ閉じられていなかった。`,
+    ],
+  };
+  return pickVariant(openings[categoryId] ?? openings['story-manga'], offset);
 }
 
 function uniqueList(items) {
@@ -1788,149 +1441,37 @@ function observationEvidenceText(observation) {
     .join(' ');
 }
 
-function rotatePlanObservations(observations, seed = 0, limit = PLAN_BATCH_SIZE) {
+function planObservationsForCluster(observations, limit = PLAN_BATCH_SIZE) {
   const pool = Array.isArray(observations) ? observations.filter(Boolean) : [];
   if (pool.length === 0) return [];
-  const start = Math.abs(Number(seed) || 0) % pool.length;
-  return Array.from({ length: limit }).map((_, index) => pool[(start + index) % pool.length]);
+  const seen = new Set();
+  const stablePool = pool.filter((observation) => {
+    const key = observation?.sourceUrl || observation?.id || observation?.title;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const source = stablePool.length > 0 ? stablePool : pool;
+  return Array.from({ length: limit }).map((_, index) => source[index % source.length]);
 }
 
-function evidenceTraits() {
-  return [
-    {
-      key: 'reply',
-      test: /返信|未返信|通知|既読|連絡|言葉|本音|メッセージ|返事/,
-      fallbackInsights: ['relation'],
-      focusTerms: ['返せなかった一言', '届かなかった本音', '未返信の後悔'],
-      scenes: ['玄関とスマホ通知の間', '駅前の待ち合わせ場所', '夜の部屋と未読欄'],
-      artifacts: ['返せなかった一文だけが光る通知欄', '未送信の言葉を預かる改札', '既読にならない手紙の束'],
-      tensions: ['近い相手ほど本音を飲み込む', '言うほどでもない一言が関係を変える', '返せなかった時間だけが残る'],
-      readerNeeds: ['近い相手ほど言葉を飲み込んでしまう不安', '小さなすれ違いを取り戻したい気持ち'],
-      emotionalHooks: ['悪意ではなかった言葉が届かないまま関係を変える痛み。', '一通だけ返せなかったことが、後から大きく見えてくる怖さ。'],
-      actionLabels: ['返事の整え方', '言えなかった一言の戻し方'],
-      productionAngles: ['対話の遅延を見せ場にする', '未返信を回収フックにする'],
-    },
-    {
-      key: 'public-rule',
-      test: /駅|通勤|制度|ルール|貼り紙|不公平|理不尽|職場|申請|規約|構造/,
-      fallbackInsights: ['unfairness', 'system'],
-      focusTerms: ['見えないルールの不公平', '言い返せない理不尽', '透明な制度疲れ'],
-      scenes: ['駅前や職場の掲示板', '申請窓口と通勤導線', '誰も読まない規約が増える場所'],
-      artifacts: ['細則だけが増える貼り紙', '反論だけが赤字で残る回覧板', '選択肢の裏側を示す導線図'],
-      tensions: ['ルールはあるのに理由が見えない', '正しいことを言うほど立場が悪くなる', '自分の失敗に見える不利益が仕組みから来る'],
-      readerNeeds: ['自分のせいに見える不利益の裏側を知りたい欲求', 'その場で言い返せなかった悔しさ'],
-      emotionalHooks: ['自分の失敗だと思っていたことが、実は仕組みで誘導されていたと知る衝撃。', '正しいことを言うほど立場が悪くなる理不尽さ。'],
-      actionLabels: ['仕組みの見抜き方', '理不尽をかわす一手'],
-      productionAngles: ['構造を小道具化する', '反論の余白を見せ場にする'],
-    },
-    {
-      key: 'family-life',
-      test: /家族|家庭|冷蔵庫|買い物|節約|家計|我慢|暮らし|生活|子育て|親子/,
-      fallbackInsights: ['life', 'relatable'],
-      focusTerms: ['生活の小さな我慢', '家族に言えない不便', '節約疲れの違和感'],
-      scenes: ['台所や帰宅後の机', '冷蔵庫の前と買い物メモ', '家族の生活動線が重なる場所'],
-      artifacts: ['買い忘れと我慢が並ぶ冷蔵庫メモ', '我慢の回数が印字されるレシート', '生活のズレを記録する買い物メモ'],
-      tensions: ['近い相手ほど小さな我慢を言い出せない', '節約や家事の小さな差が感情に変わる', '便利なはずの生活メモが負担を可視化する'],
-      readerNeeds: ['生活の数字に追われる不安', '自分だけだと思っていた小さなあるある'],
-      emotionalHooks: ['誰にも説明するほどではない違和感が、毎日少しずつ積もる感覚。', '残高や予定表を見るたび、選択肢が少しずつ削られる感覚。'],
-      actionLabels: ['我慢の減らし方', '生活違和感の直し方'],
-      productionAngles: ['生活小道具から感情を出す', '我慢の回数を物語化する'],
-    },
-    {
-      key: 'time-regret',
-      test: /時間|期限|予定|後悔|遅れ|間に合|年後|今日|明日/,
-      fallbackInsights: ['regret'],
-      focusTerms: ['取り戻せない時間', '期限を過ぎた後悔', '先延ばしの痛み'],
-      scenes: ['机のカレンダーと通知欄', '朝の部屋と予定表', '期限だけが光る画面'],
-      artifacts: ['明日だけが先に届くカレンダー', '過ぎた日付を配達する郵便受け', '昨日の予定だけが残るスマホ通知'],
-      tensions: ['まだ間に合うと思っていた予定が遠く過ぎる', '小さな先延ばしが取り戻せない差になる', '時間だけが自分を置いて進む'],
-      readerNeeds: ['時間だけが早く過ぎてしまう後悔', 'まだ間に合う方法を知りたい焦り'],
-      emotionalHooks: ['まだ間に合うと思っていた予定が、気づいた時には遠く過ぎている怖さ。', '一日を失った感覚が、生活全体の不安に変わる痛み。'],
-      actionLabels: ['予定の見直し方', '後悔を減らす一手'],
-      productionAngles: ['時間差をフックにする', '予定表を謎として扱う'],
-    },
-    {
-      key: 'evaluation',
-      test: /評価|採点|点数|査定|ランキング|比較|AI|合格|却下/,
-      fallbackInsights: ['evaluation'],
-      focusTerms: ['見えない評価', '理由のない点数', '比較疲れ'],
-      scenes: ['通知欄と提出物の横', 'ランキング画面の外側', '採点理由が隠れた画面'],
-      artifacts: ['理由だけが浮かぶ評価欄', '点数の下に出る灰色メモ', '評価不能と書かれた空白欄'],
-      tensions: ['点数だけが先に届き理由だけが見えない', '比べるほど自分の基準が消える', '評価されているのに改善点が読めない'],
-      readerNeeds: ['理由の見えない点数に振り回される不安', '比較され続ける疲れから降りたい気持ち'],
-      emotionalHooks: ['点数だけが先に届き、理由だけが誰にも見えない怖さ。', '比べられるほど、自分の輪郭が薄くなる不安。'],
-      actionLabels: ['判断基準の見直し方', '比較疲れから降りる方法'],
-      productionAngles: ['評価欄を謎にする', '点数の裏側を安全に見せる'],
-    },
-    {
-      key: 'saving',
-      test: /保存|ノウハウ|方法|手順|便利|知恵|対策|コツ|あとで/,
-      fallbackInsights: ['saving'],
-      focusTerms: ['あとで助かる知恵', '保存したくなる一手', '明日の自分へのメモ'],
-      scenes: ['机、冷蔵庫、玄関、メモアプリ', '困った時だけ開く生活ノート', '手元だけで試せる場所'],
-      artifacts: ['未来の自分から届くメモ', '明日の自分宛ての付箋', 'あとで助かる一行が増える冷蔵庫'],
-      tensions: ['今すぐは無理でも後で見返したい', '知っているだけでは使えない', '便利情報が多すぎて本当に使う一手が残らない'],
-      readerNeeds: ['今すぐは無理でもあとで見返したい安心感', '小さな逃げ道を持っておきたい気持ち'],
-      emotionalHooks: ['自分だけで抱えていた不便に、小さな逃げ道が見つかる安心。', '明日の自分が少し助かるだけで、今日の不安が軽くなる。'],
-      actionLabels: ['保存される一手', '明日の自分に渡す方法'],
-      productionAngles: ['保存理由を先に見せる', '手順を一つに絞る'],
-    },
-    {
-      key: 'continuity',
-      test: /続き|連載|章|伏線|考察|読了|次回|回収|謎/,
-      fallbackInsights: ['continuity'],
-      focusTerms: ['章をまたぐ謎', '続きが気になる余白', '回収待ちの伏線'],
-      scenes: ['章末の白紙ログ', '未完成の図と次話予告', '読了後に一行増える目次'],
-      artifacts: ['章末だけに現れる白紙ログ', '次話の証拠だけが消えたノート', '空欄のまま届く章末メモ'],
-      tensions: ['一度ではわからない違和感が後で意味を変える', '答えが出ないから読み続けたくなる', '回収前の余白が不安と期待を同時に残す'],
-      readerNeeds: ['答えを急がず追い続けたい問い', '読み進めるほど意味が変わる快感'],
-      emotionalHooks: ['一度ではわからない違和感が、読み進めるほど別の意味に変わる快感。', '空欄が残るほど、次の章を開きたくなる。'],
-      actionLabels: ['次回の残し方', '章末フックの作り方'],
-      productionAngles: ['章末の空欄を使う', '伏線の再解釈を設計する'],
-    },
-  ];
-}
 
-function evidenceTraitFor(observation, insight) {
-  const text = observationEvidenceText(observation);
-  const traits = evidenceTraits();
-  return (
-    traits.find((trait) => trait.test.test(text)) ??
-    traits.find((trait) => trait.fallbackInsights?.includes(insight?.type)) ??
-    {
-      key: 'topic',
-      focusTerms: ['世の中で動いた感情', '言葉にしにくい違和感', '名前のない反応'],
-      scenes: ['スマホ画面と机の上', '移動中の手元', '匿名の反応が集まる画面'],
-      artifacts: ['感情だけが残る通知欄', '本文が消えて気持ちだけ残ったメモ', '名前のない反応を集める画面'],
-      tensions: ['何に反応したのか自分でもわからない', '言葉にしにくい違和感が画面上に形を持つ', '匿名の反応だけが先に増える'],
-      readerNeeds: ['言葉にしにくい違和感を誰かに代弁してほしい欲求', '自分の反応の正体を知りたい気持ち'],
-      emotionalHooks: ['何に反応したのか自分でもわからない感情が、画面上に形を持つ瞬間。', '名前がつかない違和感ほど、誰かに形にしてほしくなる。'],
-      actionLabels: ['感情の見せ方', '違和感の言語化'],
-      productionAngles: ['感情だけを小道具化する', '反応の正体を分解する'],
-    }
-  );
-}
-
-function focusTermForObservation(observation, trait, offset) {
-  const tags = focusTermsFromValues(Array.isArray(observation?.tags) ? observation.tags : []);
-  if (tags.length > 0) return tags.join('・');
-  const queryTerms = focusTermsFromValues([safeQueryForPlan(observation?.queryUsed ?? observation?.query)]);
-  if (queryTerms.length > 0) return queryTerms.join('・');
-  return pickVariant(trait.focusTerms, offset);
-}
 
 function focusTermsFromValues(values) {
   return uniqueList(
     values
       .flatMap((value) => String(value ?? '').split(/[\s、,／/・]+/))
       .map(cleanFocusTerm)
-      .filter((value) => value && !isMetaFocusTerm(value)),
+      .filter((value) => isUsableEvidenceTerm(value)),
   ).slice(0, 2);
 }
 
 function cleanFocusTerm(value) {
   return compactEvidenceText(value, 14)
     .replace(/への反応|の反応|周辺の反応|反応/g, '')
+    .replace(/\s*[-–—]\s*[^-–—]{1,24}$/u, '')
+    .replace(/public Web\/RSS round \d+/gi, '')
+    .replace(/公開Web\/RSS取得\d*/g, '')
     .replace(/[【】「」『』（）()[\]"”“]/g, '')
     .trim();
 }
@@ -1944,11 +1485,124 @@ function isMetaFocusTerm(value) {
   );
 }
 
-function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0) {
-  const trait = evidenceTraitFor(observation, insight);
-  const hash = stableHash(`${observation?.id ?? ''}|${observation?.title ?? ''}|${observation?.sourceUrl ?? ''}|${seed}|${index}`);
-  const offset = Math.abs((Number(seed) || 0) * 7 + index + hash);
-  const title = compactEvidenceText(observation?.title ?? insight?.material ?? pickVariant(trait.focusTerms, offset), 72);
+const EVIDENCE_TERM_STOPWORDS = new Set([
+  'ニュース',
+  '記事',
+  '話題',
+  '議論',
+  '共感',
+  '反応',
+  '賛否',
+  '公開',
+  '取得',
+  '検索',
+  '根拠',
+  '周辺',
+  '不安',
+  '理由',
+  '方法',
+  'まとめ',
+  '速報',
+  '公式',
+  '今年',
+  '今日',
+  '明日',
+  '昨日',
+  '今回',
+  '複数',
+  '日本',
+  '国内',
+  '海外',
+  '男性',
+  '女性',
+  '自分',
+  '相手',
+  '公開Web',
+  'Web',
+  'RSS',
+]);
+
+function evidenceTermsForObservation(observation = {}) {
+  const tagTerms = focusTermsFromValues(Array.isArray(observation.tags) ? observation.tags : []);
+  const textTerms = [
+    observation.title,
+    observation.snippet,
+    observation.queryUsed,
+    observation.query,
+  ].flatMap(extractEvidenceTerms);
+  return uniqueList([...tagTerms, ...textTerms])
+    .filter(isUsableEvidenceTerm)
+    .slice(0, 6);
+}
+
+function extractEvidenceTerms(value) {
+  const text = String(value ?? '')
+    .normalize('NFKC')
+    .replace(/\s*[-–—]\s*(ABEMA|Yahoo!ニュース|Google News|Bing News|ITmedia|NHK|朝日新聞|読売新聞|毎日新聞|産経ニュース|PR TIMES|ねとらぼ|Impress Watch|CNET Japan|THE ANSWER).*$/iu, ' ')
+    .replace(/public Web\/RSS round \d+/gi, ' ')
+    .replace(/公開Web\/RSS取得\d*/g, ' ')
+    .replace(/\b\d+d\b/gi, ' ')
+    .replace(/[「」『』【】（）()[\]"”“]/g, ' ');
+  const alnumTerms = text.match(/[A-Za-z]*\d+[A-Za-z0-9０-９]*/g) ?? [];
+  const compactTerms = text.match(/[一-龯々〆ヵヶァ-ヴーA-Za-z0-9０-９]{2,16}/g) ?? [];
+  return uniqueList([...alnumTerms, ...compactTerms].map(cleanFocusTerm)).filter(isUsableEvidenceTerm);
+}
+
+function isUsableEvidenceTerm(value) {
+  const normalized = String(value ?? '').trim();
+  if (!normalized || normalized.length < 2) return false;
+  if (isMetaFocusTerm(normalized)) return false;
+  if (isSourceTag(normalized)) return false;
+  if (EVIDENCE_TERM_STOPWORDS.has(normalized)) return false;
+  if (/^(Google|Bing|Yahoo|TikTok|YouTube|LINE|Netflix|RSS|Web)$/i.test(normalized)) return false;
+  if (/^[\d０-９]+$/.test(normalized) && normalized.length < 3) return false;
+  return true;
+}
+
+function anchorSurfacesForCategory(categoryId) {
+  const surfaces = {
+    'story-manga': ['確認欄', '受付票', '掲示板', '白い余白', '記録票', '入力フォーム', '封筒', '申請欄'],
+    'short-video': ['比較カード', '手元カット', '字幕カード', 'チェック欄', 'ビフォー画面', '検証ボード'],
+    'trend-explainer': ['根拠カード', '比較表', '章立てボード', '注意点リスト', '制作判断表', '観測ログ'],
+    'long-novel': ['記録庫', '受付票', '町の台帳', '章末記録', '封印された書類', '白紙の索引'],
+  };
+  return surfaces[categoryId] ?? surfaces['story-manga'];
+}
+
+function perspectiveAnglesForCategory(categoryId) {
+  const perspectives = {
+    'story-manga': ['当事者の誤解', '周囲の沈黙', '制度の見落とし', '第三者の証言', '場面の裏側', '最後の選択'],
+    'short-video': ['失敗直前', '変化後の比較', '視聴者の手元', 'コメントの二択', '試す前の迷い', '保存後の再確認'],
+    'trend-explainer': ['観測事実', '視聴心理', '制作手順', '安全な言い換え', '媒体別の差', '次回検証'],
+    'long-novel': ['第1章の誤解', '別人物の証言', '記録の欠落', '町のルール', '章末の再解釈', '終盤の回収'],
+  };
+  return perspectives[categoryId] ?? perspectives['story-manga'];
+}
+
+function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0, categoryId = 'story-manga') {
+  const terms = evidenceTermsForObservation(observation);
+  const numericSeed = Math.abs(Number(seed) || 0);
+  const hash = stableHash(`${observation?.id ?? ''}|${observation?.title ?? ''}|${observation?.sourceUrl ?? ''}|${index}`);
+  const offset = Math.abs(hash + numericSeed * 17 + index * 11);
+  const fallbackFocus = cleanFocusTerm(insight?.material ?? '取得シグナル');
+  const focusTerm = terms[0] ?? fallbackFocus;
+  const secondaryTerm = terms.find((term) => term !== focusTerm) ?? cleanFocusTerm(insight?.type ?? '別視点');
+  const surface = pickVariant(anchorSurfacesForCategory(categoryId), offset + 1);
+  const perspective = pickVariant(perspectiveAnglesForCategory(categoryId), offset + 2);
+  const focusPair = uniqueList([focusTerm, secondaryTerm]).join('・');
+  const title = compactEvidenceText(observation?.title ?? focusPair, 72);
+  const scenePrefix = {
+    'story-manga': '1ページ目で',
+    'short-video': '縦画面で',
+    'trend-explainer': '解説画面で',
+    'long-novel': '第1章で',
+  }[categoryId] ?? '冒頭で';
+  const actionPrefix = {
+    'story-manga': '読み替える',
+    'short-video': '試して見せる',
+    'trend-explainer': '分解する',
+    'long-novel': '章ごとに追う',
+  }[categoryId] ?? '企画化する';
   return {
     id: observation?.id ?? '',
     source: observation?.source ?? '公開Web/RSS',
@@ -1958,15 +1612,18 @@ function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0) {
     observedAt: observation?.observedAt ?? '',
     publishedAt: observation?.publishedAt ?? '',
     insightType: insight?.type ?? 'topic',
-    conceptType: trait.fallbackInsights?.[0] ?? insight?.type ?? 'topic',
-    focusTerm: focusTermForObservation(observation, trait, offset),
-    scene: pickVariant(trait.scenes, offset + 1),
-    artifact: pickVariant(trait.artifacts, offset + 2),
-    tension: pickVariant(trait.tensions, offset + 3),
-    readerNeed: pickVariant(trait.readerNeeds, offset + 4),
-    emotionalHook: pickVariant(trait.emotionalHooks, offset + 5),
-    actionLabel: pickVariant(trait.actionLabels, offset + 6),
-    productionAngle: pickVariant(trait.productionAngles, offset + 7),
+    conceptType: insight?.type ?? 'topic',
+    terms,
+    focusTerm,
+    secondaryTerm,
+    perspective,
+    scene: `${scenePrefix}${focusPair}が表面化する${surface}`,
+    artifact: `${focusPair}だけが残る${surface}`,
+    tension: `${focusTerm}が${secondaryTerm}の問題として処理され、当事者の説明が置き去りになる`,
+    readerNeed: `${focusTerm}の裏で何が起きているかを、自分の判断にも引きつけて確かめたい`,
+    emotionalHook: `${focusTerm}という一語が、${secondaryTerm}まで巻き込んで見え方を変えてしまう怖さ。`,
+    actionLabel: `${focusTerm}を${actionPrefix}`,
+    productionAngle: `${focusPair}を${surface}の見せ場に変える`,
   };
 }
 
@@ -1983,6 +1640,9 @@ function evidenceAnchorForPlan(anchor, categoryId) {
     tension: anchor.tension,
     readerNeed: anchor.readerNeed,
     productionAngle: anchor.productionAngle,
+    terms: anchor.terms,
+    secondaryTerm: anchor.secondaryTerm,
+    perspective: anchor.perspective,
   };
   if (categoryId === 'trend-explainer') {
     return {
@@ -1995,9 +1655,9 @@ function evidenceAnchorForPlan(anchor, categoryId) {
 }
 
 function analysisAnchorsForCluster(cluster, seed = 0) {
-  return rotatePlanObservations(cluster?.observations, seed, PLAN_BATCH_SIZE).map((observation, index) => {
+  return planObservationsForCluster(cluster?.observations, PLAN_BATCH_SIZE).map((observation, index) => {
     const insight = classifyObservationInsight(observation ?? {});
-    return deriveEvidenceAnchor(observation, insight, seed, index);
+    return deriveEvidenceAnchor(observation, insight, seed, index, cluster?.categoryId ?? 'story-manga');
   });
 }
 
@@ -2019,38 +1679,47 @@ function enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed =
   };
   const productionMoves = {
     'story-manga': `${primary.scene}を舞台に、固有名詞ではなく${primary.artifact}で現代性を見せる`,
-    'short-video': `${primary.actionLabel}を1本1手順に固定し、保存理由を最後の字幕に置く`,
+    'short-video': `${primary.actionLabel}を1本1手順に絞り、視聴後の行動理由を最後の字幕に置く`,
     'trend-explainer': `観測、心理、制作手順、注意点の順で${primary.productionAngle}を説明する`,
     'long-novel': `${primary.artifact}を章末証拠として反復し、回収前の余白を作る`,
   };
+  const mediumTerms = {
+    'story-manga': ['1ページ目のコマ設計', '吹き出し外の情報', '縦読みの余白', 'ラスト1コマの選択'],
+    'short-video': ['0秒目の画', '短い字幕', '前後比較', 'コメントで広がる余白'],
+    'trend-explainer': ['観測根拠', '推測の境界', '章立て解説', '制作チェック'],
+    'long-novel': ['第1章の痛み', '章末の証拠', '複数視点', '長期回収'],
+  }[categoryId] ?? ['冒頭', '中盤', '回収'];
 
   return {
-    ...base,
     surfacePattern: uniqueList([
       `今回の切り口: ${anchorSummary}。${observationPhrase}を、${primary.scene}の見せ場へ変換します。`,
       categoryMoves[categoryId] ?? categoryMoves['story-manga'],
-      ...base.surfacePattern,
+      ...anchors.slice(1).map((anchor) => `${anchor.focusTerm}は、${anchor.perspective}から見ると${anchor.artifact}として扱えます。`),
+      `${mediumTerms.slice(0, 2).join(' / ')}を使い、根拠語を説明文ではなく画面上の変化へ移します。`,
     ]).slice(0, 5),
     humanMotivation: uniqueList([
       primary.readerNeed,
       ...anchors.slice(1).map((anchor) => anchor.readerNeed),
-      ...base.humanMotivation,
+      `${primary.secondaryTerm}を自分ごととして確かめたい`,
+      `${primary.focusTerm}を一面的に扱われたくない`,
     ]).slice(0, 5),
     narrativeMechanism: uniqueList([
       primary.tension,
       `${primary.artifact}を使った見せ場`,
-      ...base.narrativeMechanism,
+      ...anchors.slice(1).map((anchor) => `${anchor.focusTerm}を別人物・別場面で読み替える`),
+      `${mediumTerms.at(-1)}で最初の意味を更新する`,
     ]).slice(0, 5),
     productionMechanism: uniqueList([
       productionMoves[categoryId] ?? productionMoves['story-manga'],
       primary.productionAngle,
-      ...base.productionMechanism,
+      ...mediumTerms,
     ]).slice(0, 5),
     opportunityGap: uniqueList([
       `${queryPhrase}で見えた反応は、そのまま流行語にせず「${primary.focusTerm}」として扱うと、反復ではなく今回固有の企画判断になります。`,
-      ...base.opportunityGap,
+      `${anchors.map((anchor) => anchor.focusTerm).join(' / ')}を横並びにせず、各案で主人公、場面、最初の事件、回収点を分ける余地があります。`,
+      `同じ方向に寄る場合は、${primary.perspective}、${anchors[1]?.perspective ?? '別人物'}、${anchors[2]?.perspective ?? '別媒体'}のように視点を変えます。`,
     ]).slice(0, 3),
-    categoryInsight: `今回の分析では、${primary.focusTerm}を${primary.tension}という読者・視聴者心理に変換できる。今回は${primary.artifact}を核にすると、再検索ごとに別の企画角度を作れます。`,
+    categoryInsight: `今回の分析では、${primary.focusTerm}を${primary.tension}という読者・視聴者心理に変換できる。核は${primary.artifact}で、補助視点は${anchors.slice(1).map((anchor) => anchor.focusTerm).join(' / ') || primary.secondaryTerm}。検索結果をローテーションせず、取得順の根拠から別々の企画角度を作る。`,
   };
 }
 
@@ -2116,705 +1785,46 @@ function planForCategory(categoryId, cluster, variantSeed = 0) {
       note: '実在サービス名は証拠・配信文脈でのみ使用し、架空物語の黒幕や登場人物にはしていません。',
     },
   ];
-
-  const plans = {
-    'story-manga': [
-    {
-      id: 'story-manga-hidden-review',
-      targetFormat: 'ストーリー漫画',
-      formatLabel: '連載第1話',
-      titleCandidates: [
-        '灰色の査定欄',
-        'きみの評価は嘘をつく',
-        '隠しメモの読み方',
-        '点数の裏側',
-        '評価不能の朝',
-      ],
-      reasonToWin: [
-        'AI評価や職場査定への不安を、読者が一瞬で理解できる超能力に置き換えられる',
-        '理不尽の正体が個人ではなく制度だとわかるため、怒りだけでなく救済感が出る',
-        '毎話「隠しメモ」が見える形式にすると、短い引きで連載化しやすい',
-      ],
-      audiencePromise: '職場や生活の理不尽を、架空の評価システムでスカッと可視化する。',
-      emotionalHook: '自分だけが不当に低く見られている不安。',
-      premise:
-        '契約社員の主人公は、社内評価システムの隠しメモだけ読めるようになる。最初は自分の評価を直すために動くが、同僚の不利益も改ざんされた入力で作られていると知る。',
-      exampleDetail:
-        '第1話は、主人公が「評価不能」の通知を受け取り、画面下に灰色で表示された本当の理由を読むところから始める。上司を直接悪人にせず、入力欄・会議メモ・評価タグのズレを積み上げて、最後に同僚の評価まで同じ仕組みで落とされていたと判明させる。',
-      outline: [
-        '第1話: 最低評価の通知と隠しメモの発見',
-        '第2話: 先輩の評価が意図的に下げられている証拠',
-        '第3話: 会議で正面から告発せず、評価ロジックを再現して見せる',
-        '第4話: 本当の敵が個人ではなく制度設計だと判明',
-      ],
-      opening: '朝の通知音。画面には「評価不能」。その下に、誰にも見えていない灰色の一文が浮かぶ。',
-      productionNotes: ['会社名は架空にする', '実在AIサービス名は出さない', 'チャット風の画面は架空UIにする'],
-      differentiation: '復讐劇ではなく、構造の嘘を可視化する救済劇に寄せる。',
-      riskNotes: ['実在企業の人事制度を連想させすぎない'],
-      draftInstructions:
-        '出力はストーリー漫画の第1話として、ページごとの流れ、主要コマ、セリフ、ラストの引きを具体的に書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'story-manga-receipt-ghost',
-      targetFormat: 'ストーリー漫画',
-      formatLabel: '読み切り',
-      titleCandidates: ['レシートに本音が印字される', '買えなかった理由', '返品できない一日'],
-      reasonToWin: [
-        '節約・物価高・家計不安を、レシートという日常物で視覚化できる',
-        '読者が自分の生活に置き換えやすく、SNSで感想を言いやすい',
-        '短編でも「本音の印字」という一発ギミックで理解が速い',
-      ],
-      audiencePromise: '生活の小さな我慢を、少し不思議なレシートで可視化する。',
-      emotionalHook: '本当は欲しかったものを諦める痛み。',
-      premise:
-        '主人公が買い物をすると、レシートに金額ではなく「買わなかった理由」が印字される。最初は節約に役立つだけだったが、家族や友人のレシートにも言えなかった本音が出てしまう。',
-      exampleDetail:
-        'コンビニでスイーツを棚に戻した直後、レシートに「自分にご褒美を与える資格がないと思ったため」と出る。主人公は笑ってごまかすが、次の客のレシートにも似た言葉が出て、街全体が我慢を隠していると気づく。',
-      outline: ['冒頭: 変なレシート', '中盤: 他人の我慢も見える', '転機: 友人の本音を読んでしまう', '結末: ひとつだけ買う勇気'],
-      opening: 'レシートの合計欄には、金額ではなく「諦めた理由」とだけ印字されていた。',
-      productionNotes: ['店舗名は架空にする', '実在チェーンを描写しない', '小物と表情で見せる'],
-      differentiation: '節約ノウハウではなく、我慢の心理を物語化する。',
-      riskNotes: ['実在店舗や商品を貧困描写の象徴にしない'],
-      draftInstructions:
-        '出力は24ページ読み切り漫画のプロットとして、起承転結、重要コマ、セリフ、読後感を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'story-manga-comment-weather',
-      targetFormat: 'ストーリー漫画',
-      formatLabel: '縦読み漫画',
-      titleCandidates: ['コメント欄の天気予報', '明日の炎上が見える', '晴れない通知'],
-      reasonToWin: [
-        'SNS疲れと承認不安を、天気予報のような軽い比喩で扱える',
-        '実名SNSを使わず架空アプリにすれば、安全に現代性を出せる',
-        '縦読みで通知・雲・雨の視覚演出を使いやすい',
-      ],
-      audiencePromise: 'コメント欄の空気が天気として見える世界で、言葉の重さを描く。',
-      emotionalHook: '投稿する前から傷つく未来が見えてしまう怖さ。',
-      premise:
-        '主人公は投稿前に、コメント欄の空気が天気予報として見える。晴れなら拡散、雨なら炎上、濃霧なら誰にも届かない。ある日、親友の投稿だけ毎回「警報」になる。',
-      exampleDetail:
-        '主人公が何気ない写真を投稿しようとすると「弱い雨」。ところが親友の相談投稿には赤い警報が出る。主人公は止めようとするが、親友は「見えないから言えることもある」と返す。',
-      outline: ['通知の天気', '親友の警報', '止めるか見守るか', '言葉を選び直す結末'],
-      opening: '投稿ボタンの上に、小さな傘マークが浮いていた。',
-      productionNotes: ['SNS名は架空にする', '炎上相手を実在人物にしない', '天気アイコンで説明量を減らす'],
-      differentiation: '炎上バトルではなく、投稿前の心理サスペンスにする。',
-      riskNotes: ['特定プラットフォームのアルゴリズムを断定しない'],
-      draftInstructions:
-        '出力は縦読み漫画の第1話として、スクロール演出、各画面の見せ場、セリフ、次話への引きを具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'story-manga-family-cache',
-      targetFormat: 'ストーリー漫画',
-      formatLabel: '家族ドラマ連載',
-      titleCandidates: ['家族の検索履歴だけが見える', '言えなかった検索窓', '夜中の候補語'],
-      reasonToWin: [
-        '検索履歴という身近な行動から、家族の孤独や不安を即座に見せられる',
-        'ミステリーと生活ドラマの中間に置けるため読者層が広い',
-        '毎話ひとつの検索語を解く構造にできる',
-      ],
-      audiencePromise: '言えなかった悩みを検索語から読み解く、近距離ミステリー。',
-      emotionalHook: '近い人ほど何を抱えているかわからない寂しさ。',
-      premise:
-        '主人公は家のWi-Fiにつながった端末の検索候補だけ見えるようになる。家族の誰かが深夜に検索した言葉を追ううち、家族それぞれの不安と優しさに触れていく。',
-      exampleDetail:
-        '母の端末に「家族に迷惑をかけない 辞め方」という候補が出る。主人公は退職だと思い込むが、実際は長年続けた地域活動を辞めたいという小さなSOSだった。',
-      outline: ['変な検索候補', '家族への誤解', '本当の悩み', '言葉にして助ける'],
-      opening: '夜中のリビングで、誰も触っていない検索窓だけが光っていた。',
-      productionNotes: ['実在検索サービス名は出さない', '家庭内監視の肯定にしない', '最後に対話で回収する'],
-      differentiation: '覗き見ではなく、対話に戻る物語にする。',
-      riskNotes: ['プライバシー侵害を正当化しない'],
-      draftInstructions:
-        '出力は連載漫画の第1話として、人物関係、画面演出、セリフ、最後の検索候補による引きを具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'story-manga-lost-notice-box',
-      targetFormat: 'ストーリー漫画',
-      formatLabel: '読み切り',
-      titleCandidates: ['押し入れの未読通知', 'しまったままの返事', '古いスマホが鳴る夜'],
-      reasonToWin: [
-        '通知疲れを幽霊や呪いではなく、返せなかった言葉の物語に変換できる',
-        '部屋の中だけで完結するため読み切り漫画にしやすい',
-        '最後に返信するか消すかの選択で読後感を作れる',
-      ],
-      audiencePromise: '過去に返せなかったメッセージを、古い端末の通知として可視化する。',
-      emotionalHook: 'もう遅いかもしれない返事を抱えている痛み。',
-      premise:
-        '引っ越し準備中の主人公が、押し入れから電源の入らない古いスマホを見つける。画面には、過去に返せなかった言葉だけが通知として浮かぶ。',
-      exampleDetail:
-        '最初の通知はどうでもいい謝罪に見えるが、読み進めると相手が本当に待っていたのは返事ではなく、気づいてほしかった一言だったとわかる。',
-      outline: ['押し入れから鳴る通知', '返せなかった言葉の発見', '最後の通知の相手', '送れない返事を別の形で届ける'],
-      opening: '電源の切れたスマホが、押し入れの奥で一度だけ震えた。',
-      productionNotes: ['実在メッセージアプリ名を出さない', '亡くなった人物の美談だけにしない', '部屋の小物で時間経過を見せる'],
-      differentiation: '怪異ではなく、未返信の後悔を生活ミステリーとして扱う。',
-      riskNotes: ['実在の事件や個人のメッセージを流用しない'],
-      draftInstructions:
-        '出力は32ページ読み切り漫画のプロットとして、ページ配分、重要コマ、セリフ、静かなラストを具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'story-manga-town-score-board',
-      targetFormat: 'ストーリー漫画',
-      formatLabel: '縦読み連載',
-      titleCandidates: ['町内スコアボード', '親切が点数になる街', 'いい人ランキングの終わり'],
-      reasonToWin: [
-        '承認欲求と地域の息苦しさを、点数が見える街として絵にできる',
-        '主人公だけでなく住人ごとの短編エピソードに広げられる',
-        '親切を点数化する違和感が、読者の生活感覚に刺さりやすい',
-      ],
-      audiencePromise: '親切が点数になる街で、本当の優しさを選び直す縦読み連載。',
-      emotionalHook: '良い人でいなければ居場所がなくなる怖さ。',
-      premise:
-        '小さな商店街では、人助けをすると頭上のスコアが上がる。主人公は低スコアの祖母を助けようとするが、祖母だけは点数を上げる行動を拒み続ける。',
-      exampleDetail:
-        '雨の日、主人公は傘を配って点数を稼ぐ。だが祖母は、点数にならない裏口の片づけを一人で続けていて、その理由が次話の謎になる。',
-      outline: ['頭上の点数が見える街', '低スコアの祖母', '点数にならない親切', '評価から外れた選択'],
-      opening: '商店街の朝は、挨拶より先に点数が飛び交う。',
-      productionNotes: ['地域名は架空にする', '善悪を単純化しない', '点数表示は記号的に見せる'],
-      differentiation: 'ざまあではなく、評価されない親切の価値を描く。',
-      riskNotes: ['特定地域や自治会への風刺に見えすぎないようにする'],
-      draftInstructions:
-        '出力は縦読み連載の第1話として、スクロール演出、住人紹介、セリフ、次話への謎を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    }],
-    'short-video': [
-    {
-      id: 'short-video-room-route',
-      targetFormat: 'ショート動画',
-      formatLabel: '30秒生活改善',
-      titleCandidates: ['この不便、30秒で消えます', '部屋のストレスを1個だけ直す', '保存用・朝の動線改善'],
-      reasonToWin: [
-        '冒頭1秒で「自分もやっている不便」を見せられる',
-        '無料で真似できるため保存理由が明確',
-        'Before/Afterが縦画面でも伝わりやすい',
-      ],
-      audiencePromise: 'すぐ真似できる生活改善を、最初の1秒で見せます。',
-      emotionalHook: '毎日ちょっとだけ損している感覚。',
-      premise:
-        '狭い部屋の朝のつまずきを1つだけ選び、家にあるものだけで動線を変える。Beforeを先に見せ、最後に費用0円の変化を出す。',
-      exampleDetail:
-        '朝、充電ケーブルに足を引っかける映像から始める。原因を「床に置く」「毎朝探す」「片手がふさがる」の3字幕で分解し、フックで壁側に固定して、最後に歩線がまっすぐになる映像を見せる。',
-      outline: ['0-1秒: つまずく瞬間', '2-8秒: 原因を字幕で分解', '9-24秒: 3つ試す', '25-30秒: 一番効いた変更'],
-      opening: '「この3秒のイライラ、毎朝やってませんか？」',
-      productionNotes: ['縦画面固定', '字幕は短く', '最後に保存理由を出す'],
-      differentiation: '便利グッズ紹介ではなく、無料の配置変更に寄せる。',
-      riskNotes: ['他人の部屋画像や商品画像を無断使用しない'],
-      draftInstructions:
-        '出力は30秒ショート動画の完成台本として、秒数、画面、字幕、ナレーション、撮影小物、最後の保存誘導を書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'short-video-meal-reset',
-      targetFormat: 'ショート動画',
-      formatLabel: '15秒保存ネタ',
-      titleCandidates: ['疲れた日の冷蔵庫リセット', '買い足さない夜ごはん', '帰宅後3分の台所'],
-      reasonToWin: [
-        '疲労・節約・時短が同時に刺さる',
-        '完成品より途中の手順を見せると保存されやすい',
-        'コメントで代替食材が集まりやすい',
-      ],
-      audiencePromise: '帰宅後に買い足さず、冷蔵庫の半端食材で一食を作る。',
-      emotionalHook: '料理する元気はないが、外食する余裕もない夜。',
-      premise:
-        '冷蔵庫に残った少量の食材を3つ選び、包丁を使わず一皿にする。完璧な料理ではなく、疲れた日に自分を責めない食事として見せる。',
-      exampleDetail:
-        '画面左に半端な豆腐、卵、冷凍野菜を並べ、右に完成したスープ丼を一瞬で見せる。途中は「洗い物1個」「味付け2つ」「火を見ない」の字幕に絞る。',
-      outline: ['0秒: 完成品', '1-3秒: 残り物3つ', '4-11秒: 混ぜて温める', '12-15秒: 保存理由'],
-      opening: '「今日はもう、ちゃんとしなくていい夜ごはんです。」',
-      productionNotes: ['食品衛生に注意', '特定商品名を主役にしない', '分量は画面内で短く'],
-      differentiation: '映える料理ではなく、自己責めを減らす実用にする。',
-      riskNotes: ['健康効果を断定しない'],
-      draftInstructions:
-        '出力は15秒ショート動画の台本として、冒頭カット、字幕、手元映像、コメント誘導まで具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'short-video-phone-cleanup',
-      targetFormat: 'ショート動画',
-      formatLabel: '60秒デジタル整理',
-      titleCandidates: ['スマホの通知を1つだけ減らす', '寝る前の画面を静かにする', '朝の通知疲れを消す'],
-      reasonToWin: [
-        '多くの人が感じている通知疲れを扱える',
-        '1設定だけなら実行ハードルが低い',
-        '画面録画と手元だけで制作できる',
-      ],
-      audiencePromise: 'スマホを買い替えず、通知のストレスをひとつ減らす。',
-      emotionalHook: '休んでいるのに通知で呼び戻される感覚。',
-      premise:
-        '寝る前に見なくてよい通知を1種類だけ選び、翌朝まで表示されないようにする。アプリ名は架空表示にして、設定変更の考え方を見せる。',
-      exampleDetail:
-        '通知が連続で鳴る画面から始め、「今すぐ必要」「あとでよい」「見なくてよい」の3分類を表示する。最後に1種類だけオフにして、寝室の画面が暗く静かになる。',
-      outline: ['0-2秒: 通知音', '3-15秒: 3分類', '16-45秒: 1種類だけ止める', '46-60秒: 翌朝の差'],
-      opening: '「スマホ時間を減らす前に、呼ばれる回数を1個だけ減らします。」',
-      productionNotes: ['実在アプリ名を映さない', '設定画面はモックにする', '医療的効果を言わない'],
-      differentiation: 'デジタル断ちではなく、通知設計の小さな改善にする。',
-      riskNotes: ['個人情報が映る画面録画を使わない'],
-      draftInstructions:
-        '出力は60秒ショート動画の完成台本として、画面録画風モック、字幕、ナレーション、最後の行動提案を書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'short-video-comment-question',
-      targetFormat: 'ショート動画',
-      formatLabel: 'コメント誘発',
-      titleCandidates: ['あなたならどっちを捨てる？', '片づけの最後の1個', 'コメントで決める棚'],
-      reasonToWin: [
-        '視聴者に判断を委ねるためコメントが増えやすい',
-        '生活改善と参加型企画を合わせられる',
-        'シリーズ化して次回の理由が作れる',
-      ],
-      audiencePromise: '片づけの判断を視聴者と一緒に決める。',
-      emotionalHook: '捨てたいのに捨てられないものへの罪悪感。',
-      premise:
-        '棚の最後に残った2つの物を見せ、どちらを残すべきか視聴者に聞く。次回でコメントの理由を分類し、最終判断を見せる。',
-      exampleDetail:
-        '同じ用途のノート2冊を並べ、「使った回数」「思い出」「今後の用途」を各3秒で見せる。最後に「あなたならA/Bどっち？」で止める。',
-      outline: ['0-2秒: 2択提示', '3-15秒: 判断材料', '16-25秒: 迷う理由', '26-30秒: コメント質問'],
-      opening: '「最後の1個って、なぜか一番捨てられません。」',
-      productionNotes: ['煽りすぎない', '個人情報がある物を映さない', '次回で必ず回収する'],
-      differentiation: '片づけ術ではなく、判断プロセスをコンテンツ化する。',
-      riskNotes: ['視聴者コメントを晒す演出にしない'],
-      draftInstructions:
-        '出力はコメント誘発型ショート動画の台本として、選択肢、字幕、質問文、次回予告を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'short-video-receipt-sort',
-      targetFormat: 'ショート動画',
-      formatLabel: '45秒家計整理',
-      titleCandidates: ['レシートを3色に分けるだけ', '買わなかった理由の棚卸し', '家計メモの見える化'],
-      reasonToWin: [
-        '家計不安を数字だけでなく感情の分類にできる',
-        '手元だけで撮れ、視聴者がすぐ真似できる',
-        '保存して後で自分のレシートに使いやすい',
-      ],
-      audiencePromise: 'レシートを捨てる前に、支出ではなく感情を3色で整理する。',
-      emotionalHook: '何に使ったかより、なぜ買ったかがわからない不安。',
-      premise:
-        '1週間分のレシートを「必要」「不安で買った」「本当は欲しくなかった」の3色に分ける。節約説教ではなく、買い物の理由を見える化する動画にする。',
-      exampleDetail:
-        '机の上にレシートを並べ、金額を隠して色だけを付ける。最後に「赤が多い日は、買い物ではなく休む予定を先に入れる」と生活改善へ落とす。',
-      outline: ['0-2秒: レシート山', '3-10秒: 金額を隠す', '11-32秒: 3色分類', '33-45秒: 来週の買い方を1つ決める'],
-      opening: '「節約の前に、何で買ったかだけ見ます。」',
-      productionNotes: ['個人情報と店舗名を隠す', '節約額を断定しない', '色は画面左上に凡例を固定する'],
-      differentiation: '家計術ではなく、買い物の感情ログとして見せる。',
-      riskNotes: ['金融助言や治療効果の断定にしない'],
-      draftInstructions:
-        '出力は45秒ショート動画の完成台本として、撮影手順、字幕、手元の動き、保存誘導、コメント質問を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-      creatorBrief: {
-        protagonist: '家計簿が続かない投稿者。節約が苦手なのではなく、買った理由を忘れてしまう。',
-        setting: '夜の机、店舗名を隠したレシート、3色のペン。',
-        incitingIncident: 'レシートを金額順ではなく、買った時の気持ちで分けると赤色だけが増えていく。',
-        conflict: '節約したいのに、不安を埋める買い物を責めると続かない。',
-        choice: '買わない努力を増やすか、買いたくなる前の予定を変えるか。',
-        payoff: '視聴者が自分のレシートでも試せる小さな整理感を残す。',
-      },
-    },
-    {
-      id: 'short-video-quiet-morning',
-      targetFormat: 'ショート動画',
-      formatLabel: '20秒朝支度',
-      titleCandidates: ['朝の探し物を1個だけ消す', '出かける前の無言セット', '玄関前30秒の整え方'],
-      reasonToWin: [
-        '朝の小さな不便は多くの人が自分事化しやすい',
-        'Before/Afterが短尺でも一目で伝わる',
-        '家にある物だけでできるため保存されやすい',
-      ],
-      audiencePromise: '朝の探し物を1つだけ減らし、出発前のストレスを下げる。',
-      emotionalHook: '遅刻しそうな時ほど、鍵やイヤホンが見つからない焦り。',
-      premise:
-        '玄関前に「持ち出す物だけの無言セット」を作る。収納紹介ではなく、朝に判断しない仕組みとして見せる。',
-      exampleDetail:
-        '出発直前に鍵を探す手元から始める。小皿、充電ケーブル、メモを玄関の同じ場所へ寄せ、翌朝は何も探さず出るカットで終える。',
-      outline: ['0-2秒: 探す手元', '3-7秒: 原因字幕', '8-16秒: 置き場所を1つ作る', '17-20秒: 翌朝の無言出発'],
-      opening: '「朝の自分は信用しない仕組みにします。」',
-      productionNotes: ['家の住所や鍵形状を映さない', '収納用品の購入前提にしない', '音は環境音中心'],
-      differentiation: '収納テクではなく、朝の判断回数を減らす設計にする。',
-      riskNotes: ['防犯情報が映らないようにする'],
-      draftInstructions:
-        '出力は20秒ショート動画の完成台本として、カット割り、字幕、手元演出、最後の保存理由を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-      creatorBrief: {
-        protagonist: '朝に弱い投稿者。努力ではなく仕組みで失敗を減らしたい。',
-        setting: '玄関、バッグ置き場、小皿、充電中のスマホ。',
-        incitingIncident: '出発30秒前に鍵だけが見つからず、画面上の時間だけが進む。',
-        conflict: '片づけを増やすと続かないが、放置すると毎朝焦る。',
-        choice: '完璧な収納を目指すか、1つだけ置き場所を固定するか。',
-        payoff: '明日の朝だけ真似したくなる軽い実用感。',
-      },
-    }],
-    'trend-explainer': [
-    {
-      id: 'trend-explainer-short-drama',
-      targetFormat: 'トレンド解説動画',
-      formatLabel: '8分解説',
-      titleCandidates: ['なぜ1分ドラマは止めづらいのか', '短尺視聴の正体', 'ショート動画が物語を変えた理由'],
-      reasonToWin: [
-        'TikTokやYouTube Shortsの視聴体験を、視聴者自身の行動として語れる',
-        '企業批判ではなく構造分析に寄せると安全に深掘りできる',
-        '創作者向けの制作ヒントまで落とせる',
-      ],
-      audiencePromise: 'TikTokやYouTube Shortsの固有名詞を根拠にしつつ、断定告発ではなく仕組みを説明する。',
-      emotionalHook: 'なぜわかっていても次を見てしまうのか。',
-      premise:
-        '短尺ドラマが伸びる理由を、冒頭の損失提示、数十秒ごとの反転、コメント欄の参加感、推薦システムの4層で説明する。',
-      exampleDetail:
-        '冒頭で「1分なのに続きが気になる」体験を自作モックで再現し、その後にフック、反転、コメント、推薦の4層に分解する。実在サービス名は市場例としてだけ出し、内部事情は断定しない。',
-      outline: ['導入: 1分なのに続きが気になる理由', '構造: 損失と反転', '視聴習慣: ながら見と保存', '制作側: 量産できる型', '結論: 創作者が学ぶべき点'],
-      opening: '「これは特定の会社の話ではなく、短尺動画が物語の形を変えた話です。」',
-      productionNotes: ['実在サービス名は証拠カードに限定', '企業の内部事情を断定しない', '画面例は自作モックにする'],
-      differentiation: '炎上解説ではなく、制作者向けの構造分析にする。',
-      riskNotes: ['企業・クリエイターへの未確認の意図推定を避ける'],
-      draftInstructions:
-        '出力は8分解説動画の台本として、導入、章立て、ナレーション、画面テロップ、締めの制作ヒントを具体化してください。',
-      properNounUsage: [...properNounUsage, 'Netflix: 長尺配信との比較軸として使用'],
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'trend-explainer-ai-evaluation',
-      targetFormat: 'トレンド解説動画',
-      formatLabel: '5分解説',
-      titleCandidates: ['AI評価に人はなぜ不安になるのか', '見えない点数の時代', '評価される側のストレス'],
-      reasonToWin: [
-        '仕事・AI・評価不安の検索関心を物語ではなく解説で扱える',
-        '個人の不満に見せず、評価の透明性という大きなテーマへ広げられる',
-        '制作者が漫画や小説へ応用しやすい分析になる',
-      ],
-      audiencePromise: 'AI評価への不安を、煽りではなく構造で説明する。',
-      emotionalHook: '何を見られているかわからないまま点数化される怖さ。',
-      premise:
-        '人がAI評価に不安を感じる理由を、透明性、訂正可能性、文脈の抜け落ち、責任の所在の4点で解説する。',
-      exampleDetail:
-        '架空の「作業スコア画面」を使い、数字だけが上がるのに理由が見えない場面を提示する。その後、良い評価制度に必要な説明・異議申し立て・人間の確認を整理する。',
-      outline: ['導入: 点数だけ見える不安', '4つの原因', '創作で使う場合の型', '注意点', 'まとめ'],
-      opening: '「怖いのはAIそのものではなく、理由を聞けない点数かもしれません。」',
-      productionNotes: ['実在企業の制度を断定しない', '架空画面で説明する', '労務・法律助言にしない'],
-      differentiation: 'AI脅威論ではなく、評価設計の見えなさに焦点を当てる。',
-      riskNotes: ['特定企業の人事制度批判にしない'],
-      draftInstructions:
-        '出力は5分解説動画の台本として、ナレーション、画面例、注意喚起、創作への応用パートを具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'trend-explainer-save-behavior',
-      targetFormat: 'トレンド解説動画',
-      formatLabel: '制作者向け講座',
-      titleCandidates: ['なぜ保存される動画は伸びるのか', '保存ボタンの心理', 'あとで見るの正体'],
-      reasonToWin: [
-        'ショート動画制作者がすぐ制作改善に使える',
-        '保存・共有という行動を心理と構成で説明できる',
-        '生活ノウハウ、漫画、小説にも応用できる',
-      ],
-      audiencePromise: '保存されるコンテンツの共通点を、制作者向けに分解する。',
-      emotionalHook: '見た瞬間はいいのに、なぜ残されるものと流れるものが分かれるのか。',
-      premise:
-        '保存される理由を、再利用、後で実行、誰かに共有、自分の状態確認の4タイプに分け、各タイプに合う企画例を出す。',
-      exampleDetail:
-        '生活改善ショートなら「明日やる」、漫画なら「あとで読み返したい感情」、小説なら「設定を追いたい謎」として保存理由を設計する。',
-      outline: ['保存は褒めではなく未来の行動', '4タイプ分類', 'カテゴリ別の作り方', 'やってはいけない保存誘導'],
-      opening: '「保存してね、では保存されません。保存する理由が先に必要です。」',
-      productionNotes: ['数字を断定しない', 'スクショ誘導を過剰にしない', '具体例は架空にする'],
-      differentiation: 'アルゴリズム攻略ではなく、視聴者の未来行動から考える。',
-      riskNotes: ['プラットフォームの内部評価を断定しない'],
-      draftInstructions:
-        '出力は制作者向け解説動画の台本として、章ごとの要点、画面テロップ、カテゴリ別作例、締めのチェックリストを書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'trend-explainer-line-share',
-      targetFormat: 'トレンド解説動画',
-      formatLabel: '6分解説',
-      titleCandidates: ['なぜ家計ネタは共有されるのか', '節約情報がLINEで回る理由', '生活ノウハウの広がり方'],
-      reasonToWin: [
-        '家計・節約・共有という実用関心を扱える',
-        'LINEの固有名詞を配信文脈として安全に使える',
-        'ショート動画や漫画の企画へ接続できる',
-      ],
-      audiencePromise: '生活ノウハウが人に送られる理由を、感情と実用の両面から説明する。',
-      emotionalHook: '役に立つ情報を見たとき、なぜ誰かに送りたくなるのか。',
-      premise:
-        '共有される生活情報には、相手への気遣い、会話のきっかけ、自分も困っている確認、すぐ試せる低コスト性がある。',
-      exampleDetail:
-        '架空の節約ネタを例に、送る側が「押し付けにならないか」を気にする心理を出し、文章の柔らかさや実行ハードルが共有率に影響する構造を説明する。',
-      outline: ['導入: 送られる情報の条件', '4つの心理', '創作への応用', '危ない表現', 'まとめ'],
-      opening: '「役に立つだけでは、誰かに送られません。」',
-      productionNotes: ['実在家計データを捏造しない', '節約効果を断定しない', 'LINE画面はモックにする'],
-      differentiation: 'バズ技術ではなく、相手に送る心理を扱う。',
-      riskNotes: ['金融助言として読める表現を避ける'],
-      draftInstructions:
-        '出力は6分解説動画の台本として、ナレーション、モック画面、具体例、創作者向けチェックリストを書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'trend-explainer-fiction-safe-transform',
-      targetFormat: 'トレンド解説動画',
-      formatLabel: '制作者向け10分講座',
-      titleCandidates: ['実在トレンドを安全に物語化する方法', '固有名詞をネタにしない企画術', '炎上せず構造だけを使う'],
-      reasonToWin: [
-        '実在サービス名を扱う不安に具体的な変換手順を示せる',
-        '漫画家・小説家・動画制作者の制作前チェックに使える',
-        '単なる紹介ではなく実務上の事故防止まで踏み込める',
-      ],
-      audiencePromise: '実在トレンドから、架空設定へ安全に変換する手順を渡す。',
-      emotionalHook: '流行を使いたいが、実在企業や作品を傷つけるのは怖い。',
-      premise:
-        '実在名を「証拠」「媒体形式」「読者欲求」に分解し、物語本文へ入れる時は架空UI、架空制度、架空の生活場面へ変換する。',
-      exampleDetail:
-        '短尺ドラマの伸びを例に、実在サービス名は導入の根拠に置き、作中では「灰色の通知欄」「架空評価表」「匿名の町内掲示板」へ変換する流れを図解する。',
-      outline: ['導入: そのまま使う危険', '分解: 固有名詞と構造を分ける', '変換: 架空UIへ置く', '実例: 3ジャンル展開', '締め: 制作前チェック'],
-      opening: '「流行を使うことと、実在名を物語の悪役にすることは別です。」',
-      productionNotes: ['実在人物を例にしない', '既存作品の続編案にしない', '画面例は自作モックにする'],
-      differentiation: '炎上対策だけでなく、企画の強度を上げる変換術として見せる。',
-      riskNotes: ['法的助言ではなく創作上の安全設計として明記する'],
-      draftInstructions:
-        '出力は制作者向け10分講座の台本として、章立て、ナレーション、図解内容、変換チェックリスト、最後の実践課題を書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-      creatorBrief: {
-        protagonist: '実在トレンドを企画へ使いたいが、炎上と類似を避けたい制作者向けの語り手。',
-        setting: 'モック画面、ホワイトボード、3つのジャンル別サンプルを並べる解説画面。',
-        incitingIncident: '流行語をそのままタイトルに入れた企画が、企画会議で危険だと止められる。',
-        conflict: '現実味を残したいが、実在名を物語の主役や黒幕にすると危険が増える。',
-        choice: '固有名詞を残すか、構造だけを抽出して架空設定へ変換するか。',
-        payoff: '視聴者が自分の企画に転用できる安全な変換表を得る。',
-      },
-    },
-    {
-      id: 'trend-explainer-comment-fatigue',
-      targetFormat: 'トレンド解説動画',
-      formatLabel: '7分解説',
-      titleCandidates: ['コメント欄疲れはなぜ物語になるのか', '反応を見るのが怖い時代', '承認不安を企画に変える'],
-      reasonToWin: [
-        'SNS疲れを個人攻撃ではなく現代的な読者欲求として扱える',
-        '漫画、ショート、小説それぞれの作例に橋渡しできる',
-        '視聴者自身の投稿経験に置き換えやすい',
-      ],
-      audiencePromise: 'コメント欄への不安を、創作に使える物語エンジンとして整理する。',
-      emotionalHook: '見たいのに、反応を見るのが怖い。',
-      premise:
-        'コメント欄疲れを、予測不能性、文脈の欠落、承認欲求、炎上への恐れの4つに分け、創作では「空気が見える」「通知が天気になる」などの架空表現へ変える。',
-      exampleDetail:
-        '架空投稿アプリのモックで、コメント欄が晴れ・雨・霧として予報される画面を示し、これを漫画なら吹き出し外、小説なら章末の通知、ショートなら冒頭フックへ変換する。',
-      outline: ['導入: 反応を見る怖さ', '4つの原因', '架空表現への変換', 'ジャンル別作例', '注意点'],
-      opening: '「コメント欄は、もう文字だけの場所ではありません。」',
-      productionNotes: ['実在アカウントを晒さない', 'コメント実例は架空にする', '誹謗中傷の詳細再現を避ける'],
-      differentiation: 'SNS論ではなく、創作者が扱える感情構造として整理する。',
-      riskNotes: ['被害体験の消費に見えないよう、救済や選択に着地させる'],
-      draftInstructions:
-        '出力は7分解説動画の台本として、導入体験、章立て、図解、ジャンル別作例、制作上の注意を書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-      creatorBrief: {
-        protagonist: 'コメント欄を見るのが怖い視聴者の感覚を代弁する語り手。',
-        setting: '架空投稿アプリ、天気図風コメント欄、漫画・小説・ショート動画の作例ボード。',
-        incitingIncident: '投稿ボタンの上に、晴れではなく「弱い雨」の予報が出るモックを見せる。',
-        conflict: '反応を求めるほど、反応に傷つく構造から逃げにくい。',
-        choice: '恐怖を煽るか、言葉の届き方を選び直す企画へ変えるか。',
-        payoff: '視聴者が不安を消費せず、物語上の選択として扱える。',
-      },
-    }],
-    'long-novel': [
-    {
-      id: 'long-novel-rejection-log',
-      targetFormat: '長編小説',
-      formatLabel: '長編連載',
-      titleCandidates: ['却下理由だけが見える私', '見えない評価欄の読み方', '不合格ログの向こう側'],
-      reasonToWin: [
-        '評価不安を長期的な主人公の成長へ変換できる',
-        '毎章「却下理由」を読む謎解きで継続フックを作れる',
-        'ざまあだけでなく救済と制度理解へ広げられる',
-      ],
-      audiencePromise: '理不尽を読み解く力で、自分と周囲を救う長編連載。',
-      emotionalHook: 'なぜ自分だけ選ばれないのかという長期的な痛み。',
-      premise:
-        '主人公は、申請・面接・提案が却下された本当の理由だけ読める。最初は自分の人生を立て直すが、次第に周囲の人々の不条理も見えてくる。',
-      exampleDetail:
-        '序盤は就活や社内提案の却下理由を読む個人的な物語にする。中盤で、却下理由には本人の欠点ではなく組織側の都合や誤読も混じるとわかり、終盤で主人公が「選ばれなかった人の記録」を集める側に回る。',
-      outline: ['1-10章: 能力の発見と自分の救済', '11-30章: 他者の却下理由を読み解く', '31章以降: 評価する側の矛盾に迫る'],
-      opening: '不採用通知の下に、本来なら存在しない一行があった。「理由: 優秀すぎるため扱いにくい」。',
-      productionNotes: ['実在企業名は出さず架空組織にする', '現実の制度批判は抽象化する', '章末に小さな謎を残す'],
-      differentiation: 'ざまあ単発ではなく、読み解きと救済を主軸にする。',
-      riskNotes: ['実在採用サービスや企業を想起させる表現を避ける'],
-      draftInstructions:
-        '出力はWeb長編小説の第1章として、主人公、世界観、本文、章末の引き、今後30章の展開メモを書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'long-novel-small-debt-library',
-      targetFormat: '中編小説',
-      formatLabel: '中編小説',
-      titleCandidates: ['小さな借りだけが本になる図書館', '返せなかった親切', '未返却のやさしさ'],
-      reasonToWin: [
-        '救済・生活不安・人間関係を中編で濃く扱える',
-        '1話ごとに別人物の「返せなかった借り」を読める',
-        '派手な能力より感情の回収で読ませられる',
-      ],
-      audiencePromise: '返せなかった小さな親切を、本として読み直す中編ファンタジー。',
-      emotionalHook: '誰かに助けられたのに、何も返せなかった後悔。',
-      premise:
-        '駅裏の図書館には、人が返せなかった小さな借りだけが本になる。主人公は自分の本を探すうち、家族や職場の人々が抱えている未返却のやさしさを知る。',
-      exampleDetail:
-        '主人公が最初に読む本は「雨の日に傘を半分貸してくれた人」。たった数分の出来事が、その人の人生では大きな分岐だったとわかり、主人公は直接返せない親切の返し方を探す。',
-      outline: ['第1部: 図書館の発見', '第2部: 他人の本を読む危うさ', '第3部: 返すのではなく渡す結末'],
-      opening: 'その図書館の本には、著者名ではなく「まだ返していない人」の名前が貼られていた。',
-      productionNotes: ['実在図書館名を使わない', '説教臭くしない', '小さな出来事を重ねる'],
-      differentiation: '異世界ではなく、駅裏の日常ファンタジーにする。',
-      riskNotes: ['実在個人の美談を流用しない'],
-      draftInstructions:
-        '出力は中編小説の冒頭4000字相当の本文、主要人物、三部構成、感情の回収ポイントを具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'long-novel-one-night-ranking',
-      targetFormat: '短編小説',
-      formatLabel: '短編小説',
-      titleCandidates: ['一晩だけ順位が消えた街', 'ランキングのない朝', '誰も一番ではない夜'],
-      reasonToWin: [
-        'ランキング疲れを短編の一夜だけの寓話にできる',
-        'SNSや評価社会を直接名指しせず抽象化できる',
-        '読後に共有したくなる余韻を作れる',
-      ],
-      audiencePromise: '全ての順位が一晩だけ消えた街で、自分の価値を見直す短編。',
-      emotionalHook: '比べられないと安心する一方で、自分の輪郭も失う怖さ。',
-      premise:
-        'ある夜、街中のランキング、点数、順位表が空白になる。主人公は自由を感じるが、順位を頼りにしか選べなかった自分にも気づく。',
-      exampleDetail:
-        '人気店の行列が消え、学校の成績表も空白になり、配信ランキングも無表示になる。主人公は初めて「一番だから」ではない選択をするが、朝になると順位は戻ってくる。',
-      outline: ['夜: 順位の消失', '深夜: 自由と不安', '明け方: 自分で選ぶ', '朝: 順位が戻っても変わった視点'],
-      opening: '午前零時、街のすべての一位が消えた。',
-      productionNotes: ['実在ランキングサービスを出さない', '教訓で終わらせない', '最後に小さな行動を置く'],
-      differentiation: '制度批判より、選ぶ感覚の回復に寄せる。',
-      riskNotes: ['特定サービスのランキング批判にしない'],
-      draftInstructions:
-        '出力は短編小説として、完成本文、場面転換、象徴アイテム、静かなラストを具体的に書いてください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'long-novel-neighbor-manual',
-      targetFormat: '長編小説',
-      formatLabel: '群像長編',
-      titleCandidates: ['となりの人の取扱説明書', '親切の仕様書', '町内会ログブック'],
-      reasonToWin: [
-        '近所・家族・職場の小さな摩擦を群像劇にできる',
-        '説明書という形式で人物理解を可視化できる',
-        '章ごとに別人物へ焦点を移しやすい',
-      ],
-      audiencePromise: '人付き合いの失敗を、誰かの取扱説明書として読み直す群像長編。',
-      emotionalHook: '悪い人ではないのに、どう接すればいいかわからない相手への疲れ。',
-      premise:
-        '主人公は、相手に対する接し方が説明書として見えるようになる。ただし説明書は本人の本音ではなく、周囲が勝手に作った思い込みも混じっている。',
-      exampleDetail:
-        '無愛想な隣人の説明書には「朝は話しかけないこと」とある。主人公は従うが、実はそれは昔の噂から生まれた誤記だった。説明書を信じすぎる危うさが物語の軸になる。',
-      outline: ['第1章: 説明書が見える', '第2章以降: 誤記された人々', '中盤: 自分の説明書', '終盤: 読まずに向き合う選択'],
-      opening: '隣人の背中に、薄い紙のタグが揺れていた。「取扱注意」と書かれている。',
-      productionNotes: ['地域名は架空にする', '障害や病気を安易な説明書にしない', '対話で更新する構造にする'],
-      differentiation: '便利能力ではなく、ラベル貼りの危うさを扱う。',
-      riskNotes: ['属性や病名を雑に物語装置化しない'],
-      draftInstructions:
-        '出力は群像長編小説の第1章本文、主要キャラクター、章別焦点、長期的な関係変化を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-    },
-    {
-      id: 'long-novel-search-sign-town',
-      targetFormat: '長編小説',
-      formatLabel: '連作長編',
-      titleCandidates: ['検索候補が看板になる町', '言えない言葉の商店街', '夜だけ光る候補語'],
-      reasonToWin: [
-        '検索不安を町の風景として可視化できる',
-        '章ごとに別の店・住人・検索語を扱えて連載化しやすい',
-        'ミステリーと生活ドラマを両立できる',
-      ],
-      audiencePromise: '人が言えない悩みだけが夜の看板に出る町で、言葉にできない不安を拾う連作長編。',
-      emotionalHook: '誰にも言っていない悩みが、検索候補として先に見えてしまう怖さ。',
-      premise:
-        '夜になると商店街の看板に、住人が検索しようとして飲み込んだ言葉が浮かぶ。主人公は看板を消す仕事を任されるが、消すだけでは悩みは残ると気づく。',
-      exampleDetail:
-        '第1章では、閉店後の薬局の看板に「眠れない 仕事 評価」と出る。主人公は誰の言葉か探すが、候補語を追うほど町の人々の沈黙が見えてくる。',
-      outline: ['第1部: 夜の看板係', '第2部: 検索語を隠した住人たち', '第3部: 消す仕事から聞く仕事へ', '終盤: 自分の候補語が町に出る'],
-      opening: '夜十一時、シャッター街に最初の検索候補が灯った。',
-      productionNotes: ['実在検索サービス名を出さない', '病気や困窮を見世物にしない', '各章に一人ずつ救済を置く'],
-      differentiation: '検索履歴の怖さではなく、言葉にできなかった悩みの受け皿として描く。',
-      riskNotes: ['個人の秘密を暴く快感に寄せすぎない'],
-      draftInstructions:
-        '出力は連作長編小説の第1章本文、町のルール、主要住人、20章分の章題案、長期的な謎を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-      creatorBrief: {
-        protagonist: '商店街の夜間清掃をする青年。人の悩みに踏み込むのが苦手で、最初は看板を消すだけで済ませたい。',
-        setting: '夜だけ検索候補が看板に灯る架空の商店街。',
-        incitingIncident: '閉店後の薬局看板に、誰かが飲み込んだ評価不安の候補語が出る。',
-        conflict: '候補語を消せば町は静かになるが、悩みを持つ人は救われない。',
-        choice: '仕事として消し続けるか、誰かの言葉を聞きに行くか。',
-        payoff: '小さな会話の積み重ねで町の見え方が変わる余韻。',
-      },
-    },
-    {
-      id: 'long-novel-last-notice-station',
-      targetFormat: '中編小説',
-      formatLabel: '中編小説',
-      titleCandidates: ['終電後の未読通知局', '届かなかった返事の駅', '既読にならない夜'],
-      reasonToWin: [
-        '未読・返信不安を日常ファンタジーに変換できる',
-        '中編で一晩の密度と過去の回収を両立できる',
-        '恋愛、家族、仕事の後悔を安全に扱いやすい',
-      ],
-      audiencePromise: '送れなかった返事だけが集まる駅で、言葉を選び直す中編。',
-      emotionalHook: '返せなかった一通が、関係を変えてしまったかもしれない後悔。',
-      premise:
-        '終電後の地下駅には、送信されなかった通知だけを預かる窓口がある。主人公は自分宛ての未送信通知を受け取り、過去の関係を誤解していたと知る。',
-      exampleDetail:
-        '主人公は、疎遠になった友人から送られなかった「怒ってない。ただ、疲れていただけ」という通知を読む。返事を届け直せるのは一晩に一通だけだと告げられる。',
-      outline: ['第一夜: 未読通知局に迷い込む', '第二幕: 届かなかった言葉を読む', '第三幕: 一通だけ返す', '結末: 既読ではなく対話を選ぶ'],
-      opening: '終電が出たあと、改札の奥に「未読通知局」と書かれた窓口が開いた。',
-      productionNotes: ['実在メッセージアプリ名を出さない', '恋愛だけに限定しない', '最後は通知ではなく直接の言葉で終える'],
-      differentiation: '既読スルーのあるあるではなく、言葉を送れなかった側の事情まで読む。',
-      riskNotes: ['ストーカー的な監視能力に見えないよう窓口ルールを限定する'],
-      draftInstructions:
-        '出力は中編小説の冒頭本文、駅のルール、主要人物、三幕構成、静かな結末を具体化してください。',
-      properNounUsage,
-      sourceSimilarityFlags: safeFlags,
-      creatorBrief: {
-        protagonist: '返信が遅いことを自分の欠点だと思っている会社員。関係を壊したのは自分だと決めつけている。',
-        setting: '終電後だけ開く、架空鉄道の地下駅「未読通知局」。',
-        incitingIncident: '自分宛てに送られなかった通知が、窓口の封筒で渡される。',
-        conflict: '届かなかった言葉を読めば救われるが、相手の沈黙を勝手に覗く怖さもある。',
-        choice: '過去の通知を全部読むか、一通だけ返す言葉を選ぶか。',
-        payoff: '既読や未読ではなく、直接言葉を渡す勇気で終える。',
-      },
-    }],
-  };
-
-  const categoryPlans = plans[categoryId] ?? plans['story-manga'];
+  const categoryPlans = planSkeletonsForCategory(categoryId, properNounUsage, safeFlags);
   const acquiredObservations = (cluster?.observations ?? []).filter(
-    (observation) => observation.sourceType === 'public-web-rss',
+    (observation) => observation.sourceType === 'public-web-rss' || observation.sourceType === 'fixture' || observation.sourceType === undefined,
   );
   return regeneratePlans(categoryPlans, variantSeed, {
     ...cluster,
     observations: acquiredObservations,
   }).map((plan) => addDraftPrompt({ ...plan, whyNow: cluster.label }, categoryId, cluster));
+}
+
+function planSkeletonsForCategory(categoryId, properNounUsage, sourceSimilarityFlags) {
+  const skeletons = {
+    'story-manga': [
+      ['story-manga-frame-1', 'ストーリー漫画', '連載第1話'],
+      ['story-manga-frame-2', 'ストーリー漫画', '読み切り'],
+      ['story-manga-frame-3', 'ストーリー漫画', '縦読み漫画'],
+    ],
+    'short-video': [
+      ['short-video-frame-1', '短尺動画', '30秒ショート'],
+      ['short-video-frame-2', '短尺動画', '45秒ショート'],
+      ['short-video-frame-3', '短尺動画', 'シリーズ初回'],
+    ],
+    'trend-explainer': [
+      ['trend-explainer-frame-1', '解説動画', '7分解説'],
+      ['trend-explainer-frame-2', '解説動画', '章立て解説'],
+      ['trend-explainer-frame-3', '解説動画', '制作者向け分析'],
+    ],
+    'long-novel': [
+      ['long-novel-frame-1', '長編小説', '第1章'],
+      ['long-novel-frame-2', '中編小説', '中編小説'],
+      ['long-novel-frame-3', '長編小説', '連作長編'],
+    ],
+  };
+  return (skeletons[categoryId] ?? skeletons['story-manga']).map(([id, targetFormat, formatLabel]) => ({
+    id,
+    targetFormat,
+    formatLabel,
+    properNounUsage,
+    sourceSimilarityFlags,
+  }));
 }
 
 function properNounUsageForCategory(categoryId) {
@@ -2869,7 +1879,7 @@ export function buildReport({
     evidenceCards,
     deepAnalysis: buildDeepAnalysis(category.id, cluster, variantSeed),
     categoryFitCards: buildCategoryFitCards(category.id, cluster),
-    categoryReasons: buildCategoryReasons(category.id),
+    categoryReasons: buildCategoryReasons(category.id, cluster),
     beginnerGuide: buildBeginnerGuide(category.id, creativePlans[0], cluster),
     creativePlans,
     confidenceSummary: {
