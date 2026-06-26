@@ -3,6 +3,85 @@ import assert from 'node:assert/strict';
 import { PUBLIC_OBSERVATIONS } from './helpers/publicObservations.mjs';
 import { buildReport } from '../src/lib/reportEngine.js';
 
+const ENTITY_LEAK_OBSERVATIONS = [
+  {
+    id: 'entity-leak-a',
+    categoryId: 'story-manga',
+    source: 'はてな 暮らし',
+    sourceType: 'public-web-rss',
+    title: 'ケンドーコバヤシが新幹線内の整列問題について説明',
+    snippet: '整列の問題と確認欄の扱いについて、ケンドーコバヤシの発言が話題になっている。',
+    tags: ['ケンドーコバヤシ', '新幹線内', '整列', '確認欄'],
+    query: 'ケンドーコバヤシ 整列 確認欄',
+    queryUsed: 'ケンドーコバヤシ 整列 確認欄 / public Web/RSS round 1',
+    metrics: { rank: 1, recencyScore: 88, sourceWeight: 91, categoryMatchScore: 72 },
+    sourceUrl: 'https://example.com/entity-leak-a',
+    observedAt: '2026-06-26T13:48:07+09:00',
+    publishedAt: '2026-06-26T12:30:00+09:00',
+  },
+  {
+    id: 'entity-leak-b',
+    categoryId: 'story-manga',
+    source: 'Google News RSS',
+    sourceType: 'public-web-rss',
+    title: '乙武洋匡氏と渡辺直美の発言が確認欄の話題に',
+    snippet: '乙武洋匡氏、渡辺直美の名前を含む話題が、説明不足や記録票の読み方として共有された。',
+    tags: ['乙武洋匡氏', '渡辺直美', '説明不足', '記録票'],
+    query: '乙武洋匡氏 渡辺直美 確認欄',
+    queryUsed: '乙武洋匡氏 渡辺直美 確認欄 / public Web/RSS round 1',
+    metrics: { rank: 2, recencyScore: 81, sourceWeight: 86, categoryMatchScore: 69 },
+    sourceUrl: 'https://example.com/entity-leak-b',
+    observedAt: '2026-06-26T13:49:07+09:00',
+    publishedAt: '2026-06-26T12:10:00+09:00',
+  },
+  {
+    id: 'entity-leak-c',
+    categoryId: 'story-manga',
+    source: 'Google News RSS',
+    sourceType: 'public-web-rss',
+    title: 'Amazonと任天堂作品ドラえもんの比較が受付票の比喩で語られる',
+    snippet: 'Amazon、任天堂、ドラえもんなどの固有名詞を含む記事が、受付票や掲示板の比喩と一緒に言及された。',
+    tags: ['Amazon', '任天堂', 'ドラえもん', '受付票', '掲示板'],
+    query: 'Amazon 任天堂 ドラえもん 受付票',
+    queryUsed: 'Amazon 任天堂 ドラえもん 受付票 / public Web/RSS round 1',
+    metrics: { rank: 3, recencyScore: 76, sourceWeight: 84, categoryMatchScore: 65 },
+    sourceUrl: 'https://example.com/entity-leak-c',
+    observedAt: '2026-06-26T13:50:07+09:00',
+    publishedAt: '2026-06-26T11:50:00+09:00',
+  },
+];
+
+function storyFacingText(report) {
+  return JSON.stringify({
+    topTags: report.trendClusters[0].topTags,
+    creatorSignals: report.trendClusters[0].creatorSignals,
+    sourceSignals: report.trendClusters[0].sourceSignals,
+    deepAnalysis: report.deepAnalysis,
+    beginnerGuide: report.beginnerGuide,
+    categoryFitCards: report.categoryFitCards,
+    categoryReasons: report.categoryReasons,
+    creativePlans: report.creativePlans.map((plan) => ({
+      titleCandidates: plan.titleCandidates,
+      reasonToWin: plan.reasonToWin,
+      audiencePromise: plan.audiencePromise,
+      emotionalHook: plan.emotionalHook,
+      premise: plan.premise,
+      exampleDetail: plan.exampleDetail,
+      outline: plan.outline,
+      opening: plan.opening,
+      differentiation: plan.differentiation,
+      creatorBrief: plan.creatorBrief,
+      storyArchitecture: plan.storyArchitecture,
+      craftNotes: plan.craftNotes,
+      aiDraftPrompt: plan.aiDraftPrompt,
+    })),
+  });
+}
+
+function countMatches(text, pattern) {
+  return [...String(text).matchAll(pattern)].length;
+}
+
 test('buildReport returns practical report sections for trend explainer', () => {
   const report = buildReport({
     categoryId: 'trend-explainer',
@@ -48,6 +127,46 @@ test('fiction reports keep platform names out of story-facing analysis', () => {
   assert.doesNotMatch(visibleText, /YouTube|TikTok|Google Trends|LINE|Netflix/);
   assert.doesNotMatch(visibleText, /Netflix社員の陰謀|TikTok社長が黒幕|実在クリエイターを主人公/);
   assert.ok(report.creativePlans[0].sourceSimilarityFlags.some((flag) => flag.severity === 'safe'));
+});
+
+test('fiction reports keep real entities as evidence only and rewrite story-facing copy', () => {
+  const report = buildReport({
+    categoryId: 'story-manga',
+    timeWindow: '7d',
+    audience: 'general',
+    observations: ENTITY_LEAK_OBSERVATIONS,
+    providerMode: 'public-web-rss',
+  });
+
+  const evidenceText = JSON.stringify(report.evidenceCards);
+  const visibleText = storyFacingText(report);
+  const realEntityPattern = /ケンドーコバヤシ|乙武洋匡|渡辺直美|Amazon|任天堂|ドラえもん/;
+
+  assert.match(evidenceText, realEntityPattern);
+  assert.doesNotMatch(visibleText, realEntityPattern);
+  assert.doesNotMatch(visibleText, /整列を整列が|補助視点は.+ケンドーコバヤシ|が[^。]{0,24}の問題として処理され/);
+  assert.match(visibleText, /確認欄|記録票|受付票|掲示板|説明不足|整列/);
+});
+
+test('story manga creative briefs use distinct angles instead of one repeated sentence frame', () => {
+  const report = buildReport({
+    categoryId: 'story-manga',
+    timeWindow: '7d',
+    audience: 'general',
+    observations: ENTITY_LEAK_OBSERVATIONS,
+    providerMode: 'public-web-rss',
+  });
+
+  const briefTexts = report.creativePlans.map((plan) => Object.values(plan.creatorBrief).join(' '));
+  const joinedBriefs = briefTexts.join('\n');
+
+  assert.equal(briefTexts.length, 3);
+  assert.ok(countMatches(joinedBriefs, /主人公。最初は/g) <= 1);
+  assert.ok(countMatches(joinedBriefs, /自分の弱さ/g) <= 1);
+  assert.ok(countMatches(joinedBriefs, /小さな救済/g) <= 1);
+  assert.ok(briefTexts.some((text) => /画面|視線|小道具|欄/.test(text)));
+  assert.ok(briefTexts.some((text) => /証言|会話|沈黙|周囲/.test(text)));
+  assert.ok(briefTexts.some((text) => /選択|返す|回収|余韻/.test(text)));
 });
 
 test('buildReport varies the creative angle without rotating the evidence queue', () => {

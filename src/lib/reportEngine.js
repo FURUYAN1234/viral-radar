@@ -76,11 +76,12 @@ function buildCluster(categoryId, observations) {
 }
 
 function displayTopTagsForCategory(categoryId, rawTags, observations = []) {
-  const evidenceTerms = observations.flatMap((observation) => evidenceTermsForObservation(observation));
+  const evidenceTerms = observations.flatMap((observation) => storyFacingTermsForObservation(observation, categoryId));
   const filteredTags = (rawTags ?? [])
     .map(cleanFocusTerm)
     .filter((tag) => isUsableEvidenceTerm(tag))
-    .filter((tag) => categoryId === 'trend-explainer' || !isSourceTag(tag));
+    .filter((tag) => categoryId === 'trend-explainer' || !isSourceTag(tag))
+    .filter((tag) => !usesFictionalizedTerms(categoryId) || isStorySafeEvidenceTerm(tag));
   const fallbackTags = {
     'story-manga': ['人物の選択', '画面化できる違和感', '1ページ目の事件'],
     'short-video': ['冒頭の変化', '字幕化できる損失', 'コメント余白'],
@@ -91,7 +92,10 @@ function displayTopTagsForCategory(categoryId, rawTags, observations = []) {
 }
 
 function buildEvidenceClusterLabel(categoryId, topTags, observations, fallbackLabel) {
-  const focus = uniqueList([...(topTags ?? []), ...observations.flatMap((observation) => evidenceTermsForObservation(observation))]).slice(0, 2);
+  const focus = uniqueList([
+    ...(topTags ?? []),
+    ...observations.flatMap((observation) => storyFacingTermsForObservation(observation, categoryId)),
+  ]).slice(0, 2);
   if (focus.length === 0) return fallbackLabel;
   const mediumMove = {
     'story-manga': '漫画の入口に読み替える制作判断',
@@ -130,7 +134,7 @@ function buildCreatorSignals(categoryId, observations = [], topTags = []) {
 function buildSourceSignals(observations, topTags, categoryId) {
   if (!observations.length) return [];
   if (categoryId === 'story-manga') {
-    const terms = uniqueList(observations.flatMap((observation) => evidenceTermsForObservation(observation))).slice(0, 4);
+    const terms = uniqueList(observations.flatMap((observation) => storyFacingTermsForObservation(observation, categoryId))).slice(0, 4);
     return [
       { label: '取得語の具体性', detail: `今回拾った語は「${terms.join(' / ') || '具体語不足'}」。漫画では人物名ではなく画面上の手がかりへ変換する。` },
       { label: '周辺文脈の近さ', detail: `${new Set(observations.map((item) => item.sourceUrl || item.title)).size}件の取得結果から、同じ不安ではなく近い構造を持つ反応を比較する。` },
@@ -138,7 +142,7 @@ function buildSourceSignals(observations, topTags, categoryId) {
     ];
   }
   if (categoryId === 'long-novel') {
-    const terms = uniqueList(observations.flatMap((observation) => evidenceTermsForObservation(observation))).slice(0, 4);
+    const terms = uniqueList(observations.flatMap((observation) => storyFacingTermsForObservation(observation, categoryId))).slice(0, 4);
     return [
       { label: '章に残せる取得語', detail: `「${terms.join(' / ') || '取得語'}」を、章ごとの証拠、人物の誤解、後半で意味が変わる記録へ広げる。` },
       { label: '読者維持の周辺文脈', detail: `${observations.length}件の取得結果から、単発の話題ではなく読み進める問いに変わるかを見る。` },
@@ -703,7 +707,7 @@ function buildCraftNotes(plan, categoryId, creatorBrief) {
     },
     {
       label: '主人公の欠落',
-      detail: `${creatorBrief.protagonist} 最初は「${anchorTension}」を自分の弱さとして処理しようとし、「${creatorBrief.choice}」を選べないことが初期弱点になる。`,
+      detail: `${creatorBrief.protagonist} 初期弱点は「${anchorTension}」を一人で抱え込み、行動に移す前に止まってしまうこと。転機では「${creatorBrief.choice}」をセリフではなく具体的な行動で示す。`,
     },
     {
       label: '読者維持エンジン',
@@ -849,7 +853,7 @@ function buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign)
 
   const emotionGap = {
     method: '感情差分',
-    start: `${creatorBrief.protagonist} 最初は自分の問題だと思い込む。`,
+    start: `${creatorBrief.protagonist} 冒頭では原因を取り違え、読者だけが違和感に半歩早く気づく。`,
     pressure: `中盤は「${middleBeat}」とし、同じ痛みが他者や仕組みにも広がることを見せる。`,
     turn: `「${stripSentenceEnd(creatorBrief.choice)}」という選択を行動で見せ、${medium.audienceLabel}の感情を不安から小さな救済へ動かす。`,
   };
@@ -1198,7 +1202,7 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
   const insight = classifyObservationInsight(observation ?? {});
   const anchor = deriveEvidenceAnchor(observation, insight, seed, index, categoryId);
   const signalAnchor = categoryId === 'trend-explainer' ? anchor : { ...anchor, title: anchor.focusTerm };
-  const signal = observationSignalForPlan(observation, insight, signalAnchor);
+  const signal = observationSignalForPlan(observation, insight, signalAnchor, categoryId);
   const keyword = anchor.focusTerm;
   const artifact = anchor.artifact;
   const planAnchor = evidenceAnchorForPlan(anchor, categoryId);
@@ -1294,39 +1298,106 @@ function buildSearchDrivenFrame(categoryId, observation, seed, index) {
     };
   }
 
+  return buildStoryMangaFrame({
+    anchor,
+    signal,
+    keyword,
+    artifact,
+    planAnchor,
+    opening,
+    seed,
+    index,
+  });
+}
+
+
+
+function buildStoryMangaFrame({ anchor, signal, keyword, artifact, planAnchor, opening, seed, index }) {
+  const titleCandidates = titleCandidatesForCategory('story-manga', null, anchor, seed, index);
+  const surface = anchor.surface ?? '確認欄';
+  const secondary = anchor.secondaryTerm ?? '別視点';
+  const variants = [
+    {
+      protagonist: `${surface}の端に出た違和感を、視線で先に拾ってしまう新人記録係。${anchor.readerNeed}`,
+      setting: `閉館前の受付窓口。${artifact}だけが画面の欄外に残り、周囲はそれを通常処理として流している。`,
+      incitingIncident: `最初の大ゴマで${surface}の一列だけがずれ、主人公の視線が${keyword}の違和感に止まる。`,
+      conflict: `${anchor.tension}。声に出せば窓口全体の処理が止まり、黙れば欄外の説明が消える。`,
+      choice: `欄を閉じて通常処理に戻るか、画面の端に残った${secondary}を読者にも見える形で示すか。`,
+      payoff: `ラストは同じ${surface}が別の意味で再表示され、読者が次の欄を探したくなる余韻にする。`,
+      reason: `${artifact}は1ページ目の視線誘導と小道具の異常で読ませやすい`,
+      promise: `${keyword}を、画面上の違和感と欄外の手がかりで読ませる漫画案。`,
+      premise: `取得根拠の「${keyword}」を実名の話題ではなく、受付画面の欄外に残る異常として扱う。主人公は説明されない欄を見つけ、読者は先に違和感へ気づく。`,
+      example: `1コマ目は窓口全景、2コマ目は${surface}の拡大、3コマ目は周囲が何も見ていない表情、ラストは欄外に残る${secondary}で引く。`,
+      outline: [
+        `冒頭: ${surface}の一列だけがずれる`,
+        `中盤: ${keyword}の違和感を主人公だけが追う`,
+        `転機: ${secondary}が説明不足の証拠になる`,
+        `結末: 欄外の表示を閉じずに残す`,
+      ],
+      differentiation: `ニュース名や人物名ではなく、${surface}と視線誘導だけで読者に発見させる。`,
+    },
+    {
+      protagonist: `${secondary}について語らない周囲の沈黙を聞き分ける、控えめな聞き取り係。`,
+      setting: `${artifact}を挟んで、証言、会話、掲示板の短文が少しずつ食い違う放課後の相談室。`,
+      incitingIncident: `主人公が${keyword}の記録を整理すると、同じ出来事なのに証言の順番だけが合わない。`,
+      conflict: `${anchor.tension}。誰かを責めるほど単純ではなく、沈黙を守るほど誤読だけが広がる。`,
+      choice: `正しい犯人探しを始めるか、会話の欠けた順番を並べ替えて見落としを返すか。`,
+      payoff: `最後は誰かの短い証言で${artifact}の読み方が反転し、次話では別の人物の沈黙へ進める。`,
+      reason: `${keyword}を会話と証言のズレに変えると、同じ題材でも人物関係から読ませられる`,
+      promise: `${keyword}を、周囲の沈黙と証言の順番で読み解く群像寄りの漫画案。`,
+      premise: `取得根拠を告発にせず、複数人物の証言が少しずつずれる相談室の場面へ変換する。読者は会話の空白から${anchor.tension}を推理する。`,
+      example: `冒頭は掲示板の短文。中盤で三人の証言を並べ、最後に一番短い沈黙が${secondary}の意味を変える。`,
+      outline: [
+        `冒頭: ${keyword}の記録が相談室に届く`,
+        `中盤: 証言と会話の順番が食い違う`,
+        `転機: 周囲の沈黙が見落としの証拠になる`,
+        `結末: 誰かを責めずに記録の順番を戻す`,
+      ],
+      differentiation: `画面の異常だけでなく、証言、会話、沈黙を使って別角度の読後感にする。`,
+    },
+    {
+      protagonist: `${keyword}の欄に丸を付ける係だったが、最後の選択だけは自分で引き受けたい人物。`,
+      setting: `白い余白の多い申請窓口。${artifact}は結末で意味が回収される約束として置かれる。`,
+      incitingIncident: `主人公が${surface}に丸を付けた瞬間、${secondary}の空欄だけが消えずに残る。`,
+      conflict: `${anchor.tension}。安全な処理を選べば自分は守れるが、空欄の理由は誰にも返らない。`,
+      choice: `自分の署名だけを残すか、${secondary}の空欄に説明を返して次の人の判断を変えるか。`,
+      payoff: `結末では冒頭の丸印を回収し、読者に「次なら自分はどう書くか」を残す。`,
+      reason: `${keyword}を選択と回収の型に置くと、ラストの一コマで読後の余韻を作れる`,
+      promise: `${keyword}を、最後の選択と回収で読者の判断に返す読み切り漫画案。`,
+      premise: `取得根拠の構造を、責める物語ではなく「記入するか、空欄にするか」の選択へ変換する。冒頭の丸印が結末で別の意味を持つ。`,
+      example: `冒頭で丸印、中盤で空欄、終盤で署名を見せる。最後は主人公の一筆が${artifact}の意味を変える。`,
+      outline: [
+        `冒頭: ${surface}に丸印を付ける`,
+        `中盤: ${secondary}の空欄が消えない`,
+        `転機: 正しい処理より返す言葉を選ぶ`,
+        `結末: 丸印の意味を回収して余韻を残す`,
+      ],
+      differentiation: `構造分析をそのまま説明せず、選択、返す言葉、回収の流れへ落として読み切れる形にする。`,
+    },
+  ];
+  const variant = variants[index % variants.length];
   return {
-    titleCandidates: titleCandidatesForCategory('story-manga', null, anchor, seed, index),
-    protagonist: `${anchor.readerNeed}を抱えた主人公。最初は${anchor.tension}を自分の弱さだと思い込んでいる。`,
-    setting: `${artifact}が、${anchor.scene}の中で漫画で一目で読める小道具として現れる世界。`,
-    incitingIncident: `主人公が${artifact}を1ページ目で目撃し、日常の見え方が変わる。`,
-    conflict: `${anchor.tension}を個人の弱さとして片付けると楽だが、${artifact}を追うほど見えない仕組みや誤読が現れる。`,
-    choice: `${anchor.actionLabel}を自分だけの解決で終わらせるか、${artifact}の意味を読み替えて誰かに言葉として返すか。`,
-    payoff: `${anchor.actionLabel}の小さな行動で、読者が自分の生活へ持ち帰れる救済を置く。`,
-    reasonToWin: [
-      signal,
-      `${artifact}は漫画の冒頭1ページで異常として見せやすい`,
-      `${keyword}を架空UIや小道具にすると、説明より先に感情が伝わる`,
-    ],
-    audiencePromise: `${keyword}の不安を、1ページ目でわかる異常表示と小さな救済に変える。`,
+    titleCandidates,
+    protagonist: variant.protagonist,
+    setting: variant.setting,
+    incitingIncident: variant.incitingIncident,
+    conflict: variant.conflict,
+    choice: variant.choice,
+    payoff: variant.payoff,
+    reasonToWin: [signal, variant.reason, `${keyword}を架空UIや場面の役割へ変換するため、実在名を出さずに感情へ届く`],
+    audiencePromise: variant.promise,
     emotionalHook: anchor.emotionalHook,
-    premise: `取得根拠から抽出した「${keyword}」を、主人公が${artifact}を通じて読み解く漫画企画にする。${anchor.tension}を、1話の感情反転として見せる。`,
-    exampleDetail: `冒頭は${artifact}を大ゴマで見せる。主人公は${keyword}を自分だけの問題だと思うが、別人物にも同じ兆候が出て、仕組みを読む物語に変わる。`,
-    outline: [
-      `冒頭: ${artifact}の異常表示`,
-      `中盤: ${keyword}が自分だけではないと知る`,
-      `転機: ${anchor.tension}の仕組みを見抜く`,
-      `結末: ${anchor.actionLabel}で小さな救済を返す`,
-    ],
+    premise: variant.premise,
+    exampleDetail: variant.example,
+    outline: variant.outline,
     opening,
     productionNotes: ['実在サービス名は出さない', '固有名詞を架空UIへ変換する', '1話1つの小道具に絞る'],
-    differentiation: `既存トレンド名ではなく、観測された${anchor.focusTerm}を漫画的な見せ場へ変換する。`,
+    differentiation: variant.differentiation,
     riskNotes: ['実在人物や企業への告発にしない'],
     draftInstructions: 'ストーリー漫画の第1話として、ページごとの流れ、重要コマ、セリフ、ラストの引きを具体的に書いてください。',
     evidenceAnchor: planAnchor,
   };
 }
-
-
 
 function pickVariant(items, offset) {
   if (!Array.isArray(items) || items.length === 0) return '物語の種';
@@ -1337,9 +1408,13 @@ function titleCandidatesForCategory(categoryId, concept, anchor, seed, index) {
   const focus = cleanFocusTerm(anchor?.focusTerm ?? concept?.keyword ?? '取得語');
   const secondary = cleanFocusTerm(anchor?.secondaryTerm ?? anchor?.terms?.[1] ?? '別視点');
   const pair = uniqueList([focus, secondary]).join('・');
-  const rawSurface = anchor?.artifact ?? pickVariant(anchorSurfacesForCategory(categoryId), stableHash(`${focus}|${seed}|${index}`));
+  const rawSurface = anchor?.surface ?? anchor?.artifact ?? pickVariant(anchorSurfacesForCategory(categoryId), stableHash(`${focus}|${seed}|${index}`));
   const surface = compactEvidenceText(
     String(rawSurface)
+      .replace(`${focus}を示す`, '')
+      .replace(`${secondary}を示す`, '')
+      .replace(`${focus}の`, '')
+      .replace(`${secondary}の`, '')
       .replace(`${pair}だけが残る`, '')
       .replace(`${focus}だけが残る`, '')
       .replace(`${secondary}だけが残る`, '')
@@ -1522,6 +1597,111 @@ const EVIDENCE_TERM_STOPWORDS = new Set([
   'RSS',
 ]);
 
+const FICTIONALIZED_TERM_CATEGORIES = new Set(['story-manga', 'short-video', 'long-novel']);
+
+const STORY_SAFE_TERM_STEMS = [
+  '確認',
+  '確認欄',
+  '記録',
+  '記録票',
+  '受付',
+  '受付票',
+  '掲示',
+  '掲示板',
+  '申請',
+  '申請欄',
+  '説明',
+  '説明不足',
+  '証言',
+  '発言',
+  '会話',
+  '沈黙',
+  '整列',
+  '行列',
+  '比較',
+  '比喩',
+  '読み方',
+  '手続き',
+  '欄外',
+  '余白',
+  '空欄',
+  '表示',
+  '入力',
+  '通知',
+  '保存',
+  '共有',
+  '選択',
+  '誤解',
+  '見落とし',
+  '台帳',
+  '書類',
+  '制度',
+  '仕組み',
+  '導線',
+  '損失',
+  '不便',
+  '予定',
+  '日程',
+  '発売日',
+  '公開日',
+  '配信日',
+  '締切',
+  '期限',
+  '通知',
+  '暦',
+  'カレンダー',
+];
+
+const STORY_STRUCTURAL_PATTERNS = [
+  /確認欄/g,
+  /記録票/g,
+  /受付票/g,
+  /掲示板/g,
+  /申請欄/g,
+  /説明不足/g,
+  /整列(?:問題|ルール)?/g,
+  /行列(?:問題|ルール)?/g,
+  /記録(?:の読み方|不足|欄)?/g,
+  /確認(?:不足|疲れ|手順)?/g,
+  /受付(?:手順|窓口|記録)?/g,
+  /説明(?:不足|責任|欄)?/g,
+  /証言(?:欄|記録)?/g,
+  /発言(?:記録|欄)?/g,
+  /比較(?:表|欄)?/g,
+  /比喩/g,
+  /読み方/g,
+  /見落とし/g,
+  /誤解/g,
+  /選択/g,
+  /空欄/g,
+  /余白/g,
+  /欄外/g,
+  /台帳/g,
+  /書類/g,
+  /制度/g,
+  /仕組み/g,
+  /手続き/g,
+  /導線/g,
+  /損失/g,
+  /不便/g,
+  /発売日/g,
+  /公開日/g,
+  /配信日/g,
+  /予定/g,
+  /日程/g,
+  /締切/g,
+  /期限/g,
+  /通知/g,
+  /暦/g,
+  /カレンダー/g,
+];
+
+const STORY_SAFE_FALLBACK_TERMS = {
+  'story-manga': ['確認欄', '記録票', '受付票', '掲示板', '説明不足', '選択'],
+  'short-video': ['冒頭の変化', '比較カード', '字幕', '保存理由', '手元の手順', 'コメント余白'],
+  'long-novel': ['記録庫', '台帳', '証言', '章末記録', '誤解', '選択'],
+};
+
 function evidenceTermsForObservation(observation = {}) {
   const tagTerms = focusTermsFromValues(Array.isArray(observation.tags) ? observation.tags : []);
   const textTerms = [
@@ -1533,6 +1713,79 @@ function evidenceTermsForObservation(observation = {}) {
   return uniqueList([...tagTerms, ...textTerms])
     .filter(isUsableEvidenceTerm)
     .slice(0, 6);
+}
+
+function usesFictionalizedTerms(categoryId) {
+  return FICTIONALIZED_TERM_CATEGORIES.has(categoryId);
+}
+
+function storyFacingTermsForObservation(observation = {}, categoryId = 'story-manga') {
+  const rawTerms = evidenceTermsForObservation(observation);
+  if (!usesFictionalizedTerms(categoryId)) return rawTerms;
+  const structuralTerms = extractStoryStructuralTerms(observationEvidenceText(observation));
+  const safeRawTerms = rawTerms.filter(isStorySafeEvidenceTerm);
+  return uniqueList([
+    ...structuralTerms,
+    ...safeRawTerms,
+    ...(STORY_SAFE_FALLBACK_TERMS[categoryId] ?? STORY_SAFE_FALLBACK_TERMS['story-manga']),
+  ])
+    .map(normalizeStoryFacingTerm)
+    .filter(isUsableEvidenceTerm)
+    .slice(0, 6);
+}
+
+function extractStoryStructuralTerms(value) {
+  const text = String(value ?? '').normalize('NFKC');
+  const patternTerms = STORY_STRUCTURAL_PATTERNS.flatMap((pattern) => text.match(pattern) ?? []);
+  const extractedTerms = extractEvidenceTerms(text).filter(isStorySafeEvidenceTerm);
+  return uniqueList([...patternTerms, ...extractedTerms])
+    .map(normalizeStoryFacingTerm)
+    .filter(isStorySafeEvidenceTerm)
+    .slice(0, 8);
+}
+
+function normalizeStoryFacingTerm(value) {
+  const normalized = cleanFocusTerm(value);
+  if (/(発売日|公開日|配信日|予定|日程|締切|期限|予約|明日|カレンダー|暦)/.test(normalized)) return '予定';
+  if (/(通知|リマインド|アラーム|知らせ)/.test(normalized)) return '通知';
+  if (/(後悔|忘れ|遅れ|間に合わ)/.test(normalized)) return '後悔';
+  return normalized;
+}
+
+function isStorySafeEvidenceTerm(value) {
+  const normalized = cleanFocusTerm(String(value ?? '').normalize('NFKC'));
+  if (!isUsableEvidenceTerm(normalized)) return false;
+  if (/[のがをへと]/.test(normalized) && normalized.length > 8) return false;
+  if (containsLikelyRealEntity(normalized)) return false;
+  if (hasStorySafeStem(normalized)) return true;
+  if (/^[一-龯々]{2}$/.test(normalized)) return true;
+  if (/^[一-龯々ぁ-んァ-ヴー]{2,6}$/.test(normalized) && !looksLikeProperNoun(normalized)) return true;
+  return false;
+}
+
+function hasStorySafeStem(value) {
+  const normalized = String(value ?? '');
+  return STORY_SAFE_TERM_STEMS.some((stem) => normalized.includes(stem));
+}
+
+function containsLikelyRealEntity(value) {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return false;
+  if (/(?:氏|さん|氏ら|選手|監督|社長|会長|議員|教授|容疑者|被告|アナ|俳優|女優|芸人|タレント|クリエイター|YouTuber)/.test(normalized)) return true;
+  if (/(株式会社|有限会社|合同会社|Inc\.?|LLC|Corp\.?|Corporation|公式)/i.test(normalized)) return true;
+  if (/^[A-Za-z][A-Za-z0-9!?.&-]{2,}$/.test(normalized)) return true;
+  if (/^[ァ-ヴー・ー]{5,}$/.test(normalized) && !hasStorySafeStem(normalized)) return true;
+  if (/^[一-龯々]{3,5}$/.test(normalized) && !hasStorySafeStem(normalized)) return true;
+  if (/^[ぁ-んァ-ヴー一-龯々]{4,12}$/.test(normalized) && /[ぁ-ん]/.test(normalized) && /[ァ-ヴー]/.test(normalized) && !hasStorySafeStem(normalized)) return true;
+  return false;
+}
+
+function looksLikeProperNoun(value) {
+  const normalized = String(value ?? '').trim();
+  if (containsLikelyRealEntity(normalized)) return true;
+  if (/^[ァ-ヴー・ー]{4,}$/.test(normalized) && !hasStorySafeStem(normalized)) return true;
+  if (/^[一-龯々]{3,5}$/.test(normalized) && !hasStorySafeStem(normalized)) return true;
+  return false;
 }
 
 function extractEvidenceTerms(value) {
@@ -1580,23 +1833,60 @@ function perspectiveAnglesForCategory(categoryId) {
 }
 
 function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0, categoryId = 'story-manga') {
-  const terms = evidenceTermsForObservation(observation);
+  const terms = storyFacingTermsForObservation(observation, categoryId);
   const numericSeed = Math.abs(Number(seed) || 0);
   const hash = stableHash(`${observation?.id ?? ''}|${observation?.title ?? ''}|${observation?.sourceUrl ?? ''}|${index}`);
   const offset = Math.abs(hash + numericSeed * 17 + index * 11);
-  const fallbackFocus = cleanFocusTerm(insight?.material ?? '取得シグナル');
+  const fallbackTerms = STORY_SAFE_FALLBACK_TERMS[categoryId] ?? STORY_SAFE_FALLBACK_TERMS['story-manga'];
+  const fallbackFocus = usesFictionalizedTerms(categoryId)
+    ? fallbackTerms[index % fallbackTerms.length]
+    : cleanFocusTerm(insight?.material ?? '取得シグナル');
   const focusTerm = terms[0] ?? fallbackFocus;
-  const secondaryTerm = terms.find((term) => term !== focusTerm) ?? cleanFocusTerm(insight?.type ?? '別視点');
+  const fallbackSecondary = usesFictionalizedTerms(categoryId)
+    ? fallbackTerms[(index + 1) % fallbackTerms.length]
+    : cleanFocusTerm(insight?.type ?? '別視点');
+  const secondaryTerm = terms.find((term) => term !== focusTerm) ?? fallbackSecondary;
   const surface = pickVariant(anchorSurfacesForCategory(categoryId), offset + 1);
   const perspective = pickVariant(perspectiveAnglesForCategory(categoryId), offset + 2);
   const focusPair = uniqueList([focusTerm, secondaryTerm]).join('・');
-  const title = compactEvidenceText(observation?.title ?? focusPair, 72);
+  const title = usesFictionalizedTerms(categoryId)
+    ? `${focusPair}の取得根拠`
+    : compactEvidenceText(observation?.title ?? focusPair, 72);
   const scenePrefix = {
     'story-manga': '1ページ目で',
     'short-video': '縦画面で',
     'trend-explainer': '解説画面で',
     'long-novel': '第1章で',
   }[categoryId] ?? '冒頭で';
+  const artifact = `${focusTerm}を示す${surface}`;
+  const scene = `${scenePrefix}${surface}に${focusTerm}の違和感が現れる`;
+  const tension = pickVariant(
+    [
+      `${focusTerm}が急いで片付けられるほど、${secondaryTerm}に残った説明不足が大きくなる`,
+      `${secondaryTerm}の一行が、${focusTerm}をめぐる判断の空白を照らす`,
+      `${focusTerm}を普通の手続きとして流すほど、${secondaryTerm}の違和感が消えずに残る`,
+      `${focusTerm}の見方が一つに固定され、${secondaryTerm}から見た事情がこぼれ落ちる`,
+    ],
+    offset + 3,
+  );
+  const readerNeed = pickVariant(
+    [
+      `${focusTerm}の奥にある説明不足を、自分の生活感覚でも確かめたい`,
+      `${secondaryTerm}に残った違和感を、誰かのせいにせず読み解きたい`,
+      `${focusTerm}をめぐる判断がなぜずれたのか、画面上の手がかりから追いたい`,
+      `${secondaryTerm}の小さな変化から、見落とされた事情を拾い直したい`,
+    ],
+    offset + 4,
+  );
+  const emotionalHook = pickVariant(
+    [
+      `${focusTerm}はただの話題に見えるのに、${secondaryTerm}を見た瞬間だけ意味が変わる不安。`,
+      `${secondaryTerm}の一行を読み飛ばすと、誰かの説明が最初からなかったことになる怖さ。`,
+      `${focusTerm}を正しく処理したはずなのに、画面の端だけが納得していない感覚。`,
+      `${focusTerm}の判断を急ぐほど、${secondaryTerm}に残った余白が読者の目に刺さる。`,
+    ],
+    offset + 5,
+  );
   const actionPrefix = {
     'story-manga': '読み替える',
     'short-video': '試して見せる',
@@ -1617,13 +1907,14 @@ function deriveEvidenceAnchor(observation, insight, seed = 0, index = 0, categor
     focusTerm,
     secondaryTerm,
     perspective,
-    scene: `${scenePrefix}${focusPair}が表面化する${surface}`,
-    artifact: `${focusPair}だけが残る${surface}`,
-    tension: `${focusTerm}が${secondaryTerm}の問題として処理され、当事者の説明が置き去りになる`,
-    readerNeed: `${focusTerm}の裏で何が起きているかを、自分の判断にも引きつけて確かめたい`,
-    emotionalHook: `${focusTerm}という一語が、${secondaryTerm}まで巻き込んで見え方を変えてしまう怖さ。`,
+    surface,
+    scene,
+    artifact,
+    tension,
+    readerNeed,
+    emotionalHook,
     actionLabel: `${focusTerm}を${actionPrefix}`,
-    productionAngle: `${focusPair}を${surface}の見せ場に変える`,
+    productionAngle: `${focusPair}を${surface}と${perspective}の見せ場に変える`,
   };
 }
 
@@ -1719,14 +2010,21 @@ function enrichDeepAnalysisWithEvidence(base, categoryId, cluster, variantSeed =
       `${anchors.map((anchor) => anchor.focusTerm).join(' / ')}を横並びにせず、各案で主人公、場面、最初の事件、回収点を分ける余地があります。`,
       `同じ方向に寄る場合は、${primary.perspective}、${anchors[1]?.perspective ?? '別人物'}、${anchors[2]?.perspective ?? '別媒体'}のように視点を変えます。`,
     ]).slice(0, 3),
-    categoryInsight: `今回の分析では、${primary.focusTerm}を${primary.tension}という読者・視聴者心理に変換できる。核は${primary.artifact}で、補助視点は${anchors.slice(1).map((anchor) => anchor.focusTerm).join(' / ') || primary.secondaryTerm}。検索結果をローテーションせず、取得順の根拠から別々の企画角度を作る。`,
+    categoryInsight: `今回の分析では、取得語をそのまま人物名や企業名として使わず、${primary.focusTerm}を${primary.surface ?? primary.artifact}と${primary.perspective}へ読み替える。核は「${primary.tension}」。補助視点は${anchors.slice(1).map((anchor) => anchor.perspective || anchor.focusTerm).join(' / ') || primary.secondaryTerm}。取得順は根拠として残し、企画案ごとに画面、証言、選択の役割を分ける。`,
   };
 }
 
-function observationSignalForPlan(observation, insight, anchor) {
+function observationSignalForPlan(observation, insight, anchor, categoryId = 'story-manga') {
   const observedAt = observation?.observedAt ? `取得時刻 ${formatShortDateTime(observation.observedAt)}` : '取得時刻未取得';
-  const query = observation?.queryUsed ? `検索語「${safeQueryForPlan(observation.queryUsed)}」` : '公開Web/RSS取得';
-  const title = anchor?.title ? `取得タイトル「${anchor.title}」` : `${insight.material}に近い反応`;
+  const safeTerms = uniqueList([anchor?.focusTerm, anchor?.secondaryTerm, ...(anchor?.terms ?? [])]).slice(0, 3).join(' / ');
+  const query =
+    categoryId === 'trend-explainer' && observation?.queryUsed
+      ? `検索語「${safeQueryForPlan(observation.queryUsed)}」`
+      : `取得根拠語「${safeTerms || anchor?.focusTerm || '取得語'}」`;
+  const title =
+    categoryId === 'trend-explainer' && anchor?.title
+      ? `取得タイトル「${anchor.title}」`
+      : `${anchor?.focusTerm ?? insight.material}に近い反応`;
   return `${query}で、${title}を確認（${observedAt}）。企画では「${anchor?.readerNeed ?? '読者欲求'}」として扱う。`;
 }
 

@@ -8,7 +8,7 @@ const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8
 const viteConfig = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
 
 assert.match(html, /物語バズメーカー/);
-assert.match(html, /物語バズメーカー v1\.2\.1/);
+assert.match(html, /物語バズメーカー v1\.2\.3/);
 assert.doesNotMatch(html, /日本語圏|Story Maker/);
 assert.match(categories, /ストーリー漫画/);
 assert.match(categories, /トレンド解説動画/);
@@ -25,7 +25,7 @@ assert.match(main, /id="connect-api"/);
 assert.match(main, /接続/);
 assert.match(main, /id="api-settings"/);
 assert.match(main, /API設定/);
-assert.match(main, /const APP_VERSION = '1\.2\.1'/);
+assert.match(main, /const APP_VERSION = '1\.2\.3'/);
 assert.match(main, /brand-title-row/);
 assert.match(main, /version-badge/);
 assert.match(main, /api-panel-meta/);
