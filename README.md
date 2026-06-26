@@ -1,4 +1,4 @@
-# 物語バズメーカー / Monogatari Buzz Maker
+# Monogatari Buzz Maker / 物語バズメーカー
 
 ![Version](https://img.shields.io/badge/version-1.2.5-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
@@ -7,55 +7,41 @@
 ![Source Code License](https://img.shields.io/badge/source%20code-UNLICENSED-red)
 [![Generated Text License](https://img.shields.io/badge/generated%20text-CC%20BY--NC--SA%204.0-0f766e)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja)
 
-公開Web/RSSで実際に取得した話題を、漫画、ショート動画、トレンド解説動画、小説の制作案へ整理する創作支援アプリです。
+- English: Monogatari Buzz Maker is a creative planning app that turns real public Web/RSS trend signals into evidence packs, medium-specific plans, AI prompts, reference drafts, and editor-facing exports.
+- 日本語: 物語バズメーカーは、公開Web/RSSから実際に取得した話題シグナルを、取得根拠、媒体別制作案、AI用プロンプト、参考本文、編集者向け出力へ整理する創作支援アプリです。
 
-[!['ChatGPT Image 2026年6月25日 22_19_30'](https://github.com/user-attachments/assets/d850ac7f-aa1c-40cc-a378-b8c6673c726c)](https://youtu.be/pqYVxUUg0Cs?si=27g1I3tO2EuZkOuxJ)
+[![AI Manga Creative Suite / AIまんが制作エコシステム](https://github.com/user-attachments/assets/d850ac7f-aa1c-40cc-a378-b8c6673c726c)](https://youtu.be/pqYVxUUg0Cs?si=27g1I3tO2EuZkOuxJ)
 
-単なる流行語リストではなく、取得根拠、算出指標、制作案、本文生成プロンプト、確認用DOCXまでを一画面で扱います。
-
-> 重要: このアプリは、取得できないデータを架空・推測・固定サンプルで埋めません。公開Web/RSSから取得できない場合は、結果なし、または取得失敗として表示します。
+> English: The app must not fill missing retrievals, failed API responses, or creative sections with invented data, old samples, local templates, or fake metrics.
+>
+> 日本語: このアプリは、取得できないデータ、失敗したAPI応答、未生成の創作欄を、架空データ、旧サンプル、ローカル定型文、偽の数値で埋めてはいけません。
 
 ---
 
 ## Overview / 概要
 
-物語バズメーカーは、ニュースやSNS周辺で反応が起きている話題を、AIに渡せる取得根拠と制作案へ整理します。
+| English | 日本語 |
+|---|---|
+| The app collects public Web/RSS topic candidates and keeps the source URL, query, timestamp, and calculated evidence signals visible. | 公開Web/RSSから話題候補を取得し、取得元URL、検索語、取得時刻、算出した根拠シグナルを表示します。 |
+| It does not put trend words directly into a story. It separates evidence, analysis, planning, prompting, and export. | 流行語をそのまま作品へ入れず、根拠、分析、制作案、プロンプト、出力を分けて扱います。 |
+| OpenAI or Gemini can generate deeper readings, production notes, story/script design, and reference prose after the user enters an API key in the UI. | ユーザーがUIでAPIキーを入力したあと、OpenAIまたはGeminiで詳細読み取り、制作メモ、物語・台本設計、参考本文を生成できます。 |
+| If AI output is absent, incomplete, unsafe, or template-like, the app fails closed instead of pretending that generation succeeded. | AI応答がない、不完全、安全でない、または定型的な場合は、生成済みに見せず fail-closed で扱います。 |
 
-流行語をそのまま作品に入れず、以下の順序で扱います。
+## Problem It Solves / このアプリが解く問題
 
-1. 公開Web/RSSから話題候補を取得する。
-2. 取得元、リンク、検索クエリ、観測時刻、算出指標を残す。
-3. ローカル側では、解釈・企画判断・本文を生成済みに見せない。
-4. 漫画、ショート動画、解説動画、小説それぞれで、制作案の焦点を分ける。
-5. 取得根拠だけを含む本文生成プロンプトを作る。
-6. 必要に応じてOpenAIまたはGeminiで詳細分析、設計メモ、参考本文を生成する。
-7. JSON、Markdown、DOCXで保存し、編集者や別AIとの打ち合わせに使う。
-
-### このアプリが解こうとしている問題
-
-「今ウケているもの」を見るだけでは、漫画家、小説家、動画制作者はすぐに原稿へ入れません。
-
-必要なのは、話題そのものではなく、次のような制作判断です。ただし、これらは取得根拠だけでローカル定型生成せず、AI応答または人間の追加判断で埋めます。
-
-- なぜ今この話題に反応があるのか。
-- その反応は怒り、共感、保存、議論、恐れ、憧れのどれに近いのか。
-- 漫画なら何ページ目に何を見せるべきか。
-- ショート動画なら冒頭1秒で何を出すべきか。
-- 解説動画ならどこまで実名根拠として扱い、どこから抽象化すべきか。
-- 小説なら短編、中編、長編のどこまで伸ばせる題材か。
-- 実在名を創作の主役や告発対象にせず、どう架空化すべきか。
-
-物語バズメーカーは、この「流行の読み替え」に必要な根拠をそろえます。
-
----
+| English | 日本語 |
+|---|---|
+| Seeing what is trending is not enough for a manga artist, novelist, video creator, or editor to start production. | 「今ウケているもの」を見るだけでは、漫画家、小説家、動画制作者、編集者はすぐ制作へ入れません。 |
+| They need to know why people reacted, what emotional pattern is present, which medium can use it, and where real names must be abstracted. | 必要なのは、なぜ反応が起きたのか、どんな感情構造なのか、どの媒体に向くのか、どこから実名を抽象化すべきかという制作判断です。 |
+| Monogatari Buzz Maker prepares that decision layer without pretending that local code is an AI writer. | 物語バズメーカーは、ローカルコードをAI作家に見せかけず、その判断層を準備します。 |
 
 ## Live Site / 公開サイト
 
-GitHub Pages: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
-
-ローカル開発: [http://127.0.0.1:5180/](http://127.0.0.1:5180/)
-
-ローカルポートは `5180` 固定です。他のアプリと同時起動できるよう、既存ポートとは分けています。
+| Item | English | 日本語 |
+|---|---|---|
+| Public URL | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) | 公開版はこのURLで利用します。 |
+| Local URL | [http://127.0.0.1:5180/](http://127.0.0.1:5180/) | ローカル開発ではこのURLを使います。 |
+| Reserved port | `5180` | 他のAntigravity系アプリと同時起動できるよう、固定ポート`5180`を使います。 |
 
 ---
 
@@ -63,328 +49,136 @@ GitHub Pages: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.g
 
 ### Trend To Story / 話題を物語へ変換する
 
-本アプリは「人気記事を並べるアプリ」ではありません。
-
-取得した話題を、次のような創作要素へ変換します。
-
-| 取得したもの | そのまま使わない理由 | AI生成時に確認するもの |
+| Retrieved signal / 取得したもの | English handling | 日本語での扱い |
 |---|---|---|
-| 実在ニュースの見出し | 実名ドラマ化や告発風になる危険がある | 架空制度、架空UI、架空の生活場面 |
-| 急に伸びた話題語 | 流行語だけでは作品の芯にならない | 読者の不安、羨望、後悔、救済欲求 |
-| コメントされやすい話題 | 炎上模倣になる危険がある | 対立構造、言えなかった本音、選択の代償 |
-| 保存されるノウハウ | 単なる説明で終わりやすい | 主人公が実際に行動で変化する場面 |
-| 複数ソースの共起 | 表面語だけ追うと薄くなる | 世の中の空気として繰り返し出る違和感 |
+| Real news headline / 実在ニュースの見出し | Keep it as evidence, then abstract it before story planning. | 根拠として保持し、物語化の前に抽象化します。 |
+| Fast-rising phrase / 急に伸びた話題語 | Read the emotion behind the phrase instead of copying the phrase. | 語そのものではなく、その背後の感情を読み取ります。 |
+| Comment-heavy topic / コメントが集まる話題 | Treat it as conflict structure, not as material for harassment or accusation. | 嫌がらせや告発ではなく、対立構造として扱います。 |
+| Saved know-how / 保存されるノウハウ | Convert it into a character action or decision point. | 説明ではなく、登場人物の行動や選択へ変換します。 |
+| Cross-source co-occurrence / 複数ソースの共起 | Use it as evidence of atmosphere, not as a made-up score. | 架空スコアではなく、空気感の根拠として使います。 |
 
 ### Evidence First / 根拠から作る
 
-根拠欄には、実際に取得した記事リンク、検索クエリ、取得元、取得時刻を表示します。
+| English | 日本語 |
+|---|---|
+| Evidence cards show source title, summary, tags, search terms, retrieval time, and links. | 根拠カードには、見出し、概要、タグ、検索語、取得時刻、リンクを表示します。 |
+| Evidence is not the finished story. It is the material that AI or a human editor can inspect before planning. | 根拠は完成本文ではありません。AIや編集者が制作前に確認する素材です。 |
+| Real names may appear in evidence, but story-facing outputs should use fictionalization or abstraction when needed. | 実名は根拠欄には残せますが、物語側の出力では必要に応じて架空化・抽象化します。 |
 
-取得できないもの、接続できないもの、API制限で得られないものは、成功したようには表示しません。
+### Medium Specific Planning / 媒体別の制作判断
 
-### Medium Specific / 媒体別に別物として扱う
-
-漫画、動画、小説では、同じ話題でも効く形が違います。
-
-- 漫画: ページめくり、コマの引き、視線誘導、表情、沈黙、最初の異常。
-- ショート動画: 0秒目、1秒目、字幕の短さ、ループ、保存理由、コメント誘導。
-- 解説動画: 根拠提示、誤解回避、章立て、安全な固有名詞の扱い、視聴後の理解。
-- 小説: 短編・中編・長編の伸ばし方、章末フック、人物変化、伏線回収、読者維持。
-
-本アプリでは、同じ根拠を見ても、媒体ごとに別の制作判断として扱います。
+| Medium | English focus | 日本語での焦点 |
+|---|---|---|
+| Story manga / ストーリー漫画 | Page rhythm, panel reveal, visual contrast, and emotional payoff. | ページ運び、コマの見せ場、視覚的対比、感情の回収。 |
+| Short video / ショート動画 | First-second hook, cut order, subtitle pressure, and repeatable visual beat. | 冒頭1秒、カット順、字幕圧、繰り返せる画のリズム。 |
+| Trend explainer video / トレンド解説動画 | Evidence framing, abstraction boundary, viewer question, and responsible explanation. | 根拠の見せ方、抽象化の境界、視聴者の疑問、責任ある解説。 |
+| Novel / 小説 | Point of view, scene order, psychological pressure, and scale of expansion. | 視点、場面順、心理的圧力、短編から長編までの伸ばし方。 |
 
 ---
 
 ## Feature Map / 機能マップ
 
-| 領域 | 機能 | 目的 |
+| Area | English | 日本語 |
 |---|---|---|
-| 取得 | 公開Web/RSS取得 | 実在する話題素材を集める |
-| 透明性 | 取得リンク、検索クエリ、取得時刻 | 根拠の出所を確認できるようにする |
-| 分析 | スコア、チャート、根拠カード | 取得量、鮮度、重なりを確認する |
-| 企画 | 制作案 | AIへ渡す根拠と制作に使う項目を分ける |
-| 物語設計 | AI応答後に表示 | ローカル定型文では穴埋めしない |
-| 媒体設計 | AI応答後に表示 | 実際の制作手順はAI生成または人間が作る |
-| API分析 | OpenAI/Gemini詳細分析 | 取得結果をさらに深く読ませる |
-| 参考本文 | 自AIで参考文章生成 | プロンプトだけでなく本文例を見る |
-| 出力 | JSON、Markdown、DOCX | 保存、共有、編集者打ち合わせに使う |
-| 保守 | 生成ロジック/モデル順のスナップショット検査 | アップデート時に品質劣化を防ぐ |
+| Retrieval / 取得 | Fetch public Web/RSS topic candidates through the app's retrieval routes. | アプリの取得経路で公開Web/RSSの話題候補を取得します。 |
+| Transparency / 透明性 | Keep source links, queries, timestamps, and evidence structure visible. | 取得元リンク、検索語、取得時刻、根拠構造を見える形で残します。 |
+| Metrics / 指標 | Show source count, freshness, overlap, and category fit only from retrieved data. | 取得データに基づく件数、鮮度、重なり、カテゴリ適合を表示します。 |
+| AI analysis / AI分析 | Ask OpenAI/Gemini to read evidence and produce visible analysis fields. | OpenAI/Geminiに根拠を読ませ、画面に出る分析欄を生成します。 |
+| Production plans / 制作案 | Generate medium-specific plans only after provider output is complete. | API応答が揃った場合だけ、媒体別制作案を生成済みとして表示します。 |
+| Reference prose / 参考本文 | Generate reference prose from selected evidence and selected plan context. | 選択した根拠と制作案から参考本文を生成します。 |
+| Export / 出力 | Save JSON, Markdown, and DOCX for review or handoff. | JSON、Markdown、DOCXで保存し、確認や引き継ぎに使います。 |
+| Maintenance / 保守 | Regression tests guard against fake data, local template filler, secret leakage, and sample-specific rules. | 回帰テストで、偽データ、ローカル定型文、秘密情報漏れ、個別サンプル専用ルールを防ぎます。 |
 
----
+## User Workflow / 利用手順
 
-## Features & Modes / 機能とモード
-
-### Story Manga / ストーリー漫画
-
-読者欲求から、読み切り、連載第1話、縦読み漫画の企画へ変換します。
-
-AI生成時の確認項目:
-
-- 1ページ目で見せる異常。
-- 主人公が最初に損をする具体場面。
-- コマとして描ける小道具、通知、表情、沈黙。
-- ページめくり前後の情報差。
-- 連載第1話として残す未回収フック。
-- 縦読みの場合のコマ送り、余白、視線の落下。
-
-ローカル画面では、主人公、舞台、最初の事件、対立、最後の選択、読後感を制作案の確認項目として表示します。
-
-### Short Video / ショート動画
-
-冒頭1秒、字幕、保存理由、コメント誘発点から短尺動画案を作ります。
-
-AI生成時の確認項目:
-
-- 0秒目に出す画面。
-- 1秒目で視聴者に理解させる損失感。
-- 字幕の文量と視線誘導。
-- 音、無音、間、画面切り替え。
-- コメント欄に書きたくなる問い。
-- 保存したくなる実用性や再視聴ポイント。
-- 最後から冒頭へ戻るループ構造。
-
-ショート動画では、長い説明を避け、画面上の行動と字幕のズレで引っ張る設計を優先します。
-
-### Trend Explainer Video / トレンド解説動画
-
-実在の根拠を使いながら、告発や実名ドラマを避けた解説動画企画を作ります。
-
-AI生成時の確認項目:
-
-- 何が起きているのかを最初に短く示す。
-- 根拠と推測を分ける。
-- 実名は根拠欄や出典説明に限定する。
-- 本編では架空例、抽象構造、視聴者の生活に近い置き換えを使う。
-- 炎上、断定、名指し批判へ寄せない。
-- 最後に視聴者が使える観点を残す。
-
-解説動画は、物語化よりも「構造を理解する面白さ」を中心にします。
-
-### Novel / 小説
-
-公開根拠を、短編・中編・長編の制作案へ整理します。
-
-AI生成時の確認項目:
-
-- 短編: 一場面、一選択、一つの読後感へ絞る。
-- 中編: 誤解、関係変化、二段階の転換を入れる。
-- 長編: 章ごとに欲望、障害、代償、関係性を更新する。
-- 章末フックを出来事だけでなく感情の未決として残す。
-- 同じ悩みの反復で停滞させない。
-- 最終的に、言葉ではなく行動、物、沈黙、後始末で変化を見せる。
-
-小説では、短編・中編・長編別の設計はAI応答で生成します。ローカル側は取得根拠と制作案の確認項目を渡します。
+| Step | English | 日本語 |
+|---:|---|---|
+| 1 | Open the app and enter an OpenAI or Gemini API key in the UI when AI generation is needed. | アプリを開き、AI生成が必要な場合はUIでOpenAIまたはGeminiのAPIキーを入力します。 |
+| 2 | Choose a medium: story manga, short video, trend explainer video, or novel. | ストーリー漫画、ショート動画、トレンド解説動画、小説から媒体を選びます。 |
+| 3 | Retrieve public Web/RSS evidence and inspect the source cards. | 公開Web/RSSの根拠を取得し、取得元カードを確認します。 |
+| 4 | Run AI analysis and plan generation only when the evidence is sufficient. | 根拠が十分な場合だけAI分析と制作案生成を実行します。 |
+| 5 | Generate reference prose for a selected plan if needed. | 必要に応じて、選択した制作案の参考本文を生成します。 |
+| 6 | Export JSON, Markdown, or DOCX for editing, review, or another AI workflow. | 編集、確認、別AIへの引き継ぎ用にJSON、Markdown、DOCXで出力します。 |
 
 ---
 
 ## Analysis Surfaces / 分析画面
 
-### Root Evidence / 根拠シグナル
-
-根拠カードには次を表示します。
-
-- 実記事または公開フィード由来のタイトル。
-- 取得元。
-- 実記事リンク。
-- 今回の検索クエリ。
-- AI読み取り。
-- AI企画判断。
-- 固有名詞と安全上の扱い。
-- 取得順位、新しさ、ソース重み、共起、カテゴリ一致などの指標。
-
-読み取り欄と企画判断欄は、取得データと対応する形で表示します。
-
-### Evidence Scores / 取得状況
-
-RSSや公開フィードから取れる情報をもとに、取得指標を出します。
-
-主な観点:
-
-- 勢い: 新しさ、順位、取得元の反応しやすさ。
-- 確度: 複数ソース、カテゴリ一致、話題の具体性。
-- 飽和リスク: 類似話題が増えすぎていないか。
-- 根拠量: 使用できる観測が十分あるか。
-- カテゴリ一致: 選択カテゴリと取得語がどれくらい近いか。
-
-これらは装飾用の架空数字ではなく、取得結果からの計算値です。ただし、TikTok再生数やYouTube視聴回数のような未取得の実数は表示しません。
-
-### Production Notes / 制作メモ
-
-制作メモには、初稿の出発点、手順、書く前の確認、外すと弱くなる点をまとめます。
-
-例:
-
-- 漫画: 1ページ目、引き、コマの視線、最後の選択。
-- ショート動画: 0秒、1秒、字幕、ループ、コメント誘導。
-- 解説動画: 問い、根拠、構造分解、安全な例示、締め。
-- 小説: 短編、中編、長編、それぞれの読者維持。
-
-### Production Plans / 制作案
-
-各カテゴリで複数の制作案を表示します。
-
-各案の主な項目:
-
-- タイトル候補。
-- 読者・視聴者への約束。
-- 主人公または語り手。
-- 舞台。
-- 最初の事件。
-- 対立。
-- 転換。
-- 最後に選ばせること。
-- 読後感または視聴後感。
-- 物語・台本設計。
-- 媒体別の制作メモ。
-- 本文・台本の流れ。
-- 冒頭例。
-- 本文生成用プロンプト。
-
-タイトルや本文に相当する項目は、AI応答がない限り「未生成」として表示します。
-
-### Story Architecture / 物語・台本設計
-
-物語・台本設計は、OpenAI/Geminiの応答がある場合にだけ表示します。
-
-含まれる観点:
-
-- 伏線と回収。
-- 目的、動機、対立、代償。
-- 感情差分。
-- モチーフ再登場。
-- 知識境界。
-- 媒体実装。
-
-API応答が未取得、失敗、空、またはテンプレ的な場合は未生成として表示します。
-
-### AI Analysis Summary / AI分析サマリー
-
-右上の `API設定` にOpenAIまたはGeminiのキーを入力すると、取得結果をもとに詳細分析を実行します。
-
-主な内容:
-
-- 今回の取得結果から見える最も強い制作方向。
-- どの媒体で効きやすいか。
-- 似た企画が増える危険。
-- 企画に入れるべき具体場面。
-- 避けるべき実名化・告発化。
-- 初稿に入れるべき修正案。
-
-### Reference Draft / 自AIの参考文章
-
-各企画案の本文生成プロンプトを、入力済みAPIでも実際に参考本文へ変換できます。
+| Surface | English | 日本語 |
+|---|---|---|
+| Acquisition status / 取得状態 | Shows what was retrieved and whether retrieval failed. | 何を取得できたか、または取得に失敗したかを表示します。 |
+| AI analysis summary / AI分析サマリー | Summarizes provider-generated reading after API output exists. | API応答がある場合に、AI生成の読み取りを要約します。 |
+| Evidence readings / 取得データの読み取り | Displays one AI reading and one planning judgment per evidence card. | 根拠カードごとにAI読み取りと企画判断を表示します。 |
+| Medium decisions / 媒体別の制作判断 | Separates manga, video, explainer, and novel decisions. | 漫画、動画、解説、小説の制作判断を分けて表示します。 |
+| Production notes / 制作メモ | Gives practical notes for execution, only from valid AI output. | 実制作に使うメモを、有効なAI応答がある場合だけ表示します。 |
+| Production plans / 制作案 | Shows proposed titles, promises, examples, flow, openings, and differentiation. | タイトル、読者への約束、具体例、流れ、冒頭、差別化を表示します。 |
+| Reference drafts / 参考本文 | Shows generated prose or script samples for selected plans. | 選択した制作案の参考本文や台本例を表示します。 |
 
 ---
 
 ## Data Sources / 取得データの扱い
 
-### Current Retrieval Scope / 現在の取得範囲
-
-現在の実取得は、公開Web/RSS/公開フィード範囲です。
-
-主な取得対象:
-
-- Google News RSS。
-- Bing News RSS。
-- Google Trends RSS。
-- はてなブックマーク系RSS。
-- Yahoo系公開RSS。
-- カテゴリごとの社会・生活・感情・議論素材に寄せた検索クエリ。
-
-### Why RSS / なぜRSSか
-
-RSSは、公式または公開フィードとして取得でき、出典リンクを残しやすい形式です。
-
-ただし、RSSだけではプラットフォーム内の再生数、保存数、コメント数、視聴維持率は取得できません。そのため、物語バズメーカーでは「RSSで取れる範囲」を根拠として扱い、取得していない数値は表示しません。
+| English | 日本語 |
+|---|---|
+| The app uses public Web/RSS sources that can be retrieved from the browser or local route. | アプリは、ブラウザまたはローカル経路から取得可能な公開Web/RSSソースを使います。 |
+| If all sources fail, the app reports retrieval failure or no result instead of fabricating observations. | 全ソースの取得に失敗した場合、架空観測を作らず、取得失敗または結果なしとして扱います。 |
+| Retrieved article text is treated as evidence for analysis, not as a body of text to reproduce. | 取得記事の文章は分析根拠として扱い、再現する本文としては扱いません。 |
+| RSS is used because it gives stable public metadata, source titles, links, and time context. | RSSは、公開メタデータ、見出し、リンク、時刻情報を比較的安定して取得できるため使います。 |
 
 ---
 
 ## API Engine / APIエンジン
 
-### Supported Providers / 対応API
+| Provider | English | 日本語 |
+|---|---|---|
+| OpenAI | Used for evidence reading, plan design, and reference prose when an OpenAI key is entered. | OpenAIキーが入力された場合、根拠読み取り、制作案設計、参考本文生成に使います。 |
+| Google Gemini | Used for the same visible generation surfaces when a Gemini key is entered. | Geminiキーが入力された場合も、同じ表示生成欄に使います。 |
 
-1つのAPIキー入力欄に、OpenAIまたはGeminiのキーを入力します。
-
-形式から自動判定します。
-
-| プロバイダ | 用途 |
+| English rule | 日本語ルール |
 |---|---|
-| OpenAI | 詳細分析、参考本文生成 |
-| Gemini | 詳細分析、参考本文生成 |
+| API keys are runtime-only and must be entered in the app UI, not in chat. | APIキーは実行時のみ使い、チャットではなくアプリUIに入力します。 |
+| API keys are not written to README, JSON, Markdown, DOCX, PLAN, HANDOFF, logs, or Git history. | APIキーはREADME、JSON、Markdown、DOCX、PLAN、HANDOFF、ログ、Git履歴には書きません。 |
+| Provider failures are shown as failures; they are not replaced by local creative filler. | API失敗は失敗として扱い、ローカル創作文では置き換えません。 |
 
 ---
 
 ## Output & Export / 出力
 
-### JSON
+| Format | English | 日本語 |
+|---|---|---|
+| JSON | Saves structured report data without API keys. | APIキーを含めず、構造化されたレポートデータを保存します。 |
+| Markdown | Saves a readable handoff with evidence, plan context, and rights notes. | 根拠、制作案、権利注意を含む読みやすい引き継ぎ文書を保存します。 |
+| DOCX | Saves an editor-facing review document, not a raw dump of the screen. | 画面の丸写しではなく、編集者が確認しやすい文書として保存します。 |
 
-画面の分析結果と企画案を構造化データとして保存します。
-
-主な用途:
-
-- 後で同じ企画を読み込む。
-- 別AIへ渡す。
-- プロンプトや根拠を再利用する。
-- DOCXとは別に、機械可読なバックアップとして残す。
-
-
-### Markdown
-
-レポートコピー用のMarkdownを生成します。
-
-主な用途:
-
-- 他AIへ貼る。
-- メモアプリへ貼る。
-- 編集メモとして読む。
-
-### DOCX
-
-取得根拠と制作案を確認するDOCXを出力します。
-
-Web画面の丸写しではなく、打ち合わせ向けに次の構成へ整理します。
-
-- 取得根拠の要点。
-- 制作メモ。
-- 取得状況。
-- 制作案。
-- 媒体別の制作判断。
-- 根拠の扱い。
-- リスクと修正方針。
-- 次回までに決めること。
+| English | 日本語 |
+|---|---|
+| Saved filenames include a 14-digit local timestamp. | 保存ファイル名にはローカル時刻の14桁タイムスタンプを付けます。 |
+| Example: `monogatari-buzz-maker-story-manga-20260625123045.docx`. | 例: `monogatari-buzz-maker-story-manga-20260625123045.docx`。 |
 
 ---
 
 ## Setup & Launch / セットアップと起動
 
-### Cloud / Browser / 公開ページ
+### Public Page / 公開ページ
 
-公開版: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
+| English | 日本語 |
+|---|---|
+| Open [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/). | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) を開きます。 |
+| Enter an API key from the API settings panel when AI generation is needed. | AI生成が必要な場合は、API設定パネルからAPIキーを入力します。 |
+| Major actions remain locked until a valid runtime API key is connected. | 有効な実行時APIキーが接続されるまで、主要操作はロックされます。 |
 
-ブラウザで開き、右上の `API設定` からキーを入力します。
-
-APIキー未接続時は、API設定以外の主要UIをロックします。公開Web/RSS取得、詳細分析、参考本文生成、保存系操作は、有効なキーをUIから接続したあとに使う設計です。
-
-### Local Launch (Windows) / ローカルでの起動
-
-初回:
+### Local Launch On Windows / Windowsでのローカル起動
 
 ```powershell
+cd C:\Users\sx717\Antigravity\viral-radar
 npm install
-```
-
-起動:
-
-```powershell
 npm run dev
 ```
 
-ブラウザで開く: [http://127.0.0.1:5180/](http://127.0.0.1:5180/)
-
-ワンクリック起動:
-
-```powershell
-.\start_monogatari_buzz_maker.bat
-```
+| English | 日本語 |
+|---|---|
+| Open [http://127.0.0.1:5180/](http://127.0.0.1:5180/) after the dev server starts. | 開発サーバー起動後、[http://127.0.0.1:5180/](http://127.0.0.1:5180/) を開きます。 |
+| The reserved local port is `5180`. | 予約済みローカルポートは`5180`です。 |
 
 ### Manual Build / 手動ビルド
 
@@ -392,386 +186,149 @@ npm run dev
 npm run build
 ```
 
-ビルド結果は `dist/` に出力されます。
-
-### Preview / ビルド結果の確認
-
-```powershell
-npm run preview
-```
+| English | 日本語 |
+|---|---|
+| Production assets are generated under `dist/`. | 本番用ファイルは`dist/`に生成されます。 |
+| The production base path is `/viral-radar/` for GitHub Pages. | GitHub Pages向けのproduction base pathは`/viral-radar/`です。 |
 
 ---
 
 ## Verification / 検証
 
-基本検証:
-
 ```powershell
 npm test
-npm run build
-```
-
-保守スナップショット検査:
-
-```powershell
-npm run check:upstreams
-```
-
-個別検証の例:
-
-```powershell
 node tests\browser-smoke.mjs
-node --test tests\trendSearch.test.mjs
-node --test tests\docxExporter.test.mjs
+npm run build
+git diff --check -- . ':!dist'
 ```
 
-## Tech Stack / 技術スタック
-
-| 領域 | 技術 |
+| English | 日本語 |
 |---|---|
-| Frontend | Vanilla JavaScript, HTML, CSS |
-| Build | Vite |
-| Local middleware | Vite middleware |
-| API | OpenAI, Gemini |
-| Export | JSON, Markdown, DOCX(OpenXML) |
-| Test | Node.js test runner |
-| Deploy | GitHub Pages, gh-pages |
-
-追加のフロントエンドフレームワークは使っていません。GitHub PagesとローカルViteの両方で同じ公開Web/RSS検索モジュールを使い、ローカルViteでは保存ダイアログとOpenAI CORS回避用の中継も扱う構成です。
+| `npm test` checks retrieval boundaries, provider contracts, export safety, secret handling, and generic production rules. | `npm test`は、取得境界、API契約、出力安全性、秘密情報の扱い、汎用本番ルールを確認します。 |
+| `node tests\browser-smoke.mjs` checks the browser-facing app shell. | `node tests\browser-smoke.mjs`は、ブラウザ表示側の基本動作を確認します。 |
+| `npm run build` confirms that the production bundle can be generated. | `npm run build`は、本番バンドルを生成できることを確認します。 |
+| `git diff --check` catches whitespace and conflict-marker issues before commit. | `git diff --check`は、コミット前に空白や衝突マーカーの問題を検出します。 |
 
 ---
 
-## Unique Architecture Highlights / 固有アーキテクチャの要点
+## Tech Stack / 技術スタック
 
-### 1. Search-Grounded Creative Planning / 検索根拠に紐づく企画化
+| Layer | English | 日本語 |
+|---|---|---|
+| Frontend | Vite, browser JavaScript, CSS. | Vite、ブラウザJavaScript、CSS。 |
+| AI providers | OpenAI and Google Gemini through user-entered runtime API keys. | ユーザーが実行時に入力したAPIキーでOpenAIとGoogle Geminiを利用。 |
+| Retrieval | Browser-safe public Web/RSS retrieval with fail-closed behavior. | fail-closed方針のブラウザ対応公開Web/RSS取得。 |
+| Export | JSON, Markdown, and DOCX generation. | JSON、Markdown、DOCX生成。 |
+| Tests | Node test runner and browser smoke checks. | Node標準テストランナーとブラウザ簡易確認。 |
 
-取得根拠は、固定サンプルではなく、取得した観測結果をもとに作ります。
+---
 
-取得結果のタイトルや固有名詞をそのまま作品名にせず、AI生成時の入力根拠として扱います。
+## Architecture Highlights / アーキテクチャの要点
 
-### 2. Medium Translation Layer / 媒体変換レイヤー
-
-同じ話題を、漫画、ショート動画、解説動画、小説で別の制作判断として渡します。
-
-例:
-
-- 漫画では「最初のコマ」「ページめくり」「視線誘導」。
-- ショート動画では「冒頭1秒」「字幕」「ループ」。
-- 解説動画では「根拠提示」「推測の分離」「誤解回避」。
-- 小説では「章末フック」「人物変化」「伏線回収」。
-
-### 3. Story Architecture Layer / 物語設計レイヤー
-
-物語設計は、AI応答がある場合にだけ次の骨組みを表示します。
-
-- 伏線と回収。
-- 目的、動機、対立、代償。
-- 感情差分。
-- モチーフ再登場。
-- 知識境界。
-- 媒体実装。
-
-ローカル側では、これらを定型文で穴埋めしません。
-
-### 4. Fail-Closed Evidence Policy / 失敗を成功に見せない方針
-
-取得できない、解析できない、APIが失敗した、本文が空白だった場合は、成功扱いにしません。
-
-架空の観測値、架空の検索結果、装飾用数字で画面を埋める設計は採用しません。
-
-### 5. Editor-Facing DOCX / 編集者向けDOCX
-
-DOCXはWeb画面の複製ではなく、取得根拠と制作案を確認する資料へ再構成します。
+| Highlight | English | 日本語 |
+|---|---|---|
+| Search-grounded planning / 検索根拠に紐づく企画化 | Plans are generated from visible evidence, not from an invisible sample bank. | 制作案は見える根拠から作り、見えないサンプルバンクからは作りません。 |
+| Medium translation / 媒体変換 | The same evidence is reshaped differently for manga, short video, explainer video, and novels. | 同じ根拠でも、漫画、ショート動画、解説動画、小説で別の形に変換します。 |
+| Story architecture / 物語設計 | Structure, scene flow, opening, and differentiation are provider-generated fields. | 構成、場面の流れ、冒頭、差別化はAPI応答で生成する欄です。 |
+| Fail-closed policy / fail-closed方針 | Missing or weak provider output does not become local creative prose. | 欠けたAPI応答や弱いAPI応答を、ローカル創作文に置き換えません。 |
+| Editor-facing export / 編集者向け出力 | DOCX is organized for review and handoff, not as a raw UI screenshot. | DOCXはレビューと引き継ぎ用に整理し、画面の生コピーにはしません。 |
 
 ---
 
 ## Compliance & Legal Stance / 法的遵守について
 
-### Public Data Analysis / 公開データの分析
-
-本アプリは、公開Web/RSS/公開フィードから取得できる範囲の情報を、創作企画の参考資料として分析します。
-
-取得元リンク、検索語、観測時刻、媒体別の読み取りを分けて表示し、根拠と創作変換を混同しない設計です。
-
-実在の人物、企業、作品、事件を、そのまま物語本文や台本へ移植する目的ではありません。
-
-### Japanese Copyright Act Article 30-4 / 著作権法30条の4
-
-本アプリは、日本の著作権法30条の4が想定する情報解析、傾向分析、技術検証の範囲を前提に設計しています。
-
-取得情報は、元記事や既存作品の表現を享受するためではなく、話題の種類、反応の構造、媒体ごとの制作判断、AI生成時の確認点を分析するために扱います。
-
-既存作品、特定作家、特定キャラクター、実在人物の表現・作風・人格を再現する用途は想定していません。
-
-### Official API Usage / 公式APIの利用
-
-AI生成は、ユーザーがUIで接続したOpenAIまたはGoogle Geminiの公式APIを通じて行います。
-
-利用者は、各API提供元の利用規約、禁止事項、レート制限、モデル仕様に従う必要があります。
-
-APIキーは実行時の接続にだけ使い、保存JSON、DOCX、Markdown、README、Git履歴には含めません。
-
-### Evidence-Bound Generation / 根拠に紐づく生成
-
-本アプリは、ローカル定型文で制作判断や本文を穴埋めしません。
-
-AI応答がない項目、不完全な応答、テンプレ的な応答、根拠から逸脱した応答は、生成済みとして表示しない fail-closed 方針です。
-
-AI生成時には、取得根拠を抽象化し、必要に応じて架空名、架空設定、別構造へ置き換える前提で扱います。
-
-### Research and Creative Assistance / 研究・制作支援としての位置づけ
-
-本アプリは、AIエージェントによる情報整理、創作企画支援、編集前確認のための研究成果です。
-
-高額情報商材、権利侵害を助長するテンプレート販売、既存IPの無断模倣を目的とした利用は禁止します。
-
-### No Legal Advice / 助言ではない
-
-本アプリの出力は、創作企画支援を目的とした参考情報です。法律、医療、金融、投資、報道判断の専門助言ではありません。
-
-公開、販売、二次利用、商用利用を行う前には、利用者自身の責任で権利確認をしてください。
+| Topic | English | 日本語 |
+|---|---|---|
+| Public data analysis / 公開データ分析 | The app analyzes public Web/RSS metadata and trend signals as creative reference material. | 本アプリは、公開Web/RSSのメタデータと話題シグナルを創作参考資料として分析します。 |
+| Article 30-4 / 著作権法30条の4 | The design assumes information analysis, trend reading, and technical verification under the scope contemplated by Japanese Copyright Law Article 30-4. | 日本の著作権法30条の4が想定する情報解析、傾向分析、技術検証の範囲を前提に設計しています。 |
+| No reproduction / 再現目的ではない | Retrieved works, authors, characters, people, and events are not meant to be reproduced, substituted, or impersonated. | 取得した作品、作家、キャラクター、人物、事件を再現、代替、なりすましする目的ではありません。 |
+| Official API usage / 公式API利用 | AI generation runs through official OpenAI or Google Gemini APIs selected by the user's runtime key. | AI生成は、ユーザーの実行時APIキーで選択されたOpenAIまたはGoogle Geminiの公式APIを通じて行います。 |
+| Evidence-bound generation / 根拠に紐づく生成 | Generated text should be tied to retrieved evidence and should abstract real-world material when needed. | 生成文章は取得根拠に紐づけ、必要に応じて実在素材を抽象化する前提で扱います。 |
+| No legal advice / 法的助言ではない | This README and app output are not legal, medical, financial, investment, or publishing advice. | このREADMEとアプリ出力は、法律、医療、金融、投資、出版判断の専門助言ではありません。 |
 
 ---
 
 ## Security / セキュリティ
 
-### APIキー
-
-- チャットに貼らないでください。
-- README、JSON、DOCX、HANDOFF、PLAN、ログに保存しません。
-- 保存済みキーは入力欄へ全文再表示しません。
-- エクスポート時はキー形式の文字列をマスクします。
-
-### ローカル保存
-
-JSON/DOCX保存では、ユーザーが保存先を選びます。
-
-アプリ直下の固定フォルダへ勝手に保存しません。
-
-### ファイル名
-
-保存ファイル名には、ローカル時刻の14桁タイムスタンプを付けます。
-
-形式:
-
-```text
-YYYYMMDDHHMMSS
-```
-
-例:
-
-```text
-monogatari-buzz-maker-story-manga-20260625123045.docx
-```
+| English | 日本語 |
+|---|---|
+| Do not paste API keys into chat, issues, commits, README, PLAN, HANDOFF, exported files, or logs. | APIキーをチャット、Issue、コミット、README、PLAN、HANDOFF、出力ファイル、ログに貼らないでください。 |
+| The app uses runtime-only API keys and should not restore a saved key after reload. | アプリは実行時のみAPIキーを使い、リロード後に保存済みキーを復元しない設計です。 |
+| Exports must not contain API keys or key-like strings. | 出力ファイルにはAPIキーやキー形式の文字列を含めてはいけません。 |
+| Failed retrievals and failed API calls must be visible as failures. | 取得失敗やAPI失敗は、失敗として見えるように扱います。 |
 
 ---
 
-## License & Rights / ライセンス・権利関係
+## License & Rights / ライセンスと権利
 
-This repository uses a hybrid rights stance.
-
-このリポジトリでは、ソースコード、プロンプト/設計思想、生成文章を分けて扱います。
-
-### Source Code / ソースコード
-
-Source code is `UNLICENSED`.
-
-著作権者の明示的な許可なく、再配布、再公開、サブライセンス、販売、商用利用をしないでください。
-
-このリポジトリは、閲覧、評価、ローカル実行、個人環境での検証を目的として公開されます。
-
-### Prompts and Design Logic / プロンプトと設計ロジック
-
-本アプリ固有のプロンプト構造、分析手順、生成ガード、制作判断の組み立て方は、非商用の研究・評価目的で公開しています。
-
-高額情報商材、有料セミナー、収益化を主目的とした再配布や教材化には使わないでください。
-
-### Generated Text / 生成文章
-
-本アプリで生成される参考本文、台本案、制作メモ、企画案などの生成文章は、原則として [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja) で扱う考え方です。
-
-共有・公開する場合は、出典表示、非営利、同一条件継承の条件に従ってください。
-
-生成文章を商用利用する場合、または別ライセンスで扱う必要がある場合は、利用者自身が必要な権利確認と許諾確認を行ってください。
-
-### Third-Party Services / 外部サービス
-
-OpenAI、Google Gemini、RSS取得元、ニュース配信元などの名称、商標、サービス権利は、それぞれの権利者に帰属します。
-
-本アプリは、それらのサービスを所有、運営、代行、保証するものではありません。
+| Area | English | 日本語 |
+|---|---|---|
+| Source code / ソースコード | Source code is `UNLICENSED`. Redistribution, sublicensing, sale, or commercial use requires explicit permission from the rights holder. | ソースコードは`UNLICENSED`です。再配布、サブライセンス、販売、商用利用には権利者の明示的な許可が必要です。 |
+| Prompts and design logic / プロンプトと設計ロジック | Prompt structure, analysis flow, guardrails, and production-judgment logic are published for noncommercial research and evaluation. | プロンプト構造、分析手順、ガード、制作判断ロジックは、非商用の研究・評価目的で公開しています。 |
+| Generated text / 生成文章 | Generated reference prose, scripts, production notes, and proposals are treated by default under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja). | 生成される参考本文、台本案、制作メモ、企画案は、原則として[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja)で扱う考え方です。 |
+| Third-party services / 外部サービス | OpenAI, Google Gemini, RSS providers, news providers, trademarks, and service names belong to their respective rights holders. | OpenAI、Google Gemini、RSS取得元、ニュース配信元、商標、サービス名は、それぞれの権利者に帰属します。 |
 
 ---
 
-## Terms of Use / 利用規約
+## Terms Of Use / 利用規約
 
-### 1. Purpose / 目的
-
-本アプリは、公開Web/RSSの話題を創作企画へ変換する研究・制作支援ツールです。
-
-既存の著作物、ブランド、キャラクター、作家、実在人物を再現・代替・模倣するためのツールではありません。
-
-### 2. Prohibited Uses / 禁止事項
-
-以下の用途を禁止します。
-
-- 実在人物や企業への虚偽告発、名誉毀損、嫌がらせ。
-- 既存作品、既存キャラクター、特定作家の作風を、識別可能な水準で再現する利用。
-- 既存IPに類似した生成文章、企画案、台本案を無断で公開、販売、収益化する利用。
-- APIキー、個人情報、非公開情報の保存や公開。
-- 取得していない数値、根拠のない分析、失敗した取得結果を、実データとして表示する行為。
-- 法律、医療、金融、投資判断の専門助言として使う行為。
-- 高額情報商材、有料セミナー、短期収益化をうたう教材への無断転用。
-
-### 3. Responsibility & Generated Text / 生成文章の責任と扱い
-
-ユーザーが本アプリを使って作成した企画、プロンプト、参考本文、台本案の確認、修正、公開責任はユーザーにあります。
-
-生成文章は、原則として [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja) として扱ってください。
-
-第三者の権利を侵害しないよう、公開前に必ず確認してください。
-
-### 4. Disclaimer / 免責事項
-
-本アプリの取得結果、分析、企画案、参考本文は、成功、収益、拡散、出版、掲載を保証しません。
-
-RSS取得元の仕様変更、API制限、ネットワーク障害により、結果が取得できない場合があります。
-
-### 5. Infringement & Takedown / 権利侵害への対応
-
-権利侵害が疑われる出力を発見した場合は、公開を停止し、該当部分を削除または修正してください。
-
-### 6. Changes / 規約の変更
-
-本READMEおよび利用条件は、アプリの更新に合わせて変更される場合があります。
-
-### 7. Governing Law / 準拠法
-
-本アプリの利用に関する解釈は、日本法を基準とします。
+| Topic | English | 日本語 |
+|---|---|---|
+| Purpose / 目的 | The app is a research and creative-assistance tool for turning public trend evidence into planning material. | 本アプリは、公開トレンド根拠を制作資料へ変換する研究・創作支援ツールです。 |
+| Prohibited use / 禁止事項 | Do not use it for defamation, harassment, false accusation, impersonation, recognizable style cloning, unauthorized IP-like output, fake data display, secret storage, or professional advice. | 名誉毀損、嫌がらせ、虚偽告発、なりすまし、識別可能な作風模倣、既存IPに類似した無断出力、偽データ表示、秘密情報保存、専門助言用途には使わないでください。 |
+| Generated text responsibility / 生成文章の責任 | Users are responsible for reviewing, revising, licensing, and publishing any plan, prompt, reference prose, or script created with the app. | 本アプリで作成した企画、プロンプト、参考本文、台本案の確認、修正、ライセンス確認、公開責任はユーザーにあります。 |
+| Disclaimer / 免責 | The app does not guarantee virality, revenue, publication, ranking, accuracy of third-party sources, or continued provider availability. | 本アプリは、拡散、収益、出版、順位、第三者ソースの正確性、API提供継続を保証しません。 |
+| Takedown / 権利侵害対応 | If a rights issue is reported, related output should be reviewed, corrected, or removed as needed. | 権利問題の指摘があった場合、該当出力を確認し、必要に応じて修正または削除してください。 |
+| Governing law / 準拠法 | Unless otherwise required, interpretation follows Japanese law. | 別途必要な場合を除き、日本法に従って解釈します。 |
 
 ---
 
 ## AI Manga Creative Suite / AIまんが制作エコシステム
 
-物語バズメーカーは、Antigravity内のAI制作支援群の一部として設計されています。
-
-ただし、実行時に他アプリを呼び出すものではありません。各アプリは独立して動作します。
-
-### Ecosystem Components / 構成システム
-
-| App | Role | Links |
+| App | English | 日本語 |
 |---|---|---|
-| Nano Banana Pro | 4コマ漫画・画像生成プロンプト生成 | [Explanation / 解説](https://note.com/happy_duck780/n/ndf063558c1f5) / [Demo / デモ](https://furuyan1234.github.io/nano-banana-pro/) / [Code / コード](https://github.com/FURUYAN1234/nano-banana-pro) |
-| AI Story Maker | 物語本文・脚本・短編・中編生成 | [Explanation / 解説](https://note.com/happy_duck780/n/nd3d972922868) / [Demo / デモ](https://furuyan1234.github.io/story-maker/) / [Code / コード](https://github.com/FURUYAN1234/story-maker) |
-| AI Character Sheet Maker | キャラクター設定と画像プロンプト支援 | [Explanation / 解説](https://note.com/happy_duck780/n/neccbebd7d957) / [Demo / デモ](https://furuyan1234.github.io/character-sheet-maker/) / [Code / コード](https://github.com/FURUYAN1234/character-sheet-maker) |
-| AI Comic Translation Tool | 漫画翻訳・翻訳画像処理支援 | [Explanation / 解説](https://note.com/happy_duck780/n/ne462dfc55ec8) / [Demo / デモ](https://furuyan1234.github.io/comic-translation/) / [Code / コード](https://github.com/FURUYAN1234/comic-translation) |
-| 360° AI Panorama Generator | 背景・パノラマ素材生成 | [Explanation / 解説](https://note.com/happy_duck780/n/nb53b121fef88) / [Demo / デモ](https://furuyan1234.github.io/panoforge/) / [Code / コード](https://github.com/FURUYAN1234/panoforge) |
-| AI Voice Comic Maker | 漫画素材からショート動画・音声動画を生成 | [Explanation / 解説](https://note.com/happy_duck780/n/ndc6533c1512f) / [Code / コード](https://github.com/FURUYAN1234/ai-voice-comic-maker) |
-| Monogatari Buzz Maker / 物語バズメーカー | 公開Web/RSSトレンドを創作企画へ変換 | [Explanation / 解説](https://note.com/happy_duck780/n/ncc593101d77f) / [Demo / デモ](https://furuyan1234.github.io/viral-radar/) / [Code / コード](https://github.com/FURUYAN1234/viral-radar) |
+| [Nano Banana Pro](https://github.com/FURUYAN1234/nano-banana-pro) | AI image generation and visual production support. | AI画像生成とビジュアル制作支援。 |
+| [AI Story Maker](https://github.com/FURUYAN1234/story-maker) | Story generation and narrative drafting. | 物語生成と本文制作支援。 |
+| [AI Character Sheet Maker](https://github.com/FURUYAN1234/character_sheet) | Character sheet and visual profile creation. | キャラクターシートと設定資料作成。 |
+| [Comic Translation Tool](https://github.com/FURUYAN1234/comic_translation) | Comic translation and localization support. | 漫画翻訳とローカライズ支援。 |
+| [360 AI Panorama Generator](https://github.com/FURUYAN1234/background) | Panorama and background generation support. | パノラマと背景生成支援。 |
+| AI Voice Comic Maker | Voice comic and short video narration support. | ボイスコミックと短編動画ナレーション支援。 |
+| [Monogatari Buzz Maker](https://github.com/FURUYAN1234/viral-radar) | Public Web/RSS trends to story planning. | 公開Web/RSSトレンドから物語企画へ変換。 |
 
 ---
 
 ## Changelog / 更新履歴
 
-All public release notes are written in English and Japanese.
-
-公開版の更新履歴は英日併記で記録します。`0.1.x` は公開版番号ルール確定前の内部プレビュー記録です。
-
-### v1.2.5 (2026-06-26)
-
-- English: Hardened the OpenAI/Gemini response contract and quality gates so generated UI fields do not remain half-pending, fall back to template prose, or leak prompt labels into visible text. / 日本語: OpenAI/Gemini生成欄の未生成残り、定型文化、本文への設計ラベル漏れを防ぐため、API応答契約と品質ゲートを強化しました。
-- English: Changed generated-result merging to fail closed unless every evidence-card reading, plan field, and reference prose item is complete. / 日本語: 全取得根拠カード、全制作案フィールド、全参考文章が揃った場合だけ生成結果を反映する fail-closed 動作に修正しました。
-- English: Removed sample-specific production rules and kept the draft-quality checks generic across OpenAI and Gemini. / 日本語: 個別サンプル語に依存した本番ルールを排除し、OpenAI/Geminiの参考文章判定を汎用ルールに整理しました。
-- English: Updated the README to clarify public Web/RSS analysis, official OpenAI/Gemini API usage, no API-key persistence, source-code `UNLICENSED` status, and generated text handling under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja). / 日本語: READMEに、公開Web/RSS分析、OpenAI/Gemini公式API利用、APIキー非保存、ソースコードの`UNLICENSED`、生成文章の[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja)扱いを明記しました。
-
-### v1.2.4 (2026-06-26)
-
-- English: Stopped local template generation for professional design notes and story/script design; those sections are filled only by OpenAI/Gemini responses. / 日本語: プロ向け設計メモと物語・台本設計をローカル定型文で生成せず、OpenAI/GeminiのAPI応答でのみ埋める設計に修正しました。
-- English: If an API response is missing, failed, empty, or template-like, the app shows the item as not generated instead of filling it locally. / 日本語: API応答が未取得、失敗、空、またはテンプレ的な場合は、ローカル文で穴埋めせず未生成として扱う fail-closed 動作に変更しました。
-- English: Added regression tests for the design-note API schema, template-response rejection, not-generated display, and export wording. / 日本語: 設計メモ生成用APIスキーマ、テンプレ応答拒否、未生成表示、エクスポート時の誤認防止を確認する回帰テストを追加しました。
-
-### v1.2.3 (2026-06-26)
-
-- English: Kept real names in evidence, but converted story-facing fields into fictionalizable structures such as checklists, records, reception forms, and boards. / 日本語: 実在の人物、企業、作品名は取得根拠に保持しつつ、物語化欄では確認欄、記録票、受付票、掲示板など架空化できる構造語へ変換するよう修正しました。
-- English: Revised fixed wording in deep analysis and planning drafts so each plan has its own visual unease, testimony gap, choice, and payoff role. / 日本語: 詳細分析と企画下書き欄の固定文型を見直し、企画案ごとに画面の違和感、証言・会話のズレ、選択と回収の役割を分けるよう改善しました。
-- English: Added regressions for real-name leakage, broken Japanese dependency, and repeated brief wording. / 日本語: 実名流入、破綻した係り受け、同一ブリーフ文型の繰り返しを検出する回帰テストを追加しました。
-
-### v1.2.2 (2026-06-26)
-
-- English: Rebuilt metrics, deep analysis, plans, evidence, design notes, openings, and writing prompts from retrieved evidence terms. / 日本語: 取得指標、詳細分析、制作案、根拠、設計メモ、冒頭例、執筆プロンプトを取得根拠語から再構成するよう修正しました。
-- English: Removed old fixed examples and rotation banks so shopping, notification, and memo motifs do not leak into unrelated search results. / 日本語: 旧固定バンク由来の買い物、通知、メモ系モチーフが非該当の検索結果へ混ざらないよう、固定例とローテーション生成を削除しました。
-- English: Added regression coverage so seed changes vary perspective, scene, and opening without reordering the evidence queue. / 日本語: 同じ根拠では取得順を維持し、seed変更時は視点、場面、冒頭だけが変わることを確認する回帰テストを追加しました。
-
-### v1.2.1 (2026-06-25)
-
-- English: Stopped saving API keys to `localStorage` and returned the app to the API-entry state after reload. / 日本語: APIキーを`localStorage`に保存しないよう修正し、リロード後は必ずAPI入力待機へ戻るよう変更しました。
-- English: Removed legacy `viral-radar-settings-v1` saved keys during startup. / 日本語: 起動時に旧バージョンで残った`viral-radar-settings-v1`の保存キーを削除する処理を追加しました。
-- English: Sent Gemini keys via the `x-goog-api-key` header for both GitHub Pages direct calls and the local Vite proxy, without URL query exposure. / 日本語: Gemini APIキーをURLクエリに出さず、GitHub Pages直呼びとローカルViteプロキシの両方で`x-goog-api-key`ヘッダー送信に変更しました。
-- English: Hardened API input autofill protection and limited visible connection state to provider and model names. / 日本語: API入力欄の自動復元対策を強化し、画面表示はAPI名とモデル名だけに限定しました。
-
-### v1.2.0 (2026-06-25)
-
-- English: Reset stale AI summaries, reference prose, evidence, charts, and plans immediately when the API key changes. / 日本語: APIキー変更時に、古いAI分析サマリー、参考文章、取得根拠、チャート、企画案を即時リセットするよう修正しました。
-- English: Treated post-key-change retrieval as a new analysis session and rebuilt Web/RSS search plus plans with a new seed. / 日本語: API変更後の再取得を新しい分析セッションとして扱い、別seedで公開Web/RSS検索と企画生成を作り直すよう調整しました。
-- English: Added session-signature checks so late API responses from older sessions cannot merge into the new screen. / 日本語: 遅れて返った古いAPI分析結果が新しい画面へ混ざらないよう、API分析開始時のセッション署名を照合する保護を追加しました。
-
-### v1.1.9 (2026-06-25)
-
-- English: Regenerated professional design notes and story/script design from each plan's evidence, focus words, props, scenes, and tension. / 日本語: プロ向け設計メモと物語・台本設計を、各案の取得根拠、焦点語、小道具、場面、緊張に連動して再生成するよう修正しました。
-- English: Added later CORS proxy fallbacks for GitHub Pages Web/RSS retrieval so public deployment can attempt real data retrieval. / 日本語: GitHub Pages版の公開Web/RSS取得で後段CORSプロキシを追加し、公開URLでも実データ取得を試行できる経路を強化しました。
-- English: Fixed mojibake in retrieval-failure messages. / 日本語: 取得失敗時の文字化けしたエラー文を修正しました。
-
-### v1.1.8 (2026-06-25)
-
-- English: Separated material-term extraction from title generation so manga and novel titles do not become analysis labels or media names. / 日本語: 漫画・小説の企画タイトルが分析ラベルや媒体名にならないよう、素材語の抽出と作品タイトル候補生成を分離しました。
-- English: Removed meta terms such as `漫画・企画への反応` from tags and search terms so titles come from the content core. / 日本語: `漫画・企画への反応`などのメタ語をタグ/検索語から除外し、内容の芯からタイトルを出すよう修正しました。
-- English: Renamed `分析ラウンド1` to `今回の切り口` to avoid implying multiple analysis rounds. / 日本語: `分析ラウンド1`表記を`今回の切り口`へ変更し、複数ラウンドがあるように見える誤解を解消しました。
-- English: Unified plan-field and post-copy action wording around `他AI`. / 日本語: 企画案欄とコピー後アクションの説明を`他AI`表記に統一しました。
-
-### v1.1.7 (2026-06-25)
-
-- English: Added a compact version label next to the app name. / 日本語: アプリ名横に小さなバージョン表示を追加しました。
-- English: Added the same version label to the API input/settings panel for easier screen-state confirmation. / 日本語: API入力/設定パネルにも同じバージョン表示を追加し、AIや運用者が画面状態を確認しやすくしました。
-
-### v1.1.6 (2026-06-25)
-
-- English: Opened the API input panel on first load when no API key is connected, without starting Web/RSS search or API analysis. / 日本語: API未設定時は初回にAPI入力パネルを開いて待機し、公開Web/RSS検索やAPI分析を開始しないよう修正しました。
-- English: If evidence is empty when AI analysis is requested, the app retries Web/RSS retrieval before analysis. / 日本語: AI分析サマリーボタン押下時に根拠データが空なら、先に公開Web/RSS取得を再試行してから分析するよう修正しました。
-- English: Parsed Gemini/OpenAI JSON responses even when wrapped in code fences or extra prose, without showing raw JSON. / 日本語: Gemini/OpenAIのJSON応答がコードフェンスや余計な本文付きでも、JSON本文をそのまま表示せず各項目へ展開するよう強化しました。
-- English: Removed all key fragments from visible API status and showed only provider and model names. / 日本語: 画面上のAPI接続表示からキー断片を完全に外し、API名と使用モデル名だけを表示するよう修正しました。
-
-### v1.1.5 (2026-06-25)
-
-- English: Added browser-side RSS search so GitHub Pages can perform public Web/RSS retrieval. / 日本語: GitHub Pages版でも公開Web/RSS取得を実行できるよう、ブラウザ実行用のRSS検索モジュールを追加しました。
-- English: Reused the same search module for the local Vite `/api/trend-search` route to remove logic drift. / 日本語: ローカルViteの`/api/trend-search`も同じ検索モジュールを使うようにし、公開版とローカル版の取得ロジック差分を解消しました。
-- English: Tried public retrieval proxies after CORS failures and reported total source failure as retrieval failure, not success. / 日本語: RSS直接取得がCORSで失敗した場合は公開取得プロキシを順に試し、全ソース失敗時は成功扱いせず取得失敗として表示するよう修正しました。
-- English: Corrected the README statement that wrongly described the GitHub Pages version as a static preview. / 日本語: `GitHub Pages版は静的プレビュー`という誤ったREADME表記を修正しました。
-
-### v1.1.4 (2026-06-25)
-
-- English: Reduced fixed-rotation drift when users rerun search or generate alternate plans. / 日本語: 再検索・別案生成で、企画案と深掘り分析が固定ローテーションに戻りにくいよう強化しました。
-- English: Tied each plan to a specific evidence anchor so titles, premises, protagonists, settings, props, and tension vary from evidence. / 日本語: 各企画案を個別の取得根拠アンカーに結びつけ、タイトル、前提、主人公、舞台、小道具、緊張を根拠由来で変化させるよう調整しました。
-- English: Reflected angle and core evidence in deep analysis, with regression tests against category-only fixed prose. / 日本語: 深掘り分析にも切り口と中心根拠を反映し、カテゴリ固定文だけにならない回帰テストを追加しました。
-
-### Internal preview builds before public v1.x / 公開v1.x以前の内部プレビュー (2026-06-24 to 2026-06-25)
-
-- English: Fixed GitHub Pages project-path asset loading by setting the production base to `/viral-radar/`. / 日本語: GitHub Pagesのproject path配信でJS/CSSが読み込めない問題を、production asset baseを`/viral-radar/`へ固定して修正しました。
-- English: Expanded the README, strengthened filters against existing manga/novel/drama/movie/book-review material, and confirmed rerun behavior updates retrieved evidence and titles. / 日本語: READMEを拡張し、既存漫画・小説・ドラマ・映画・書評記事を創作素材プールから除外するフィルタを強化し、再検索時に取得結果と企画タイトルが更新されることを確認しました。
-- English: Standardized the app name as `物語バズメーカー`, documented the no-fake-search policy, consolidated API entry, and separated evidence, media judgments, plans, prompts, JSON/Markdown/DOCX export, and local launch support. / 日本語: アプリ名を`物語バズメーカー`に統一し、架空検索を実検索に見せない方針、API入力、根拠、媒体別判断、企画案、プロンプト、JSON/Markdown/DOCX出力、ローカル起動を整理しました。
-- English: Initial MVP added story manga, short video, documentary video, and long novel categories with public Web/RSS retrieval, evidence cards, charts, plans, prompts, AI analysis summary, and exports. / 日本語: 初期MVPとして、ストーリー漫画、ショート動画、トレンド解説動画、小説カテゴリ、公開Web/RSS取得、根拠カード、分析チャート、企画案、本文生成プロンプト、AI分析サマリー、各種出力を実装しました。
+| Version | English | 日本語 |
+|---|---|---|
+| v1.2.5 | Hardened OpenAI/Gemini visible generation fields, rejected incomplete or template-like provider output, removed sample-specific production rules, updated compliance text, and documented generated text handling under CC BY-NC-SA 4.0. | OpenAI/Geminiの表示生成欄を強化し、不完全または定型的なAPI応答を拒否し、個別サンプル専用の本番ルールを排除し、法的遵守文と生成文章のCC BY-NC-SA 4.0扱いを明記しました。 |
+| v1.2.4 | Stopped local template generation for professional design notes and story/script design; provider output is required. | プロ向け設計メモと物語・台本設計をローカル定型文で生成せず、API応答必須にしました。 |
+| v1.2.3 | Kept real names as evidence while converting story-facing fields into fictionalizable structures. | 実名は根拠に保持しつつ、物語化欄では架空化できる構造へ変換するよう修正しました。 |
+| v1.2.2 | Rebuilt metrics, analysis, plans, notes, openings, and prompts from retrieved evidence terms. | 取得指標、分析、制作案、設計メモ、冒頭、プロンプトを取得根拠語から再構成しました。 |
+| v1.2.1 | Made API keys runtime-only, removed legacy saved keys, and avoided Gemini key exposure in URL queries. | APIキーを実行時のみ扱い、旧保存キーを削除し、GeminiキーをURLクエリに出さないよう修正しました。 |
+| v1.2.0 | Reset stale reports after API key changes and blocked late old responses from merging into a new session. | APIキー変更後に古いレポートをリセットし、遅れて返った旧応答が新セッションへ混ざらないようにしました。 |
+| v1.1.9 | Linked design notes and story/script design to each plan's evidence and added public retrieval fallbacks. | 設計メモと物語・台本設計を各案の根拠に結びつけ、公開版の取得フォールバックを追加しました。 |
+| v1.1.8 | Separated title generation from analysis labels and removed misleading analysis-round wording. | タイトル生成を分析ラベルから分離し、誤解を招く分析ラウンド表記を修正しました。 |
+| v1.1.7 | Added visible version labels in the app header and API settings panel. | アプリヘッダーとAPI設定パネルにバージョン表示を追加しました。 |
+| v1.1.6 | Improved API-gate behavior, JSON parsing, and visible API-status privacy. | API未設定時の制御、JSON解析、API接続表示の秘匿性を改善しました。 |
+| v1.1.5 | Added browser-side RSS retrieval for GitHub Pages and removed the static-preview limitation. | GitHub Pages版のブラウザ側RSS取得を追加し、静的プレビュー扱いを解消しました。 |
+| v1.1.4 | Reduced fixed-rotation drift and tied alternate plans to specific evidence anchors. | 固定ローテーションへの戻りを減らし、別案を個別根拠に結びつけました。 |
+| Internal preview | Built the initial app, project-path asset support, export formats, evidence cards, charts, and no-fake-search policy before the public v1.x line. | 公開v1.x以前の内部プレビューとして、初期アプリ、project path対応、出力形式、根拠カード、チャート、架空検索禁止方針を整備しました。 |
 
 ---
 
 ## Repository Info / リポジトリ情報
 
-| Item | Value |
-|---|---|
-| App Name | 物語バズメーカー |
-| English Name | Monogatari Buzz Maker |
-| Package | `monogatari-buzz-maker` |
-| Repository | [FURUYAN1234/viral-radar](https://github.com/FURUYAN1234/viral-radar) |
-| Local Port | `5180` |
-| Public URL | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) |
-| Source Code License | `UNLICENSED` |
-| Generated Text License | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja) |
+| Item | English | 日本語 |
+|---|---|---|
+| App name | Monogatari Buzz Maker | 物語バズメーカー |
+| Package | `monogatari-buzz-maker` | `monogatari-buzz-maker` |
+| Version | `1.2.5` | `1.2.5` |
+| Repository | [FURUYAN1234/viral-radar](https://github.com/FURUYAN1234/viral-radar) | [FURUYAN1234/viral-radar](https://github.com/FURUYAN1234/viral-radar) |
+| Public URL | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) |
+| Local port | `5180` | `5180` |
+| Source code license | `UNLICENSED` | `UNLICENSED` |
+| Generated text license | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja) | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja) |
 
-Developed by FURU.
+- English: Developed by FURU.
+- 日本語: 開発者: FURU。
