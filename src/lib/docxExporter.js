@@ -71,7 +71,7 @@ function documentXml(report) {
       ['中心シグナル', cluster.label ?? '未設定'],
       [
         '編集上の狙い',
-        primaryPlan?.craftNotes?.[0]?.detail ?? report.deepAnalysis?.categoryInsight ?? '未設定',
+        primaryPlan?.craftNotes?.[0]?.detail ?? 'AI設計メモは未生成です。ローカル定型文では埋めません。',
       ],
     ]),
     paragraph(
@@ -111,7 +111,7 @@ function documentXml(report) {
         plan.titleCandidates?.[0] ?? '',
         plan.emotionalHook ?? plan.audiencePromise ?? '',
         plan.opening ?? plan.premise ?? '',
-        plan.craftNotes?.find((note) => note.label.includes('差別化'))?.detail ??
+        plan.craftNotes?.[0]?.detail ??
           plan.differentiation ??
           '',
       ]),
@@ -146,7 +146,7 @@ function documentXml(report) {
       ],
       [
         '流行語追いだけに見える',
-        '主人公の欠落、選択、代償を先に決め、トレンドは感情の入口に留める。',
+        '人物の弱点、選択、代償を先に決め、トレンドは感情の入口に留める。',
       ],
       [
         '説明が多くなる',
@@ -218,7 +218,7 @@ function editorPlanParagraphs(plan) {
     heading3('物語・台本設計'),
     table([
       ['設計項目', '打ち合わせで見る内容'],
-      ...((plan.storyArchitecture?.notes ?? []).map((note) => [note.label, note.detail])),
+      ...designRowsForDocx(plan.storyArchitecture?.notes),
     ]),
     heading3('第1話で見せる順番'),
     table([
@@ -232,6 +232,13 @@ function editorPlanParagraphs(plan) {
     labelParagraph('初回具体例', plan.exampleDetail),
     labelParagraph('冒頭の見せ場', plan.opening),
   ];
+}
+
+function designRowsForDocx(notes) {
+  if (Array.isArray(notes) && notes.length > 0) {
+    return notes.map((note) => [note.label, note.detail]);
+  }
+  return [['AI未生成', 'API応答がまだないため未生成です。ローカル定型文では埋めません。']];
 }
 
 function heading1(text) {

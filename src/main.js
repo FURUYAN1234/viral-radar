@@ -5,7 +5,7 @@ import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from './lib/docxExporter.j
 import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
 import { buildReport } from './lib/reportEngine.js';
-import { getProviderStatus, runDraftSample, runProviderAnalysis } from './lib/providers.js';
+import { getProviderStatus, runDraftSample, runPlanDesignGeneration, runProviderAnalysis } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
 import { loadSettingsFromStorage } from './lib/settings.js';
 
@@ -14,7 +14,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.2.3';
+const APP_VERSION = '1.2.4';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -899,9 +899,24 @@ async function runProviderDeepening() {
   render();
 
   try {
-    const results = await Promise.allSettled([runOneProvider(providerStatus.mode, providerStatus.apiKey)]);
+    const [summaryResult, designResult] = await Promise.allSettled([
+      runOneProvider(providerStatus.mode, providerStatus.apiKey),
+      runOnePlanDesign(providerStatus.mode, providerStatus.apiKey),
+    ]);
     if (state.providerRunSignature !== runSignature) return;
-    state.providerSummary = ensureReadableProviderSummary(mergeProviderResults(results), state.report, providerStatus);
+    const designStatus =
+      designResult.status === 'fulfilled'
+        ? applyProviderPlanDesigns(designResult.value.design, providerStatus)
+        : {
+            applied: 0,
+            risk_note: designResult.reason?.message ?? '設計メモ生成に失敗しました。',
+          };
+    state.providerSummary = ensureReadableProviderSummary(
+      mergeProviderResults([summaryResult]),
+      state.report,
+      providerStatus,
+      designStatus,
+    );
   } finally {
     if (state.providerRunSignature !== runSignature) return;
     state.providerBusy = false;
@@ -917,6 +932,47 @@ async function runOneProvider(provider, apiKey) {
     proxyBase: PROVIDER_PROXY,
   });
   return { provider, summary };
+}
+
+async function runOnePlanDesign(provider, apiKey) {
+  const design = await runPlanDesignGeneration({
+    provider,
+    apiKey,
+    report: state.report,
+    proxyBase: PROVIDER_PROXY,
+  });
+  return { provider, design };
+}
+
+function applyProviderPlanDesigns(design, providerStatus) {
+  const designById = new Map((design?.plans ?? []).map((plan) => [plan.id, plan]));
+  let applied = 0;
+  state.report = {
+    ...state.report,
+    creativePlans: state.report.creativePlans.map((plan) => {
+      const generated = designById.get(plan.id);
+      if (!generated) return plan;
+      applied += 1;
+      return {
+        ...plan,
+        craftNotes: generated.craftNotes,
+        storyArchitecture: generated.storyArchitecture,
+        aiDesign: {
+          status: 'done',
+          provider: providerStatus.provider.name,
+          model: design.used_model,
+        },
+      };
+    }),
+  };
+  return {
+    applied,
+    used_model: design.used_model,
+    risk_note:
+      applied > 0
+        ? `${providerStatus.provider.name}で${applied}件のプロ向け設計メモと物語・台本設計を生成しました。`
+        : 'API応答に使える設計メモがありませんでした。',
+  };
 }
 
 function mergeProviderResults(results) {
@@ -951,7 +1007,7 @@ function mergeProviderResults(results) {
   };
 }
 
-function ensureReadableProviderSummary(summary, report, providerStatus) {
+function ensureReadableProviderSummary(summary, report, providerStatus, designStatus = null) {
   const visibleText = [
     summary.summary,
     summary.strongest_signal,
@@ -969,19 +1025,17 @@ function ensureReadableProviderSummary(summary, report, providerStatus) {
     return {
       ...summary,
       summary: stripProviderPrefix(summary.summary ?? '追加分析'),
+      risk_note: [summary.risk_note, designStatus?.risk_note].filter(Boolean).join(' / '),
     };
   }
 
-  const cluster = report.trendClusters[0];
-  const plan = report.creativePlans[0];
   return {
-    summary: `${report.category.label}では「${cluster.label}」を、${categoryFallbackAngle(report.category.id)}として使う方向が最も実用的です。`,
-    strongest_signal: `${cluster.creatorSignals[0]?.label ?? cluster.label}: ${cluster.creatorSignals[0]?.detail ?? report.deepAnalysis.categoryInsight}`,
-    practical_revision: `推奨企画「${plan.titleCandidates[0]}」は、冒頭で${plan.opening}を見せ、主人公の選択と読後感まで先に設計してください。`,
-    risk_note: '実在の人物、企業、作品、サービス名は根拠欄に留め、作品内では架空の制度、UI、場所、人物へ変換してください。',
+    summary: 'API詳細分析は具体性不足のため表示しません。',
+    strongest_signal: '',
+    practical_revision: '',
+    risk_note: [summary.risk_note, designStatus?.risk_note, 'ローカル定型文での代替表示は行いません。'].filter(Boolean).join(' / '),
     next_actions: [
-      `第1案「${plan.titleCandidates[0]}」を軸に、初回の見せ場を1つに絞る。`,
-      `別案が必要な場合は「別案を出す」で別の企画ベースに切り替える。`,
+      'APIキー、クォータ、またはモデル応答を確認して、もう一度API詳細分析を更新してください。',
     ],
   };
 }
@@ -990,16 +1044,6 @@ function stripProviderPrefix(value) {
   return String(value ?? '')
     .replace(/^\s*(Gemini|OpenAI)\s*[:：]\s*/i, '')
     .trim();
-}
-
-function categoryFallbackAngle(categoryId) {
-  const angles = {
-    'story-manga': 'ページ上の異常表示と連載の引き',
-    'short-video': '冒頭1秒、字幕、保存理由',
-    'trend-explainer': '根拠提示、章立て、断定回避',
-    'long-novel': '章ごとの謎、伏線、長期的な救済アーク',
-  };
-  return angles[categoryId] ?? '読者が続きを見たくなる構造';
 }
 
 function renderAnalysisBusyBanner(report, providerStatus) {
@@ -1091,7 +1135,7 @@ function buildDecisionScores(report) {
 
 function decisionNarrative(report, scores) {
   const categoryMoves = {
-    'story-manga': '数値を見る目的は、1ページ目の小道具、主人公の欠落、最後の一コマの救済を決めることです。',
+    'story-manga': '数値を見る目的は、1ページ目の小道具、人物の弱点、最後の一コマの救済を決めることです。',
     'short-video': '数値を見る目的は、冒頭0秒の画、保存理由、コメント誘導を決めることです。',
     'trend-explainer': '数値を見る目的は、どの外部話題を根拠にし、どこから制作手順へ翻訳するかを決めることです。',
     'long-novel': '数値を見る目的は、第1章の痛み、章末の謎、長期アークの救済対象を決めることです。',
@@ -1349,12 +1393,7 @@ function renderCreativePlan(plan, index) {
         </dl>
       </div>
 
-      <div class="craft-panel">
-        <h4>プロ向け設計メモ</h4>
-        <dl>
-          ${plan.craftNotes.map((note) => `<div><dt>${escapeHtml(note.label)}</dt><dd>${escapeHtml(note.detail)}</dd></div>`).join('')}
-        </dl>
-      </div>
+      ${renderCraftNotes(plan)}
 
       ${renderStoryArchitecture(plan.storyArchitecture)}
 
@@ -1385,8 +1424,29 @@ function renderCreativePlan(plan, index) {
   `;
 }
 
+function renderCraftNotes(plan) {
+  const notes = plan.craftNotes ?? [];
+  return `
+    <div class="craft-panel">
+      <h4>プロ向け設計メモ</h4>
+      ${
+        notes.length
+          ? `<dl>${notes.map((note) => `<div><dt>${escapeHtml(note.label)}</dt><dd>${escapeHtml(note.detail)}</dd></div>`).join('')}</dl>`
+          : renderAiDesignPlaceholder('API応答がまだないため未生成です。ローカル定型文では埋めません。')
+      }
+    </div>
+  `;
+}
+
 function renderStoryArchitecture(architecture) {
-  if (!architecture?.notes?.length) return '';
+  if (!architecture?.notes?.length) {
+    return `
+      <div class="architecture-panel">
+        <h4>物語・台本設計</h4>
+        ${renderAiDesignPlaceholder('API応答がまだないため未生成です。固定テンプレや単語差し替え文は表示しません。')}
+      </div>
+    `;
+  }
 
   return `
     <div class="architecture-panel">
@@ -1398,6 +1458,11 @@ function renderStoryArchitecture(architecture) {
       </dl>
     </div>
   `;
+}
+
+function renderAiDesignPlaceholder(message) {
+  const busyText = state.providerBusy ? 'AIで生成中です。固定テンプレは表示しません。' : message;
+  return `<p class="ai-design-placeholder">${escapeHtml(busyText)}</p>`;
 }
 
 function renderBeginnerGuide(report, timestamp = '') {

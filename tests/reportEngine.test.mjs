@@ -305,8 +305,8 @@ test('same evidence is not treated as a rotation queue when only the variation s
     salted.creativePlans.map((plan) => plan.evidenceAnchor.sourceUrl),
   );
   assert.notDeepEqual(
-    first.creativePlans.map((plan) => plan.storyArchitecture.mediumExecution.focus),
-    salted.creativePlans.map((plan) => plan.storyArchitecture.mediumExecution.focus),
+    first.creativePlans.map((plan) => plan.opening),
+    salted.creativePlans.map((plan) => plan.opening),
   );
 });
 
@@ -381,7 +381,7 @@ test('non-household evidence does not collapse into shopping notification memo c
   assert.doesNotMatch(storyFacingText, /買い物|冷蔵庫|レシート|家計簿|生活通知|未来の自分|明日の自分|生活メモ/);
 });
 
-test('each plan changes brief, notes, architecture, scene, reason, flow, opening, and prompt wording', () => {
+test('each plan changes brief, scene, reason, flow, opening, and prompt wording without local design prose', () => {
   const observations = [
     {
       id: 'distinct-a',
@@ -434,13 +434,16 @@ test('each plan changes brief, notes, architecture, scene, reason, flow, opening
 
   assert.equal(new Set(valuesFor((plan) => plan.titleCandidates[0])).size, 3);
   assert.equal(new Set(valuesFor((plan) => JSON.stringify(plan.creatorBrief))).size, 3);
-  assert.equal(new Set(valuesFor((plan) => JSON.stringify(plan.craftNotes))).size, 3);
-  assert.equal(new Set(valuesFor((plan) => JSON.stringify(plan.storyArchitecture))).size, 3);
+  assert.deepEqual(valuesFor((plan) => plan.craftNotes), [[], [], []]);
+  assert.ok(report.creativePlans.every((plan) => plan.storyArchitecture.status === 'awaiting-ai'));
+  assert.ok(report.creativePlans.every((plan) => plan.storyArchitecture.notes.length === 0));
   assert.equal(new Set(valuesFor((plan) => plan.exampleDetail)).size, 3);
   assert.equal(new Set(valuesFor((plan) => plan.reasonToWin.join('\n'))).size, 3);
   assert.equal(new Set(valuesFor((plan) => plan.outline.join('\n'))).size, 3);
   assert.equal(new Set(valuesFor((plan) => plan.opening)).size, 3);
   assert.equal(new Set(valuesFor((plan) => plan.aiDraftPrompt)).size, 3);
+  assert.doesNotMatch(valuesFor((plan) => plan.aiDraftPrompt).join('\n'), /プロ向け設計メモ:|物語設計:|編集者に通す一文|読者維持エンジン/);
+  assert.match(valuesFor((plan) => plan.aiDraftPrompt).join('\n'), /固定テンプレ、単語差し替え/);
   assert.doesNotMatch(report.creativePlans.map((plan) => plan.opening).join('\n'), /誰にも見えないはずの欄にだけ残っていた/);
 });
 
@@ -519,7 +522,7 @@ test('regenerated plans bind visible briefs to distinct evidence anchors, not on
   assert.equal(new Set(firstRound.creativePlans.map((plan) => plan.creatorBrief.protagonist)).size, 3);
 });
 
-test('regenerated plans rebuild professional notes and story architecture per evidence anchor', () => {
+test('regenerated plans keep advanced design AI-only while varying evidence anchors', () => {
   const evidenceSet = [
     {
       id: 'memo-1',
@@ -575,19 +578,10 @@ test('regenerated plans rebuild professional notes and story architecture per ev
   });
 
   assert.equal(report.creativePlans.length, 3);
-  assert.equal(
-    new Set(
-      report.creativePlans.map((plan) =>
-        plan.craftNotes.find((note) => note.label === '読者維持エンジン')?.detail,
-      ),
-    ).size,
-    3,
-  );
-  assert.equal(new Set(report.creativePlans.map((plan) => plan.storyArchitecture.gmc.goal)).size, 3);
-  assert.equal(
-    new Set(report.creativePlans.map((plan) => plan.storyArchitecture.mediumExecution.focus)).size,
-    3,
-  );
+  assert.equal(new Set(report.creativePlans.map((plan) => plan.evidenceAnchor.focusTerm)).size, 3);
+  assert.ok(report.creativePlans.every((plan) => plan.craftNotes.length === 0));
+  assert.ok(report.creativePlans.every((plan) => plan.storyArchitecture.status === 'awaiting-ai'));
+  assert.ok(report.creativePlans.every((plan) => plan.storyArchitecture.notes.length === 0));
 });
 
 test('creative plans are actionable story briefs, not only analysis notes', () => {
@@ -605,15 +599,15 @@ test('creative plans are actionable story briefs, not only analysis notes', () =
   for (const key of ['protagonist', 'setting', 'incitingIncident', 'conflict', 'choice', 'payoff']) {
     assert.ok(plan.creatorBrief[key], `${key} should be present`);
   }
-  assert.ok(plan.craftNotes.length >= 4);
-  assert.deepEqual(
-    plan.craftNotes.map((note) => note.label),
-    ['編集者に通す一文', '主人公の欠落', '読者維持エンジン', '凡庸化を避ける手'],
-  );
+  assert.deepEqual(plan.craftNotes, []);
+  assert.equal(plan.storyArchitecture.status, 'awaiting-ai');
+  assert.deepEqual(plan.storyArchitecture.notes, []);
   assert.match(plan.aiDraftPrompt, /主人公:/);
   assert.match(plan.aiDraftPrompt, /最初の事件:/);
   assert.match(plan.aiDraftPrompt, /最後に選ばせること:/);
-  assert.match(plan.aiDraftPrompt, /プロ向け設計メモ:/);
+  assert.match(plan.aiDraftPrompt, /AI生成時の設計条件:/);
+  assert.match(plan.aiDraftPrompt, /固定テンプレ、単語差し替え/);
+  assert.doesNotMatch(plan.aiDraftPrompt, /プロ向け設計メモ:|物語設計:|編集者に通す一文|読者維持エンジン/);
 });
 
 test('reports include a novice-ready production roadmap before writing', () => {

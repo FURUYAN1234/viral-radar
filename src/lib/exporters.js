@@ -110,10 +110,10 @@ export function toMarkdown(report) {
       `- 読後感: ${plan.creatorBrief.payoff}`,
       '',
       '#### 物語・台本設計',
-      ...(plan.storyArchitecture?.notes ?? []).map((note) => `- ${note.label}: ${note.detail}`),
+      ...designNotesForMarkdown(plan.storyArchitecture?.notes, 'API応答がまだないため未生成です。ローカル定型文では埋めません。'),
       '',
       '#### プロ向け設計メモ',
-      ...plan.craftNotes.map((note) => `- ${note.label}: ${note.detail}`),
+      ...designNotesForMarkdown(plan.craftNotes, 'API応答がまだないため未生成です。ローカル定型文では埋めません。'),
       '',
       '#### ウケそうな理由',
       ...plan.reasonToWin.map((item) => `- ${item}`),
@@ -142,6 +142,13 @@ export function toMarkdown(report) {
   ].join('\n');
 
   return scrubSecrets(markdown);
+}
+
+function designNotesForMarkdown(notes, emptyMessage) {
+  if (Array.isArray(notes) && notes.length > 0) {
+    return notes.map((note) => `- ${note.label}: ${note.detail}`);
+  }
+  return [`- ${emptyMessage}`];
 }
 
 export function toJson(report) {

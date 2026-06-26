@@ -115,6 +115,79 @@ export function createProviderAnalysisRequest({ provider, report, model = primar
   };
 }
 
+export function createPlanDesignRequest({ provider, report, model = primaryModel(provider) }) {
+  const reportDigest = {
+    category: report.category,
+    timeWindow: report.timeWindow,
+    audience: report.audience,
+    evidenceCards: report.evidenceCards?.map((card) => ({
+      claim: card.claim,
+      source: card.source,
+      metricsSummary: card.metricsSummary,
+      observation: card.observation,
+      meaningForCreator: card.meaningForCreator,
+      creativeUse: card.creativeUse,
+      limitations: card.limitations,
+    })),
+    creativePlans: report.creativePlans?.map((plan) => ({
+      id: plan.id,
+      formatLabel: plan.formatLabel,
+      titleCandidates: plan.titleCandidates,
+      audiencePromise: plan.audiencePromise,
+      emotionalHook: plan.emotionalHook,
+      creatorBrief: plan.creatorBrief,
+      premise: plan.premise,
+      exampleDetail: plan.exampleDetail,
+      outline: plan.outline,
+      opening: plan.opening,
+      reasonToWin: plan.reasonToWin,
+      differentiation: plan.differentiation,
+      productionNotes: plan.productionNotes,
+      riskNotes: plan.riskNotes,
+      evidenceAnchor: plan.evidenceAnchor,
+    })),
+    limitations: report.limitations,
+  };
+
+  const prompt = [
+    'あなたは日本語コンテンツの商業編集者兼脚本開発者です。',
+    '必ずJSONだけを返してください。',
+    '目的: 各企画案の「プロ向け設計メモ」と「物語・台本設計」を、公開Web/RSS根拠と企画下書きから新規に生成する。',
+    '禁止: 固定テンプレ、単語差し替え、全案で同じ文型、ラベルだけ違う同文、一般論の穴埋め、ダミーデータ、架空の外部根拠。',
+    '各noteは、その案の根拠語、場面、矛盾、媒体、制作上の判断を読み直して書く。別案にそのまま移植できる文は禁止。',
+    '実在人物、企業、作品、クリエイター、既存キャラクターを物語の主役・黒幕・告発対象にしない。',
+    '返却JSON schema:',
+    '{"plans":[{"id":"creativePlansのid","craftNotes":[{"label":"短い見出し","detail":"80〜180字の固有判断"}],"storyArchitecture":{"notes":[{"label":"短い見出し","detail":"80〜180字の固有設計"}]}}]}',
+    'craftNotesは3〜5件。編集判断、ネーム/尺、演出、制作チェックなど、実制作で手が動く内容にする。',
+    'storyArchitecture.notesは4〜6件。伏線、目的/動機/障害、感情変化、知識境界、回収などを、案ごとの出来事として書く。',
+    `入力レポート: ${JSON.stringify(reportDigest)}`,
+  ].join('\n');
+
+  if (provider === 'gemini') {
+    return {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    };
+  }
+
+  return {
+    model,
+    input: prompt,
+    text: {
+      format: {
+        type: 'json_object',
+      },
+    },
+  };
+}
+
 export async function runProviderAnalysis({ provider, apiKey, report, fetchImpl = fetch, proxyBase = '' }) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
@@ -128,6 +201,22 @@ export async function runProviderAnalysis({ provider, apiKey, report, fetchImpl 
     failureMessage: `${provider}の詳細分析に失敗しました。キー、クォータ、提供元の状態を確認してください。`,
     createRequest: (model) => createProviderAnalysisRequest({ provider, report, model }),
     parsePayload: (payload) => parseProviderPayload(provider, payload),
+  });
+}
+
+export async function runPlanDesignGeneration({ provider, apiKey, report, fetchImpl = fetch, proxyBase = '' }) {
+  if (!apiKey || apiKey.length < 12) {
+    throw new Error(`${provider}のAPIキーが未設定です。`);
+  }
+
+  return runProviderFallback({
+    provider,
+    apiKey,
+    fetchImpl,
+    proxyBase,
+    failureMessage: `${provider}の設計メモ生成に失敗しました。キー、クォータ、提供元の状態を確認してください。`,
+    createRequest: (model) => createPlanDesignRequest({ provider, report, model }),
+    parsePayload: (payload) => parsePlanDesignPayload(provider, payload, report),
   });
 }
 
@@ -272,11 +361,7 @@ function pickPrimaryTitle(value) {
 }
 
 function parseProviderPayload(provider, payload) {
-  const raw =
-    provider === 'gemini'
-      ? payload.candidates?.[0]?.content?.parts?.map((part) => part.text).join('\n')
-      : payload.output_text ??
-        payload.output?.flatMap((item) => item.content ?? []).find((item) => item.text)?.text;
+  const raw = providerPayloadText(provider, payload);
 
   if (!raw) {
     return {
@@ -302,6 +387,90 @@ function parseProviderPayload(provider, payload) {
       next_actions: [],
     };
   }
+}
+
+function parsePlanDesignPayload(provider, payload, report) {
+  const raw = providerPayloadText(provider, payload);
+  if (!raw) {
+    throw new Error('APIから設計メモとして解析できる文章が返りませんでした。');
+  }
+  const parsed = parseProviderJsonPayload(raw);
+  if (!parsed) {
+    throw new Error('APIの設計メモ応答をJSONとして解析できませんでした。');
+  }
+  return normalizePlanDesignPayload(parsed, report);
+}
+
+function normalizePlanDesignPayload(payload, report) {
+  const knownPlanIds = new Set((report.creativePlans ?? []).map((plan) => plan.id));
+  const rawPlans = Array.isArray(payload.plans) ? payload.plans : [];
+  const plans = rawPlans
+    .map((plan) => normalizePlanDesign(plan, knownPlanIds))
+    .filter(Boolean);
+
+  if (plans.length === 0) {
+    throw new Error('API応答に利用できる設計メモがありませんでした。');
+  }
+
+  return { plans };
+}
+
+function normalizePlanDesign(plan, knownPlanIds) {
+  const id = stringifySummaryValue(plan?.id).trim();
+  if (!id || !knownPlanIds.has(id)) return null;
+
+  const craftNotes = normalizeDesignNotes(plan.craftNotes).slice(0, 5);
+  const storyNotes = normalizeDesignNotes(plan.storyArchitecture?.notes ?? plan.storyArchitecture).slice(0, 6);
+  if (craftNotes.length < 2 || storyNotes.length < 2) return null;
+  if (looksLikeTemplateSet([...craftNotes, ...storyNotes])) return null;
+
+  return {
+    id,
+    craftNotes,
+    storyArchitecture: {
+      status: 'done',
+      source: 'provider',
+      notes: storyNotes,
+    },
+  };
+}
+
+function normalizeDesignNotes(value) {
+  const rawNotes = Array.isArray(value)
+    ? value
+    : value && typeof value === 'object'
+      ? Object.entries(value).map(([label, detail]) => ({ label, detail }))
+      : [];
+  return rawNotes
+    .map((note) => ({
+      label: stringifySummaryValue(note?.label ?? note?.title ?? note?.heading ?? '').slice(0, 40),
+      detail: stringifySummaryValue(note?.detail ?? note?.description ?? note?.text ?? note?.body ?? note?.content ?? ''),
+    }))
+    .filter((note) => note.label.length >= 2 && note.detail.length >= 28)
+    .filter((note) => !looksLikeTemplateDetail(note.detail));
+}
+
+function looksLikeTemplateSet(notes) {
+  const normalizedDetails = notes.map((note) => normalizeForTemplateCheck(note.detail)).filter(Boolean);
+  if (new Set(normalizedDetails).size < Math.ceil(normalizedDetails.length * 0.75)) return true;
+  const commonStarts = normalizedDetails.map((detail) => detail.slice(0, 18));
+  return new Set(commonStarts).size < Math.ceil(commonStarts.length * 0.6);
+}
+
+function looksLikeTemplateDetail(detail) {
+  const text = String(detail ?? '');
+  if (/テンプレ|ダミー|サンプル|任意の|ここに/.test(text)) return true;
+  if (/取得根拠の「[^」]+」を.+に置き換え/.test(text)) return true;
+  if (/同じ根拠でも見せ方を変える/.test(text)) return true;
+  return false;
+}
+
+function normalizeForTemplateCheck(value) {
+  return String(value ?? '')
+    .replace(/[「『][^」』]+[」』]/g, '「…」')
+    .replace(/[0-9０-９]+/g, '0')
+    .replace(/\s+/g, '')
+    .trim();
 }
 
 function parseProviderJsonPayload(raw) {
@@ -362,11 +531,7 @@ function extractBalancedJsonText(value) {
 }
 
 function parseDraftSamplePayload(provider, payload, draftPrompt = '') {
-  const raw =
-    provider === 'gemini'
-      ? payload.candidates?.[0]?.content?.parts?.map((part) => part.text).join('\n')
-      : payload.output_text ??
-        payload.output?.flatMap((item) => item.content ?? []).find((item) => item.text)?.text;
+  const raw = providerPayloadText(provider, payload);
 
   const text = cleanDraftSampleText(raw || '');
   if (!text) {
@@ -377,6 +542,13 @@ function parseDraftSamplePayload(provider, payload, draftPrompt = '') {
   }
 
   return { text: ensureDraftSampleTitle(text, extractSelectedTitleFromPrompt(draftPrompt)) };
+}
+
+function providerPayloadText(provider, payload) {
+  return provider === 'gemini'
+    ? payload.candidates?.[0]?.content?.parts?.map((part) => part.text).join('\n')
+    : payload.output_text ??
+        payload.output?.flatMap((item) => item.content ?? []).find((item) => item.text)?.text;
 }
 
 function isUsableDraftSample(text) {
@@ -481,6 +653,10 @@ function sanitizeProviderError(error) {
     (result, pattern) => result.replace(pattern, '[redacted-key]'),
     String(error?.message ?? error ?? 'API error'),
   )
+    .replace(/Incorrect API key provided:\s*[^.。]+[.。]?/gi, 'Incorrect API key provided: [redacted-key].')
+    .replace(/API key provided:\s*[^.。]+[.。]?/gi, 'API key provided: [redacted-key].')
+    .replace(/You can find your API key at\s+\S+/gi, '')
+    .replace(/\[redacted-key\][A-Za-z0-9_*.-]+/g, '[redacted-key]')
     .replace(/key=[^&\s)]+/g, 'key=[redacted-key]')
     .replace(/Bearer\s+[A-Za-z0-9._-]+/g, 'Bearer [redacted-key]')
     .slice(0, 160);

@@ -226,7 +226,7 @@ function evidenceSourceForCategory(observation, categoryId) {
 
 function evidenceMeaningForCategory(observation, categoryId) {
   if (categoryId === 'story-manga') {
-    return '取得した話題を、1ページ目で見える小道具、主人公の欠落、最後の一コマの救済へ変換して使います。';
+    return '取得した話題を、1ページ目で見える小道具、人物の弱点、最後の一コマの救済へ変換して使います。';
   }
   if (categoryId === 'long-novel') {
     return '取得した話題を、章をまたいで残る疑問、評価制度の謎、主人公が救う対象の連鎖へ変換して使います。';
@@ -529,10 +529,10 @@ const PLAN_BATCH_SIZE = 3;
 
 function addDraftPrompt(plan, categoryId, cluster) {
   const creatorBrief = buildCreatorBrief(plan, categoryId);
-  const craftNotes = buildCraftNotes(plan, categoryId, creatorBrief);
   const retentionDesign = buildRetentionDesign(plan, categoryId);
   const internalRoutineNotes = buildStoryMakerRoutineNotes(categoryId);
-  const storyArchitecture = buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign);
+  const storyArchitecture = buildAiDesignPlaceholder('storyArchitecture');
+  const craftNotes = [];
   const primaryTitle = plan.titleCandidates[0];
   const promptLines = [
     'あなたは日本語コンテンツの商業創作者です。',
@@ -547,10 +547,10 @@ function addDraftPrompt(plan, categoryId, cluster) {
     `対立: ${creatorBrief.conflict}`,
     `最後に選ばせること: ${creatorBrief.choice}`,
     `読後感: ${creatorBrief.payoff}`,
-    '物語設計:',
-    ...storyArchitecture.notes.map((note) => `${note.label}: ${note.detail}`),
-    'プロ向け設計メモ:',
-    ...craftNotes.map((note) => `${note.label}: ${note.detail}`),
+    'AI生成時の設計条件:',
+    'プロ向け設計メモと物語・台本設計は、根拠、創作ブリーフ、構成、媒体条件を読み直して新規に書く。',
+    '固定テンプレ、単語差し替え、全案で同じ文型、ラベルだけ違う同文は禁止。',
+    '編集判断、制作手順、物語構造はそれぞれ別の観点で、取得根拠に固有の判断として書く。',
     '創作ルーチン:',
     ...internalRoutineNotes.map((note) => `- ${note}`),
     ...(retentionDesign
@@ -593,6 +593,15 @@ function addDraftPrompt(plan, categoryId, cluster) {
     enumerable: false,
   });
   return enrichedPlan;
+}
+
+function buildAiDesignPlaceholder(section) {
+  return {
+    status: 'awaiting-ai',
+    source: 'provider-required',
+    section,
+    notes: [],
+  };
 }
 
 function externalSignalInstruction(categoryId) {
@@ -684,42 +693,6 @@ function buildCreatorBrief(plan, categoryId) {
   };
 }
 
-function buildCraftNotes(plan, categoryId, creatorBrief) {
-  const mediumGuide = {
-    'story-manga': '1ページ目の異常表示とラスト1コマの未解決で読者を次話へ送る',
-    'short-video': '冒頭1秒の不便、途中の手順、最後の保存理由を1本の視線移動でつなぐ',
-    'trend-explainer': '導入の体験、根拠、構造図、制作への応用を章立てで分ける',
-    'long-novel': '第1章の個人的な痛みを、章を重ねるほど他者と制度の謎へ広げる',
-  };
-  const formatGuide = mediumGuide[categoryId] ?? mediumGuide['story-manga'];
-  const firstThreeBeats = plan.outline.slice(0, 3).join('」→「');
-  const anchor = plan.evidenceAnchor ?? {};
-  const anchorFocus = cleanBeatLabel(anchor.focusTerm ?? plan.titleCandidates[0] ?? '今回の根拠');
-  const anchorScene = cleanBeatLabel(anchor.scene ?? '冒頭場面');
-  const anchorArtifact = cleanBeatLabel(anchor.artifact ?? inferRecurringMotif(plan));
-  const anchorTension = cleanBeatLabel(anchor.tension ?? plan.emotionalHook);
-  const anchorMove = cleanBeatLabel(anchor.productionAngle ?? plan.differentiation);
-
-  return [
-    {
-      label: '編集者に通す一文',
-      detail: `「${plan.titleCandidates[0]}」は、取得根拠の「${anchorFocus}」を${anchorScene}の${anchorArtifact}に置き換え、${plan.emotionalHook}を${plan.formatLabel}で可視化する企画。${plan.audiencePromise}`,
-    },
-    {
-      label: '主人公の欠落',
-      detail: `${creatorBrief.protagonist} 初期弱点は「${anchorTension}」を一人で抱え込み、行動に移す前に止まってしまうこと。転機では「${creatorBrief.choice}」をセリフではなく具体的な行動で示す。`,
-    },
-    {
-      label: '読者維持エンジン',
-      detail: `${formatGuide}。${anchorArtifact}を「${firstThreeBeats}」の各段階で別の意味に変え、${anchorFocus}の小さな発見と未解決を置く。`,
-    },
-    {
-      label: '凡庸化を避ける手',
-      detail: `${plan.differentiation} ${anchorMove}を優先し、悪役の強さではなく、主人公の選択と画面・文章上の発見で読ませる。`,
-    },
-  ];
-}
-
 function buildRetentionDesign(plan, categoryId) {
   if (categoryId !== 'long-novel') return null;
 
@@ -764,161 +737,6 @@ function buildRetentionDesign(plan, categoryId) {
   };
 }
 
-function buildStoryArchitecture(plan, categoryId, creatorBrief, retentionDesign) {
-  const firstBeat = cleanBeatLabel(plan.outline?.[0] ?? plan.opening ?? plan.audiencePromise);
-  const middleBeat = cleanBeatLabel(
-    plan.outline?.[Math.min(1, Math.max((plan.outline?.length ?? 1) - 1, 0))] ??
-    plan.emotionalHook ??
-    creatorBrief.conflict,
-  );
-  const lastBeat = cleanBeatLabel(plan.outline?.at(-1) ?? retentionDesign?.payoff ?? creatorBrief.payoff);
-  const motif = inferRecurringMotif(plan);
-  const anchor = plan.evidenceAnchor ?? {};
-  const anchorArtifact = cleanBeatLabel(anchor.artifact ?? motif);
-  const anchorScene = cleanBeatLabel(anchor.scene ?? firstBeat);
-  const anchorTension = cleanBeatLabel(anchor.tension ?? plan.emotionalHook);
-  const anchorFocus = cleanBeatLabel(anchor.focusTerm ?? plan.titleCandidates?.[0] ?? motif);
-
-  const medium = {
-    'story-manga': {
-      audienceLabel: '読者',
-      agentLabel: '主人公',
-      setupPlace: '第1ページの最初の大ゴマ',
-      middlePlace: '中盤の見開きまたは縦読みの沈黙コマ',
-      payoffPlace: 'ラスト1コマ',
-      readerKnows: '読者は画面や小道具の矛盾を主人公より半歩早く見つける。',
-      hiddenTruth: '不利益の原因は個人の悪意ではなく、見えない仕組みや誤読にある。',
-      revealRule: '人物が知り得ない情報を急に語らせず、画面、記録、行動、会話のズレで段階的に明かす。',
-      execution: 'ページをめくる前に視線が止まる小道具、表情、欄外文字で説明を圧縮する。',
-    },
-    'short-video': {
-      audienceLabel: '視聴者',
-      agentLabel: '画面上の投稿者',
-      setupPlace: '0秒目の画',
-      middlePlace: '8秒から24秒の手順カット',
-      payoffPlace: 'ラスト3秒',
-      readerKnows: '視聴者は結論画を先に見て、途中でなぜ効くのかを追う。',
-      hiddenTruth: '本当に欲しいのは流行語ではなく、明日同じ場面で使える小さな改善である。',
-      revealRule: '説明を長くせず、画、字幕、手元の変化で根拠を順番に見せる。',
-      execution: '字幕、手元、音、最後の保存理由を一つの行動に束ねる。',
-    },
-    'trend-explainer': {
-      audienceLabel: '視聴者',
-      agentLabel: '語り手',
-      setupPlace: '冒頭30秒の問い',
-      middlePlace: '根拠と推測を分ける中盤章',
-      payoffPlace: '締めの制作チェックリスト',
-      readerKnows: '視聴者は観測事実と制作者の解釈が分かれていることを確認しながら見る。',
-      hiddenTruth: '反応の理由は固有名詞そのものではなく、視聴者心理と制作形式の噛み合いにある。',
-      revealRule: '観測事実、推測、制作への応用を分け、断定に見える飛躍を避ける。',
-      execution: '現象名、根拠、心理、制作応用、注意点の順で誤解を減らす。',
-    },
-    'long-novel': {
-      audienceLabel: '読者',
-      agentLabel: '主人公',
-      setupPlace: '第1章冒頭',
-      middlePlace: '中盤の章末',
-      payoffPlace: '部の終盤または最終章',
-      readerKnows: '読者は章ごとの記録や違和感を覚えておき、後の再解釈で意味を更新する。',
-      hiddenTruth: '主人公だけの痛みに見えたものが、他者や制度の痛みへ広がる。',
-      revealRule: '章ごとの証拠と人物の誤解を分け、終盤で同じ記録の意味を更新する。',
-      execution: '短編は一つの回収、中編は別人物への拡張、長編は制度謎の持続で読者維持を分ける。',
-    },
-  }[categoryId] ?? {
-    audienceLabel: '読者',
-    agentLabel: '主人公',
-    setupPlace: '冒頭',
-    middlePlace: '中盤',
-    payoffPlace: '結末',
-    readerKnows: '読者は主人公より少し早く違和感に気づく。',
-    hiddenTruth: '見えている問題の奥に別の原因がある。',
-    revealRule: '人物が知り得ない情報を急に語らせず、段階的に明かす。',
-    execution: '媒体に合わせて見せ場と回収を配置する。',
-  };
-
-  const setupPayoff = {
-    method: '伏線と回収',
-    setup: `${medium.setupPlace}で「${firstBeat}」を約束として置き、${motif}を${medium.audienceLabel}の記憶に残す。`,
-    payoff: `${medium.payoffPlace}で「${lastBeat}」へ戻し、冒頭の${motif}の意味が変わって見えるように回収する。`,
-    editorCheck: '冒頭に置いたものが、結末で別の意味を持って返ってくるかを確認する。',
-  };
-
-  const gmc = {
-    method: 'GMC+S',
-    goal: creatorBrief.choice,
-    motivation: plan.emotionalHook,
-    conflict: creatorBrief.conflict,
-    stakes: `${creatorBrief.payoff} これを失うと、企画は流行語の説明だけで終わる。`,
-  };
-
-  const emotionGap = {
-    method: '感情差分',
-    start: `${creatorBrief.protagonist} 冒頭では原因を取り違え、読者だけが違和感に半歩早く気づく。`,
-    pressure: `中盤は「${middleBeat}」とし、同じ痛みが他者や仕組みにも広がることを見せる。`,
-    turn: `「${stripSentenceEnd(creatorBrief.choice)}」という選択を行動で見せ、${medium.audienceLabel}の感情を不安から小さな救済へ動かす。`,
-  };
-
-  const motifRecurrence = {
-    method: 'モチーフ再登場',
-    motif,
-    firstAppearance: `${medium.setupPlace}で異常として出す。`,
-    secondAppearance: `${medium.middlePlace}で別人物または別場面にも現れ、単発ネタではないと示す。`,
-    finalAppearance: `${medium.payoffPlace}で選択の結果として再登場させる。`,
-  };
-
-  const knowledgeBoundary = {
-    method: '知識境界',
-    protagonistKnows: `${medium.agentLabel}は「${firstBeat}」を体験するが、最初は原因を取り違える。`,
-    readerKnows: medium.readerKnows,
-    hiddenTruth: `${medium.hiddenTruth} 今回は「${anchorTension}」を隠れた真相の圧力として扱う。`,
-    revealRule: medium.revealRule,
-  };
-
-  const mediumExecution = {
-    method: '媒体実装',
-    focus: `${medium.execution} 具体物は「${anchorArtifact}」、場面は「${anchorScene}」、根拠焦点は「${anchorFocus}」。視点は「${anchor.perspective ?? '別視点'}」から入り、同じ根拠でも見せ方を変える。`,
-    firstOutput: categoryId === 'short-video' ? '秒数つき台本' : categoryId === 'trend-explainer' ? '章立て台本' : categoryId === 'long-novel' ? '第1章と章末フック' : '第1ページのネーム',
-    revisionTarget: plan.draftInstructions,
-  };
-
-  const notes = [
-    {
-      label: setupPayoff.method,
-      detail: `${setupPayoff.setup} ${setupPayoff.payoff}`,
-    },
-    {
-      label: gmc.method,
-      detail: `目的は「${gmc.goal}」、動機は「${gmc.motivation}」、障害は「${gmc.conflict}」、失うものは「${gmc.stakes}」。`,
-    },
-    {
-      label: emotionGap.method,
-      detail: `${emotionGap.start} ${emotionGap.pressure} ${emotionGap.turn}`,
-    },
-    {
-      label: motifRecurrence.method,
-      detail: `${motifRecurrence.motif}を、冒頭、中盤、結末で意味を変えながら再登場させる。`,
-    },
-    {
-      label: knowledgeBoundary.method,
-      detail: `${knowledgeBoundary.protagonistKnows} ${knowledgeBoundary.readerKnows} ${knowledgeBoundary.hiddenTruth} ${knowledgeBoundary.revealRule}`,
-    },
-    {
-      label: mediumExecution.method,
-      detail: `${mediumExecution.focus} 最初の出力は「${mediumExecution.firstOutput}」。`,
-    },
-  ];
-
-  return {
-    setupPayoff,
-    gmc,
-    emotionGap,
-    motifRecurrence,
-    knowledgeBoundary,
-    mediumExecution,
-    notes,
-  };
-}
-
 function inferRecurringMotif(plan) {
   const candidates = [
     plan.titleCandidates?.[0],
@@ -935,17 +753,6 @@ function inferRecurringMotif(plan) {
     .replace(/[はがをにでとの]+$/, '')
     .trim()
     .slice(0, 34) || '最初の違和感';
-}
-
-function cleanBeatLabel(value) {
-  return String(value ?? '')
-    .replace(/^[^:：]{1,12}[:：]\s*/, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function stripSentenceEnd(value) {
-  return String(value ?? '').replace(/[。.!！?？]+$/, '').trim();
 }
 
 function buildBeginnerGuide(categoryId, primaryPlan, cluster) {

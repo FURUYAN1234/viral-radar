@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   getProviderStatus,
   createProviderAnalysisRequest,
+  createPlanDesignRequest,
   getProviderModelChain,
+  runPlanDesignGeneration,
   runProviderAnalysis,
   runDraftSample,
 } from '../src/lib/providers.js';
@@ -18,6 +20,52 @@ const USABLE_STORY_SAMPLE = [
 const OPENAI_TEST_KEY = `sk-${'proj'}-abcdefghijklmnopqrstuvwxyz`;
 const OPENAI_SECRET_KEY = `sk-${'proj'}-secret`;
 const GEMINI_TEST_KEY = `AI${'zaSy'}DUMMY1234567890`;
+
+function providerDesignReport() {
+  return {
+    category: { id: 'story-manga', label: 'ストーリー漫画' },
+    timeWindow: '7d',
+    audience: 'general',
+    limitations: ['公開Web/RSSの取得結果は制作前に確認する。'],
+    evidenceCards: [
+      {
+        claim: '番号不足への不安が反応している',
+        source: 'Google News RSS',
+        metricsSummary: 'rank 1 / recency 90',
+        observation: '携帯電話に060番号が追加され番号不足への不安が話題に',
+        meaningForCreator: '番号不足を本人確認で止まる場面として読む。',
+        creativeUse: '架空の受付票へ変換する。',
+        limitations: '実在サービス名は出さない。',
+      },
+    ],
+    creativePlans: [
+      {
+        id: 'creative-plan-1',
+        formatLabel: '連載第1話',
+        titleCandidates: ['060番目の受付票'],
+        audiencePromise: '番号不足の不安を、本人確認で止まる小さな救済へ変える。',
+        emotionalHook: '正しい番号を持っているはずなのに、画面だけが自分を認めない不安。',
+        creatorBrief: {
+          protagonist: '受付票の空欄を先に見つける新人記録係。',
+          setting: '閉館前の受付窓口。',
+          incitingIncident: '060欄だけが空白になる。',
+          conflict: '通常処理に戻せば別人の記録が消える。',
+          choice: '自分の欄だけを直すか、別人の欄も開くか。',
+          payoff: '空欄が救済対象の名前へ変わる。',
+        },
+        premise: '番号不足を架空UIの空欄へ変換する。',
+        exampleDetail: '受付票の空欄を見つける場面。',
+        outline: ['空欄を見つける', '本人確認で止まる', '別人の欄を開く', '空欄の意味が変わる'],
+        opening: '閉館前、受付票の060欄だけが白く残った。',
+        reasonToWin: ['番号不足の不安を具体物にできる。'],
+        differentiation: '実在制度の説明ではなく、架空UIの選択にする。',
+        productionNotes: ['実在サービス名は出さない。'],
+        riskNotes: ['制度批判にしない。'],
+        evidenceAnchor: { focusTerm: '番号不足', artifact: '受付票', tension: '本人確認が止まる' },
+      },
+    ],
+  };
+}
 
 test('getProviderStatus detects provider from a single API key field', () => {
   const openaiStatus = getProviderStatus({ apiKey: OPENAI_TEST_KEY });
@@ -53,6 +101,105 @@ test('provider request includes report schema instructions and excludes API keys
   assert.match(JSON.stringify(request), /短尺反応データ/);
   assert.equal(JSON.stringify(request).includes(OPENAI_SECRET_KEY), false);
   assert.doesNotMatch(JSON.stringify(request), /ads\.tiktok|2026-06-24/);
+});
+
+test('plan design request asks the provider to generate non-template design sections', () => {
+  const request = createPlanDesignRequest({
+    provider: 'openai',
+    apiKey: OPENAI_SECRET_KEY,
+    report: providerDesignReport(),
+  });
+  const requestText = JSON.stringify(request);
+  assert.match(requestText, /プロ向け設計メモ/);
+  assert.match(requestText, /物語・台本設計/);
+  assert.match(requestText, /固定テンプレ、単語差し替え/);
+  assert.match(requestText, /creative-plan-1/);
+  assert.equal(requestText.includes(OPENAI_SECRET_KEY), false);
+});
+
+test('runPlanDesignGeneration parses provider notes for plan cards', async () => {
+  const report = providerDesignReport();
+  const result = await runPlanDesignGeneration({
+    provider: 'openai',
+    apiKey: OPENAI_SECRET_KEY,
+    report,
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          output_text: JSON.stringify({
+            plans: [
+              {
+                id: 'creative-plan-1',
+                craftNotes: [
+                  {
+                    label: '編集判断',
+                    detail: '番号不足の不安を説明で処理せず、受付票の空欄が増える場面を先に見せる。編集では冒頭の絵だけで損失が伝わるかを確認する。',
+                  },
+                  {
+                    label: 'ネーム確認',
+                    detail: '1コマ目は端末全景、2コマ目は060欄、3コマ目は本人確認で止まる手元に寄せる。会話より視線誘導を優先する。',
+                  },
+                ],
+                storyArchitecture: {
+                  notes: [
+                    {
+                      label: '選択の芯',
+                      detail: '主人公は自分の番号だけを直すか、同じ欄で止まった別人の記録を開くかで迷う。目的と代償を受付票に結びつける。',
+                    },
+                    {
+                      label: '回収',
+                      detail: '冒頭の空欄は結末で救済対象の名前が入る場所に変わる。読者が同じ小道具を違う意味で見直せる構成にする。',
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        };
+      },
+    }),
+  });
+
+  assert.equal(result.plans[0].id, 'creative-plan-1');
+  assert.equal(result.plans[0].craftNotes.length, 2);
+  assert.equal(result.plans[0].storyArchitecture.status, 'done');
+  assert.match(result.plans[0].storyArchitecture.notes[0].detail, /受付票/);
+});
+
+test('runPlanDesignGeneration rejects template-only design responses', async () => {
+  await assert.rejects(
+    runPlanDesignGeneration({
+      provider: 'openai',
+      apiKey: OPENAI_SECRET_KEY,
+      report: providerDesignReport(),
+      fetchImpl: async () => ({
+        ok: true,
+        async json() {
+          return {
+            output_text: JSON.stringify({
+              plans: [
+                {
+                  id: 'creative-plan-1',
+                  craftNotes: [
+                    { label: '編集者に通す一文', detail: '取得根拠の「番号不足」を確認欄に置き換えるだけのテンプレ文です。' },
+                    { label: '読者維持エンジン', detail: '取得根拠の「番号不足」を確認欄に置き換えるだけのテンプレ文です。' },
+                  ],
+                  storyArchitecture: {
+                    notes: [
+                      { label: '伏線と回収', detail: '同じ根拠でも見せ方を変えるだけのテンプレ文です。' },
+                      { label: 'GMC+S', detail: '同じ根拠でも見せ方を変えるだけのテンプレ文です。' },
+                    ],
+                  },
+                },
+              ],
+            }),
+          };
+        },
+      }),
+    }),
+    /設計メモ/,
+  );
 });
 
 test('provider model chains follow the Nano Banana Pro text fallback order', () => {
@@ -154,6 +301,33 @@ test('runProviderAnalysis falls back to the next Nano Banana Pro model on provid
     ['gpt-4.1:failed', 'gpt-4.1-mini:success'],
   );
   assert.equal(JSON.stringify(result).includes(OPENAI_SECRET_KEY), false);
+});
+
+test('provider failures redact echoed API key fragments from error text', async () => {
+  await assert.rejects(
+    runProviderAnalysis({
+      provider: 'openai',
+      apiKey: OPENAI_SECRET_KEY,
+      report: { category: { label: 'ストーリー漫画' }, evidenceCards: [] },
+      fetchImpl: async () => ({
+        ok: false,
+        status: 401,
+        async json() {
+          return {
+            error: {
+              message: 'Incorrect API key provided: sk-proj-secret********************************7890. You can find your API key at https://platform.openai.com/account/api-keys.',
+            },
+          };
+        },
+      }),
+    }),
+    (error) => {
+      const message = String(error?.message ?? '');
+      assert.match(message, /Incorrect API key provided: \[redacted-key\]/);
+      assert.doesNotMatch(message, /secret|\*{4,}7890|api-keys/);
+      return true;
+    },
+  );
 });
 
 test('runProviderAnalysis converts object next actions into readable text', async () => {

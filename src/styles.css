@@ -1206,6 +1206,17 @@ button:disabled {
   color: #b83b29;
 }
 
+.ai-design-placeholder {
+  border: 1px dashed #65717e;
+  background: #ffffff;
+  color: #46515f;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.6;
+  margin: 0;
+  padding: 10px;
+}
+
 .retention-panel div {
   background: #ffffff;
 }

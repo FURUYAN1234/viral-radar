@@ -43,8 +43,9 @@ test('json export is parseable and omits secrets', () => {
   assert.equal(JSON.stringify(parsed).includes(OPENAI_KEY_PREFIX), false);
   assert.ok(parsed.creativePlans[0].aiDraftPrompt);
   assert.ok(parsed.creativePlans[0].storyArchitecture);
-  assert.match(parsed.creativePlans[0].aiDraftPrompt, /物語設計/);
-  assert.match(parsed.creativePlans[0].storyArchitecture.gmc.method, /GMC/);
+  assert.match(parsed.creativePlans[0].aiDraftPrompt, /AI生成時の設計条件/);
+  assert.equal(parsed.creativePlans[0].storyArchitecture.status, 'awaiting-ai');
+  assert.deepEqual(parsed.creativePlans[0].craftNotes, []);
   assert.ok(parsed.beginnerGuide);
   assert.match(parsed.beginnerGuide.headline, /台本|順番|ロードマップ|章|ページ|解説/);
   assert.equal(Object.hasOwn(parsed.creativePlans[0], 'storyMakerRoutineNotes'), false);

@@ -25,9 +25,8 @@ test('docx export creates an editor meeting brief with tables instead of a JSON-
   assert.match(raw, /編集判断チャート/);
   assert.match(raw, /企画比較表/);
   assert.match(raw, /推奨企画/);
-  assert.match(raw, /伏線と回収/);
-  assert.match(raw, /GMC\+S/);
-  assert.match(raw, /知識境界/);
+  assert.match(raw, /AI未生成/);
+  assert.match(raw, /ローカル定型文では埋めません/);
   assert.match(raw, /打ち合わせで決めたいこと/);
   assert.ok((raw.match(/<w:tbl>/g) ?? []).length >= 3);
   assert.ok((raw.match(/<w:tblGrid>/g) ?? []).length >= 3);

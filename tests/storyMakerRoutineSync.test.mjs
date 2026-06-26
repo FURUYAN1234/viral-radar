@@ -33,26 +33,20 @@ test('creative plans use imported craft routines internally without exposing Sto
   assert.match(internalNotes.value.join('\n'), /Setup-Payoff|GMC|Show Don't Tell/);
   assert.match(internalNotes.value.join('\n'), /Character Knowledge Boundary/);
   assert.ok(plan.storyArchitecture);
-  assert.equal(plan.storyArchitecture.setupPayoff.method, '伏線と回収');
-  assert.equal(plan.storyArchitecture.gmc.method, 'GMC+S');
-  assert.equal(plan.storyArchitecture.knowledgeBoundary.method, '知識境界');
-  assert.match(plan.storyArchitecture.setupPayoff.setup, /冒頭|第1ページ|0秒|第1章/);
-  assert.match(plan.storyArchitecture.setupPayoff.payoff, /結末|読後感|回収|救済/);
-  assert.match(plan.storyArchitecture.knowledgeBoundary.readerKnows, /読者|画面|証拠/);
-  assert.doesNotMatch(plan.storyArchitecture.notes.map((note) => note.detail).join('\n'), /今日はを|はを|がを|にはを/);
-  assert.match(plan.aiDraftPrompt, /物語設計/);
-  assert.match(plan.aiDraftPrompt, /伏線と回収/);
-  assert.match(plan.aiDraftPrompt, /GMC\+S/);
-  assert.match(plan.aiDraftPrompt, /知識境界/);
+  assert.equal(plan.storyArchitecture.status, 'awaiting-ai');
+  assert.deepEqual(plan.storyArchitecture.notes, []);
+  assert.deepEqual(plan.craftNotes, []);
+  assert.match(plan.aiDraftPrompt, /AI生成時の設計条件/);
+  assert.match(plan.aiDraftPrompt, /固定テンプレ、単語差し替え/);
   assert.match(plan.aiDraftPrompt, /創作ルーチン/);
   assert.match(plan.aiDraftPrompt, /Setup-Payoff|GMC|Show Don't Tell/);
   assert.match(plan.aiDraftPrompt, /Character Knowledge Boundary/);
-  assert.match(plan.aiDraftPrompt, /伏線|回収|人物が知り得ることの境界/);
+  assert.doesNotMatch(plan.aiDraftPrompt, /物語設計:|プロ向け設計メモ:/);
   assert.doesNotMatch(plan.aiDraftPrompt, /Story Maker|story-maker|連携|同期ハッシュ/);
   assert.doesNotMatch(JSON.stringify(plan), /Story Maker|story-maker|連携|internalRoutineNotes/);
 });
 
-test('story architecture uses medium-specific audience language', () => {
+test('advanced story architecture stays empty until provider generation for every medium', () => {
   const shortVideo = buildReport({
     categoryId: 'short-video',
     observations: PUBLIC_OBSERVATIONS,
@@ -65,8 +59,10 @@ test('story architecture uses medium-specific audience language', () => {
     providerMode: 'fixture',
   }).creativePlans[0];
 
-  assert.match(shortVideo.storyArchitecture.setupPayoff.setup, /視聴者/);
-  assert.match(shortVideo.storyArchitecture.knowledgeBoundary.readerKnows, /視聴者/);
-  assert.doesNotMatch(shortVideo.storyArchitecture.notes.map((note) => note.detail).join('\n'), /読者の感情/);
-  assert.match(novel.storyArchitecture.mediumExecution.detail ?? novel.storyArchitecture.notes.at(-1).detail, /第1章|章末/);
+  assert.equal(shortVideo.storyArchitecture.status, 'awaiting-ai');
+  assert.deepEqual(shortVideo.storyArchitecture.notes, []);
+  assert.equal(novel.storyArchitecture.status, 'awaiting-ai');
+  assert.deepEqual(novel.storyArchitecture.notes, []);
+  assert.match(shortVideo.aiDraftPrompt, /固定テンプレ、単語差し替え/);
+  assert.match(novel.aiDraftPrompt, /固定テンプレ、単語差し替え/);
 });
