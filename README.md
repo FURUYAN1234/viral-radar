@@ -58,6 +58,22 @@ GitHub Pages: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.g
 
 ---
 
+## Current v1.2.5 Behavior / 現行v1.2.5挙動
+
+The current public line is **v1.2.5**. It is intentionally evidence-first: retrieval and provider output are separated, and the app does not fill missing live data with fake examples.
+現行公開系統は **v1.2.5** です。根拠優先の設計で、取得処理とプロバイダー出力を分離し、取得できないライブデータを架空例で埋めません。
+
+* **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, and derived metrics. If retrieval fails or returns no usable data, the UI reports that state instead of rotating old or invented topics.
+  公開Web/RSS取得では、ソースURL、検索語、観測時刻、算出指標を含む根拠行を作ります。取得失敗や有効データなしの場合は、古い結果や架空トピックを回さず、その状態を表示します。
+* **Provider analysis / プロバイダー分析**: OpenAI or Gemini analysis runs only when the user supplies a valid UI-entered key and the provider returns usable content. Local templates do not pretend to be AI-generated analysis or reference prose.
+  OpenAI / Gemini の分析は、UIで入力された有効なキーがあり、プロバイダーが利用可能な内容を返した場合だけ成立します。ローカルテンプレートをAI生成済みの分析や参考本文として見せません。
+* **Single key field / 単一キー入力**: The API settings UI detects OpenAI and Gemini keys from one field, keeps them in the browser session only, and clears legacy saved settings.
+  API設定UIは単一フィールドでOpenAI/Geminiキーを判別し、ブラウザセッション内だけで扱い、過去の保存設定は消去します。
+* **Export role / エクスポートの役割**: JSON, Markdown, and DOCX exports are treated as editorial handoff material: evidence, planning notes, and prompts for another AI or human editor.
+  JSON、Markdown、DOCXの出力は、根拠、設計メモ、別AIや編集者に渡すプロンプトを含む編集引き継ぎ資料として扱います。
+
+---
+
 ## Core Concept / 基本コンセプト
 
 ### Trend To Story / 話題を物語へ変換する
