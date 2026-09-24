@@ -4,6 +4,14 @@ import { copyTextToClipboard } from './lib/clipboard.js';
 import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from './lib/docxExporter.js';
 import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
+import {
+  DEFAULT_OPENAI_MODEL_ID,
+  OPENAI_MODEL_OPTIONS,
+  OPENAI_MODEL_PRICE_SNAPSHOT_DATE,
+  formatOpenAIModelPrice,
+  getOpenAIModelOption,
+  normalizeOpenAIModelId,
+} from './lib/openaiModels.js';
 import { buildPlanDraftPrompt, buildReport } from './lib/reportEngine.js';
 import { getProviderStatus, runDraftSample, runPlanDesignGeneration, runProviderAnalysis } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
@@ -14,7 +22,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.2.5';
+const APP_VERSION = '1.2.6';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -23,6 +31,14 @@ const initialSettings = loadSettings();
 const initialProviderStatus = getProviderStatus(initialSettings);
 
 const state = {
+  openAiModelId: DEFAULT_OPENAI_MODEL_ID,
+  openAiModelConfirmed: false,
+  analysisStartConfirmed: false,
+  openAiModelRoute: {
+    selected: '',
+    attemptedByPath: {},
+    adoptedByPath: {},
+  },
   selectedCategoryId: 'story-manga',
   timeWindow: '7d',
   audience: 'general',
@@ -50,11 +66,11 @@ state.report = createReport();
 bootstrapApp();
 
 function bootstrapApp() {
-  const providerStatus = getProviderStatus(state.settings);
+  const providerStatus = currentProviderStatus();
   state.apiPanelOpen = !providerStatus.provider.connected;
   render();
-  if (!providerStatus.provider.connected) {
-    focusApiInputSoon();
+  if (!isApiReady()) {
+    if (!providerStatus.provider.connected) focusApiInputSoon();
     return;
   }
   refreshTrendObservations({ runProvider: true });
@@ -104,7 +120,16 @@ function isUiWorking() {
 }
 
 function isApiReady() {
-  return getProviderStatus(state.settings).provider.connected;
+  const status = currentProviderStatus();
+  return isProviderConfigured(status) && state.analysisStartConfirmed;
+}
+
+function isProviderConfigured(status = currentProviderStatus()) {
+  return status.provider.connected && (status.mode !== 'openai' || state.openAiModelConfirmed);
+}
+
+function currentProviderStatus(settings = state.settings) {
+  return getProviderStatus({ ...settings, openaiModelId: state.openAiModelId });
 }
 
 function hasLiveObservations() {
@@ -136,7 +161,7 @@ function createReport() {
     timeWindow: state.timeWindow,
     audience: state.audience,
     observations: state.observations ?? [],
-    providerMode: getReportProviderMode(getProviderStatus(state.settings).mode),
+    providerMode: getReportProviderMode(currentProviderStatus().mode),
     variantSeed: state.variantSeed,
   });
 }
@@ -150,6 +175,25 @@ function resetAnalysisSessionForApiChange() {
   state.planSamples = {};
   state.observations = [];
   state.report = createReport();
+  resetOpenAiModelRoute();
+}
+
+function resetAnalysisSessionForModelChange() {
+  state.analysisSessionId += 1;
+  state.providerRunSignature = null;
+  state.providerSummary = null;
+  state.planSamples = {};
+  state.report = createReport();
+  resetOpenAiModelRoute();
+  clearActionMessage();
+}
+
+function resetOpenAiModelRoute() {
+  state.openAiModelRoute = {
+    selected: state.openAiModelConfirmed ? state.openAiModelId : '',
+    attemptedByPath: {},
+    adoptedByPath: {},
+  };
 }
 
 function currentProviderRunSignature(providerStatus) {
@@ -158,6 +202,7 @@ function currentProviderRunSignature(providerStatus) {
   return [
     state.analysisSessionId,
     providerStatus.mode,
+    state.openAiModelId,
     providerStatus.provider.model,
     report.category.id,
     report.timeWindow,
@@ -170,8 +215,12 @@ function currentProviderRunSignature(providerStatus) {
 }
 
 function render() {
-  const providerStatus = getProviderStatus(state.settings);
-  const draftStatus = getProviderStatus({ apiKey: state.apiKeyDraft });
+  const providerStatus = currentProviderStatus();
+  const draftStatus = currentProviderStatus({ apiKey: state.apiKeyDraft });
+  const providerLabel =
+    providerStatus.mode === 'openai' && !state.openAiModelConfirmed
+      ? 'OpenAI 接続済み・モデル未選択'
+      : providerStatus.provider.label;
   const showApiPanel = !isApiReady() || state.apiPanelOpen;
   const apiWorking = isApiWorking();
   const uiWorking = isUiWorking();
@@ -197,9 +246,13 @@ function render() {
         </div>
         <div class="header-api-block">
           <div class="status-strip" aria-label="API接続状態">
-            <span class="${providerStatus.provider.connected ? 'ok' : ''}">${providerStatus.provider.label}</span>
+            <span class="${providerStatus.provider.connected ? 'ok' : ''}">${escapeHtml(providerLabel)}</span>
             <span>対象: 漫画・動画・小説</span>
-            <button class="api-settings-button" id="api-settings" type="button" ${disabledAttr(uiWorking)}>API設定</button>
+            ${
+              !showApiPanel
+                ? `<button class="api-settings-button" id="api-settings" type="button" ${disabledAttr(uiWorking)}>AI設定</button>`
+                : ''
+            }
           </div>
           ${showApiPanel ? renderApiConnectPanel(draftStatus, uiWorking) : ''}
         </div>
@@ -255,7 +308,7 @@ function render() {
 
       ${
         !isApiReady()
-          ? renderApiStartGate()
+          ? ''
           : `<div class="${isLocked ? 'is-disabled' : ''}" ${isLocked ? 'aria-disabled="true"' : ''}>
       ${renderInsightDashboard(report)}
       ${state.providerSummary && !uiWorking ? renderProviderSummary(state.providerSummary, dataTimestamp) : ''}
@@ -327,23 +380,73 @@ function render() {
   `;
 
   bindEvents(isLocked, showApiPanel);
-  if (!isApiReady() && showApiPanel) focusApiInputSoon();
+  if (!providerStatus.provider.connected && showApiPanel) focusApiInputSoon();
 }
 
-function renderApiStartGate() {
+function renderApiStartGate(providerStatus) {
+  if (providerStatus.mode === 'openai' && !state.openAiModelConfirmed) {
+    return `
+      <div class="api-start-gate" aria-live="polite">
+        ${renderDataLabel('モデル選択待機')}
+        <h2>OpenAIモデルを選ぶまで検索・分析は開始しません。</h2>
+        <p>上のプルダウンでモデルを明示的に選択してください。Astraを使う場合も選択操作が必要です。</p>
+        <button class="primary-action" id="provider-start" type="button" disabled>検索・分析を開始</button>
+      </div>
+    `;
+  }
+  if (providerStatus.provider.connected && !state.analysisStartConfirmed) {
+    return `
+      <div class="api-start-gate" aria-live="polite">
+        ${renderDataLabel('開始確認待機')}
+        <h2>準備ができました。ボタンを押すまで検索・分析は開始しません。</h2>
+        <p>${providerStatus.mode === 'openai' ? '選択したOpenAIモデルで' : 'Geminiで'}公開Web/RSS検索とAPI分析を開始します。</p>
+        <button class="primary-action" id="provider-start" type="button" ${disabledAttr(isUiWorking())}>検索・分析を開始</button>
+      </div>
+    `;
+  }
   return `
-    <section class="panel api-start-gate" aria-live="polite">
+    <div class="api-start-gate" aria-live="polite">
       ${renderDataLabel('開始待機')}
-      <h2>APIキーを入力すると公開Web/RSS取得を開始します。</h2>
-      <p>OpenAIまたはGeminiのAPIキーを接続するまで、取得と分析は実行しません。</p>
+      <h2>APIキーを入力してモデルを選択すると公開Web/RSS取得を開始します。</h2>
+      <p>OpenAIではAPIキー接続後にモデルを明示的に選ぶまで、取得と分析は実行しません。</p>
       <p>キーはこのブラウザの保存領域にだけ保存し、レポートやDOCX/JSONには含めません。</p>
-    </section>
+    </div>
+  `;
+}
+
+function renderOpenAiModelControl(providerStatus, uiWorking) {
+  if (providerStatus.mode !== 'openai') return '';
+
+  const selectedModel = getOpenAIModelOption(state.openAiModelId);
+
+  return `
+    <div class="openai-model-card" aria-label="OpenAIモデル設定">
+      <label class="openai-model-control" for="openai-model-select">
+        <span>OpenAIモデル</span>
+        <select id="openai-model-select" ${disabledAttr(uiWorking)}>
+          <option value="" disabled ${state.openAiModelConfirmed ? '' : 'selected'}>OpenAIモデルを選択してください（Astra推奨）</option>
+          ${OPENAI_MODEL_OPTIONS.map(
+            (model) =>
+              `<option value="${escapeAttr(model.id)}" ${state.openAiModelConfirmed && model.id === state.openAiModelId ? 'selected' : ''}>${escapeHtml(model.label)}（${escapeHtml(model.description)}）</option>`,
+          ).join('')}
+        </select>
+      </label>
+      <div class="openai-model-details">
+        <strong>${escapeHtml(selectedModel.description)}</strong>
+        <span class="openai-model-price">参考単価: ${escapeHtml(formatOpenAIModelPrice(selectedModel))}（${escapeHtml(OPENAI_MODEL_PRICE_SNAPSHOT_DATE)}時点）</span>
+        <small class="openai-model-caveat">${escapeHtml(selectedModel.comparisonNote)}</small>
+      </div>
+    </div>
   `;
 }
 
 function renderApiConnectPanel(draftStatus, uiWorking) {
-  const currentStatus = getProviderStatus(state.settings);
+  const currentStatus = currentProviderStatus();
   const isConnected = currentStatus.provider.connected;
+  const currentProviderLabel =
+    currentStatus.mode === 'openai' && !state.openAiModelConfirmed
+      ? 'OpenAI 接続済み・モデル未選択'
+      : currentStatus.provider.label;
   const draftKey = state.apiKeyDraft;
   const draftProviderHint =
     draftStatus.mode === 'openai'
@@ -357,17 +460,17 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
   const inputDisabled = disabledAttr(uiWorking);
 
   return `
-    <section class="api-connect-panel" aria-label="APIキー入力">
+    <section class="api-connect-panel" aria-label="AI設定">
       <div class="api-connect-copy">
         <p class="panel-label api-panel-meta">
-          <span>${isConnected ? 'API設定' : '最初に設定'}</span>
+          <span>${isConnected ? 'AI設定' : '最初に設定'}</span>
           <span class="version-badge compact" aria-label="アプリバージョン">v${APP_VERSION}</span>
         </p>
-        <h2>${isConnected ? 'AIエンジン設定' : 'AIエンジンを接続'}</h2>
+        <h2>${isConnected ? '接続とモデル' : 'AIを接続'}</h2>
         <p>${
           isConnected
-            ? `現在の接続: ${escapeHtml(currentStatus.provider.label)}。別のキーを使う場合だけ、新しいキーをこの欄に入力して接続してください。`
-            : 'OpenAIまたはGeminiのキーを1つ入力してください。形式から自動判定し、接続後はこの画面を閉じます。'
+            ? `現在の接続: ${escapeHtml(currentProviderLabel)}。別のキーを使う場合だけ、新しいキーをこの欄に入力して接続してください。`
+            : 'APIキーを接続し、OpenAIの場合はモデルを選んでから検索・分析を開始します。'
         }</p>
         ${state.apiGateMessage ? `<p class="gate-warning">${escapeHtml(state.apiGateMessage)}</p>` : ''}
       </div>
@@ -379,11 +482,13 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
         </div>
         <small class="${draftStatus.provider.connected ? 'ok' : ''}">${escapeHtml(draftProviderHint)}</small>
         ${
-          isConnected
+          isConnected && isApiReady()
             ? `<button class="secondary-action compact" id="close-api-settings" type="button" ${inputDisabled}>閉じる</button>`
             : ''
         }
       </form>
+      ${renderOpenAiModelControl(currentStatus, uiWorking)}
+      ${!isApiReady() ? renderApiStartGate(currentStatus) : ''}
     </section>
   `;
 }
@@ -439,6 +544,45 @@ function bindEvents(isLocked = false, showApiPanel = false) {
 function bindHeaderControls() {
   const apiSettingsButton = document.querySelector('#api-settings');
   if (apiSettingsButton) apiSettingsButton.addEventListener('click', openApiSettings);
+  const modelSelect = document.querySelector('#openai-model-select');
+  if (modelSelect) modelSelect.addEventListener('change', handleOpenAiModelChange);
+  const providerStartButton = document.querySelector('#provider-start');
+  if (providerStartButton) providerStartButton.addEventListener('click', handleProviderStart);
+}
+
+function handleOpenAiModelChange(event) {
+  if (isUiWorking()) return;
+  const nextModelId = normalizeOpenAIModelId(event.target.value);
+  const isFirstSelection = !state.openAiModelConfirmed;
+  if (!isFirstSelection && nextModelId === state.openAiModelId) return;
+
+  state.openAiModelId = nextModelId;
+  state.openAiModelConfirmed = true;
+  resetAnalysisSessionForModelChange();
+  const selectedModel = getOpenAIModelOption(nextModelId);
+  showActionMessage({
+    summary: `OpenAIモデルを${selectedModel.label}に変更しました。`,
+    risk_note: isFirstSelection
+      ? 'モデル選択を確認しました。「検索・分析を開始」ボタンを押すまで実行しません。'
+      : '次のAPI分析・設計・参考文章生成から選択モデルを使います。',
+    next_actions: [],
+  });
+  render();
+}
+
+function handleProviderStart() {
+  if (isUiWorking() || !isProviderConfigured()) return;
+  state.analysisStartConfirmed = true;
+  state.apiPanelOpen = false;
+  state.apiGateMessage = '';
+  clearActionMessage();
+  showActionMessage({
+    summary: '検索・分析を開始します。',
+    risk_note: '選択済みのAPI設定を使います。',
+    next_actions: [],
+  });
+  render();
+  refreshTrendObservations({ runProvider: true });
 }
 
 function bindApiControls(showApiPanel = false) {
@@ -490,13 +634,12 @@ function closeApiSettings() {
 async function connectApiKey() {
   if (isUiWorking()) return;
   const cleanKey = normalizeEnteredApiKey(state.apiKeyDraft);
-  const providerStatus = getProviderStatus({ apiKey: cleanKey });
+  const providerStatus = currentProviderStatus({ apiKey: cleanKey });
   if (!providerStatus.provider.connected) {
     state.apiGateMessage = 'APIキーを確認できません。OpenAIまたはGeminiのキーを1つ入力してください。';
     render();
     return;
   }
-
   state.apiSaving = true;
   clearActionMessage();
   render();
@@ -504,20 +647,27 @@ async function connectApiKey() {
   try {
     await wait(API_SAVE_BUSY_MS);
     state.settings.apiKey = cleanKey;
+    state.openAiModelConfirmed = false;
+    state.analysisStartConfirmed = false;
     forgetPersistedSettings();
     state.apiKeyDraft = '';
     apiInputUserTouched = false;
-    state.apiPanelOpen = false;
-    state.apiGateMessage = '';
+    state.apiPanelOpen = true;
+    state.apiGateMessage =
+      providerStatus.mode === 'openai'
+        ? 'OpenAIモデルを選択し、「検索・分析を開始」ボタンを押してください。'
+        : '「検索・分析を開始」ボタンを押すまで検索・分析は開始しません。';
     resetAnalysisSessionForApiChange();
   } finally {
     state.apiSaving = false;
     showActionMessage({
-      summary: 'APIキーを接続しました。公開Web/RSS検索を開始します。',
+      summary:
+        providerStatus.mode === 'openai'
+          ? 'OpenAIキーを接続しました。次にモデルを選択してください。'
+          : 'Geminiキーを接続しました。「検索・分析を開始」ボタンを押してください。',
     });
     render();
   }
-  refreshTrendObservations({ runProvider: true });
 }
 
 function normalizeEnteredApiKey(value) {
@@ -634,7 +784,7 @@ async function generatePlanSample(planId) {
   const plan = state.report.creativePlans.find((item) => item.id === planId);
   if (!plan) return;
 
-  const providerStatus = getProviderStatus(state.settings);
+  const providerStatus = currentProviderStatus();
   if (!providerStatus.provider.connected) {
     state.planSamples = {
       ...state.planSamples,
@@ -654,6 +804,7 @@ async function generatePlanSample(planId) {
       text: '参考文章を生成中です。',
     },
   };
+  if (providerStatus.mode === 'openai') resetOpenAiModelRoute();
   state.draftBusy = true;
   render();
 
@@ -663,6 +814,9 @@ async function generatePlanSample(planId) {
       apiKey: providerStatus.apiKey,
       draftPrompt: plan.aiDraftPrompt,
       proxyBase: PROVIDER_PROXY,
+      selectedModelId: state.openAiModelId,
+      onModelRoute:
+        providerStatus.mode === 'openai' ? (event) => handleOpenAiModelRoute('draft', event) : undefined,
     });
     const sampleText = result.text?.trim();
     if (!sampleText) {
@@ -876,7 +1030,7 @@ function bytesToBase64(bytes) {
 
 async function runProviderDeepening() {
   if (isUiWorking()) return;
-  const providerStatus = getProviderStatus(state.settings);
+  const providerStatus = currentProviderStatus();
   if (providerStatus.mode === 'fixture' || providerStatus.mode === 'unknown') {
     state.providerSummary = {
       summary:
@@ -901,6 +1055,7 @@ async function runProviderDeepening() {
     risk_note: `${providerStatus.provider.name}で分析を生成しています。`,
     next_actions: [],
   };
+  resetOpenAiModelRoute();
   state.providerBusy = true;
   render();
 
@@ -953,6 +1108,8 @@ function isProviderAuthError(error) {
 
 function handleProviderAuthFailure(providerStatus) {
   state.settings.apiKey = '';
+  state.openAiModelConfirmed = false;
+  state.analysisStartConfirmed = false;
   state.apiKeyDraft = '';
   apiInputUserTouched = false;
   state.apiPanelOpen = true;
@@ -973,6 +1130,9 @@ async function runOneProvider(provider, apiKey) {
     apiKey,
     report: state.report,
     proxyBase: PROVIDER_PROXY,
+    selectedModelId: state.openAiModelId,
+    onModelRoute:
+      provider === 'openai' ? (event) => handleOpenAiModelRoute('analysis', event) : undefined,
   });
   return { provider, summary };
 }
@@ -983,8 +1143,37 @@ async function runOnePlanDesign(provider, apiKey) {
     apiKey,
     report: state.report,
     proxyBase: PROVIDER_PROXY,
+    selectedModelId: state.openAiModelId,
+    onModelRoute:
+      provider === 'openai' ? (event) => handleOpenAiModelRoute('planDesign', event) : undefined,
   });
   return { provider, design };
+}
+
+function handleOpenAiModelRoute(path, event) {
+  if (!event?.modelId) return;
+  if (event.phase === 'trying') {
+    state.openAiModelRoute = {
+      ...state.openAiModelRoute,
+      attemptedByPath: {
+        ...state.openAiModelRoute.attemptedByPath,
+        [path]: event.modelId,
+      },
+    };
+  } else if (event.phase === 'adopted') {
+    state.openAiModelRoute = {
+      ...state.openAiModelRoute,
+      attemptedByPath: {
+        ...state.openAiModelRoute.attemptedByPath,
+        [path]: event.modelId,
+      },
+      adoptedByPath: {
+        ...state.openAiModelRoute.adoptedByPath,
+        [path]: event.modelId,
+      },
+    };
+  }
+  render();
 }
 
 function applyProviderReportAnalysis(summary) {

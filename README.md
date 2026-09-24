@@ -1,6 +1,6 @@
 # Monogatari Buzz Maker / 物語バズメーカー
 
-![Version](https://img.shields.io/badge/version-1.2.5-0f766e)
+![Version](https://img.shields.io/badge/version-1.2.6-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -70,18 +70,18 @@ The local port is fixed to `5180` so this app can run beside the other Antigravi
 
 ---
 
-## Current v1.2.5 Behavior / 現行v1.2.5挙動
+## Current v1.2.6 Behavior / 現行v1.2.6挙動
 
-The current public line is **v1.2.5**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
+The current public line is **v1.2.6**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
 
-現行公開系統は **v1.2.5** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
+現行公開系統は **v1.2.6** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
 
 * **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, categories, and derived metrics. If retrieval fails, the UI reports the failure instead of recycling old or invented topics.
   公開Web/RSS取得では、ソースURL、検索語、観測時刻、カテゴリ、算出指標を含む根拠行を作ります。取得失敗時は古い結果や架空トピックを回さず、失敗状態を表示します。
 * **Provider analysis / プロバイダー分析**: OpenAI or Gemini analysis runs only when the user supplies a valid UI-entered key and the provider returns usable content. Local templates do not pretend to be AI analysis or reference prose.
   OpenAI / Gemini の分析は、UIで入力された有効なキーがあり、プロバイダーが利用可能な内容を返した場合だけ成立します。ローカルテンプレートをAI分析や参考本文として見せません。
-* **Single key field / 単一キー入力**: The API settings UI detects OpenAI and Gemini keys from one field, keeps them in the browser session only, and clears legacy saved settings.
-  API設定UIは単一フィールドでOpenAI/Geminiキーを判別し、ブラウザセッション内だけで扱い、過去の保存設定は消去します。
+* **Single key field / 単一キー入力**: The AI settings flow detects OpenAI and Gemini keys from one field, keeps them in the browser session only, and clears legacy saved settings.
+  AI設定UIは単一フィールドでOpenAI/Geminiキーを判別し、ブラウザセッション内だけで扱い、過去の保存設定は消去します。
 * **Fail-closed merge / fail-closed統合**: Provider output is reflected only when the expected analysis fields, production-plan fields, evidence-card fields, and reference-draft fields are usable.
   プロバイダー出力は、期待される分析欄、制作案欄、根拠カード欄、参考文章欄が利用可能な場合だけ反映します。
 * **Export role / エクスポートの役割**: JSON, Markdown, and DOCX exports are editorial handoff material: evidence, planning notes, prompts, risks, and next decisions.
@@ -396,9 +396,9 @@ API応答が未取得、失敗、空、またはテンプレ的な場合、こ�
 
 ### AI Analysis Summary / AI分析サマリー
 
-When the user enters an OpenAI or Gemini key in `API Settings`, the app can run deeper analysis on the retrieved evidence.
+When the user connects an OpenAI or Gemini key in `AI Settings` and explicitly starts the workflow, the app can run deeper analysis on the retrieved evidence. OpenAI additionally requires an explicit model selection.
 
-右上の `API設定` にOpenAIまたはGeminiのキーを入力すると、取得結果をもとに詳細分析を実行できます。
+`AI設定` でOpenAIまたはGeminiのキーを接続し、明示的に開始すると、取得結果をもとに詳細分析を実行できます。OpenAIではモデル選択も必須です。
 
 Main outputs:
 
@@ -478,6 +478,14 @@ The app uses a single API-key input field. OpenAI and Gemini keys are detected f
 |---|---|
 | OpenAI | Deep analysis and reference-draft generation / 詳細分析、参考本文生成 |
 | Gemini | Deep analysis and reference-draft generation / 詳細分析、参考本文生成 |
+
+### OpenAI Model Selection / OpenAIモデル選択
+
+Default: GPT-6 Astra / 既定: GPT-6 Astra
+
+API connection does not start retrieval or analysis for either provider. With OpenAI, the user must explicitly choose a model, including Astra, and then press the `検索・分析を開始` button. With Gemini, the user presses the same button after connecting the key. Astra is shown as the recommended first OpenAI option. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list.
+
+どちらのAPIも、キーを接続しただけでは検索・分析を開始しません。OpenAIはAstraを使う場合を含めてモデルを明示的に選び、その後に `検索・分析を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。Astraは推奨の先頭候補として表示します。選択はページ内だけで保持され、再読み込みすると再選択が必要です。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
 
 API usage fees, terms, model restrictions, and rate limits follow each provider's contract.
 
@@ -562,13 +570,13 @@ Open the public version:
 
 [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
 
-Enter a provider key from `API Settings` in the top-right corner.
+Enter a provider key in the initial `AI Settings` panel. For OpenAI, select a model, then press `Start Search & Analysis`. Gemini also waits for the same explicit start action.
 
-右上の `API設定` からプロバイダーキーを入力します。
+初期表示の `AI設定` でプロバイダーキーを入力します。OpenAIではモデルを選び、`検索・分析を開始` を押します。Geminiも同じ開始操作まで待機します。
 
-When no API key is connected, the main UI is locked except for API settings. Public Web/RSS retrieval, deep analysis, reference-draft generation, and save/export operations are designed to be used after a valid key is connected from the UI.
+Until AI setup is completed, the main UI remains locked. Public Web/RSS retrieval, deep analysis, reference-draft generation, and save/export operations become available only after the user explicitly starts the workflow.
 
-APIキー未接続時は、API設定以外の主要UIをロックします。公開Web/RSS取得、詳細分析、参考本文生成、保存系操作は、有効なキーをUIから接続したあとに使う設計です。
+AI設定が完了するまでは主要UIをロックします。公開Web/RSS取得、詳細分析、参考本文生成、保存系操作は、利用者が明示的に開始したあとに有効になります。
 
 ### Local Launch (Windows) / ローカルでの起動
 
@@ -950,7 +958,16 @@ It does not call the other apps at runtime. Each app works independently.
 
 ## Changelog / 更新履歴
 
-### Unreleased
+### v1.2.6 (2026-09-24)
+
+* Added an explicit OpenAI model selector, with GPT-6 Astra shown as the recommended option and downward-only fallback from the selected model.
+  OpenAIモデルを明示的に選べるようにし、GPT-6 Astraを推奨候補として表示しました。フォールバックは選択モデルより下位だけへ進みます。
+* Stopped automatic retrieval after API connection. OpenAI requires model selection and both OpenAI and Gemini require the `検索・分析を開始` action.
+  API接続直後の自動取得を停止しました。OpenAIはモデル選択、OpenAIとGeminiの両方で `検索・分析を開始` 操作が必要です。
+* Unified API connection, model selection, and start confirmation in one AI settings panel, and removed transient route-status boxes that disappeared with the panel.
+  API接続、モデル選択、開始確認を1つのAI設定パネルにまとめ、パネルとともに消える経路表示欄を削除しました。
+* Added product-specific model descriptions and synchronized model order and pricing metadata without importing Nano Banana product copy.
+  物語バズメーカー専用のモデル説明を追加し、Nano Bananaの製品文言を持ち込まず、モデル順と料金情報だけを同期しました。
 
 * Expanded the README into a consistent English/Japanese bilingual structure.
   README全体を一貫した英日併記構造へ拡張しました。

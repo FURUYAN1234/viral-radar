@@ -1,4 +1,5 @@
 import { NANO_BANANA_FALLBACK_SNAPSHOT } from './nanoBananaFallbackSnapshot.js';
+import { DEFAULT_OPENAI_MODEL_ID, getOpenAIModelRoute, normalizeOpenAIModelId } from './openaiModels.js';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/responses';
 const GEMINI_MODEL_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -67,12 +68,17 @@ export function detectProvider(apiKey = '') {
   return 'unknown';
 }
 
-export function getProviderStatus({ apiKey = '', openaiKey = '', geminiKey = '' } = {}) {
+export function getProviderStatus({
+  apiKey = '',
+  openaiKey = '',
+  geminiKey = '',
+  openaiModelId = DEFAULT_OPENAI_MODEL_ID,
+} = {}) {
   const normalized = (apiKey || openaiKey || geminiKey || '').trim();
   const mode = detectProvider(normalized);
   const providerName = mode === 'openai' ? 'OpenAI' : mode === 'gemini' ? 'Gemini' : '';
   const connected = mode === 'openai' || mode === 'gemini';
-  const model = connected ? primaryModel(mode) : '';
+  const model = connected ? primaryModel(mode, openaiModelId) : '';
   const label = connected ? `${providerName} ${model}` : mode === 'unknown' ? 'APIキー形式未判定' : 'API未設定';
 
   return {
@@ -97,16 +103,15 @@ export function getProviderStatus({ apiKey = '', openaiKey = '', geminiKey = '' 
   };
 }
 
-export function getProviderModelChain(provider) {
-  const chain =
-    provider === 'gemini'
-      ? NANO_BANANA_FALLBACK_SNAPSHOT.chains.geminiText
-      : NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText;
-  return chain.models.map((model) => model.id);
+export function getProviderModelChain(provider, selectedModelId = DEFAULT_OPENAI_MODEL_ID) {
+  if (provider === 'openai') return getOpenAIModelRoute(selectedModelId);
+  return NANO_BANANA_FALLBACK_SNAPSHOT.chains.geminiText.models.map((model) => model.id);
 }
 
-function primaryModel(provider) {
-  return getProviderModelChain(provider)[0];
+function primaryModel(provider, selectedModelId = DEFAULT_OPENAI_MODEL_ID) {
+  return provider === 'openai'
+    ? normalizeOpenAIModelId(selectedModelId)
+    : getProviderModelChain(provider)[0];
 }
 
 export function createProviderAnalysisRequest({ provider, report, model = primaryModel(provider) }) {
@@ -268,7 +273,15 @@ export function createPlanDesignRequest({ provider, report, model = primaryModel
   };
 }
 
-export async function runProviderAnalysis({ provider, apiKey, report, fetchImpl = fetch, proxyBase = '' }) {
+export async function runProviderAnalysis({
+  provider,
+  apiKey,
+  report,
+  selectedModelId,
+  onModelRoute,
+  fetchImpl = fetch,
+  proxyBase = '',
+}) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
   }
@@ -276,6 +289,8 @@ export async function runProviderAnalysis({ provider, apiKey, report, fetchImpl 
   return runProviderFallback({
     provider,
     apiKey,
+    selectedModelId,
+    onModelRoute,
     fetchImpl,
     proxyBase,
     failureMessage: `${provider}の詳細分析に失敗しました。`,
@@ -284,7 +299,15 @@ export async function runProviderAnalysis({ provider, apiKey, report, fetchImpl 
   });
 }
 
-export async function runPlanDesignGeneration({ provider, apiKey, report, fetchImpl = fetch, proxyBase = '' }) {
+export async function runPlanDesignGeneration({
+  provider,
+  apiKey,
+  report,
+  selectedModelId,
+  onModelRoute,
+  fetchImpl = fetch,
+  proxyBase = '',
+}) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
   }
@@ -292,6 +315,8 @@ export async function runPlanDesignGeneration({ provider, apiKey, report, fetchI
   return runProviderFallback({
     provider,
     apiKey,
+    selectedModelId,
+    onModelRoute,
     fetchImpl,
     proxyBase,
     failureMessage: `${provider}の設計メモ生成に失敗しました。`,
@@ -300,7 +325,15 @@ export async function runPlanDesignGeneration({ provider, apiKey, report, fetchI
   });
 }
 
-export async function runDraftSample({ provider, apiKey, draftPrompt, fetchImpl = fetch, proxyBase = '' }) {
+export async function runDraftSample({
+  provider,
+  apiKey,
+  draftPrompt,
+  selectedModelId,
+  onModelRoute,
+  fetchImpl = fetch,
+  proxyBase = '',
+}) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
   }
@@ -311,6 +344,8 @@ export async function runDraftSample({ provider, apiKey, draftPrompt, fetchImpl 
   return runProviderFallback({
     provider,
     apiKey,
+    selectedModelId,
+    onModelRoute,
     fetchImpl,
     proxyBase,
     failureMessage: `${provider}の参考文章生成に失敗しました。`,
@@ -366,23 +401,35 @@ function createDraftSampleRequest({ provider, draftPrompt, model = primaryModel(
   };
 }
 
-async function runProviderFallback({ provider, apiKey, fetchImpl, proxyBase = '', failureMessage, createRequest, parsePayload }) {
+async function runProviderFallback({
+  provider,
+  apiKey,
+  selectedModelId,
+  onModelRoute,
+  fetchImpl,
+  proxyBase = '',
+  failureMessage,
+  createRequest,
+  parsePayload,
+}) {
   const attempts = [];
-  for (const model of getProviderModelChain(provider)) {
+  for (const model of getProviderModelChain(provider, selectedModelId)) {
+    onModelRoute?.({ phase: 'trying', modelId: model });
     try {
       const body = JSON.stringify(createRequest(model));
       const payload = await callProviderModel({ provider, apiKey, model, body, fetchImpl, proxyBase });
+      const parsed = parsePayload(payload);
+      onModelRoute?.({ phase: 'adopted', modelId: model });
       return {
-        ...parsePayload(payload),
+        ...parsed,
         used_model: model,
         fallback_chain: [...attempts, { model, status: 'success' }],
       };
     } catch (error) {
-      attempts.push({
-        model,
-        status: 'failed',
-        reason: sanitizeProviderError(error),
-      });
+      const reason = sanitizeProviderError(error);
+      attempts.push({ model, status: 'failed', reason });
+      onModelRoute?.({ phase: 'failed', modelId: model, reason });
+      if (isProviderAuthenticationReason(reason)) break;
     }
   }
 
@@ -393,6 +440,10 @@ async function runProviderFallback({ provider, apiKey, fetchImpl, proxyBase = ''
   throw new Error(
     `${failureMessage}${connectivityHint} 試行モデル: ${attempts.map((attempt) => attempt.model).join(' → ')}。${reasons ? ` 理由: ${reasons}` : ''}`,
   );
+}
+
+function isProviderAuthenticationReason(reason = '') {
+  return /HTTP\s*401|Incorrect API key|invalid_api_key|API key provided|認証できません|認証失敗/i.test(String(reason));
 }
 
 function isProviderConnectivityReason(reason = '') {

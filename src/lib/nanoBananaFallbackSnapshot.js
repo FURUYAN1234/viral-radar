@@ -3,35 +3,35 @@
 
 export const NANO_BANANA_FALLBACK_SNAPSHOT = {
   "sourceApp": "nano-banana-pro",
-  "sourceVersion": "4.8.2",
-  "syncedAt": "2026-06-24T06:58:14.079Z",
-  "sourceFingerprint": "24601067fa8225b1fc483305b232127c94ec428d8d933a16cb4d14ae3fafeb7a",
+  "sourceVersion": "6.5.3",
+  "syncedAt": "2026-09-24T08:15:12.897Z",
+  "sourceFingerprint": "4b154361dae3f8ca554917d657c27ac0e8718dae98a32fd059e84d74bebe5269",
   "sourceFiles": [
     {
       "path": "nano-banana-pro/package.json",
-      "bytes": 1210,
-      "sha256": "c6ec090b60f2a2cff3712f12f973b86b211ec8de8144ea1342861476d137ecbf"
+      "bytes": 1503,
+      "sha256": "d8c5e9b4b3fcbf092be4bef748ebe2e7d14528a4c5dfb4a8f3e4f007aacfdd7b"
     },
     {
       "path": "nano-banana-pro/src/lib/fallback-chain-history.js",
-      "bytes": 11097,
-      "sha256": "e825b88ee4dcbe6b6a90c6a5b7f15a088d9c588873e3cd28c9541c06035c12e9"
+      "bytes": 13800,
+      "sha256": "6bf654f23479375906942ed0424611b662dc24f255333d60b49d91855c75d6cf"
     },
     {
-      "path": "nano-banana-pro/src/lib/gemini.js",
-      "bytes": 12077,
-      "sha256": "5c642cb7eea18e8dd19b531001a06b440d0b07a6c33ee6bddbc4b58b8fcff442"
+      "path": "nano-banana-pro/src/lib/gemini-model-routes.js",
+      "bytes": 464,
+      "sha256": "fd75156f38e329e763ef3b724dab2c3a0478b558dac9687d35624f027af8554d"
     },
     {
-      "path": "nano-banana-pro/src/lib/openai-text.js",
-      "bytes": 9131,
-      "sha256": "ea78d0ae37fc0ce07e426eb14b02a6b0106403529a1f789ac7ffe77560e987c9"
+      "path": "nano-banana-pro/src/config/openai-scenario-models.json",
+      "bytes": 3354,
+      "sha256": "5a4baeee9403e9cc79cb6bdd1ced64a97c897be1fe86a1c14eb9a028efb92ac0"
     }
   ],
   "chains": {
     "geminiText": {
       "provider": "gemini",
-      "sourceFile": "nano-banana-pro/src/lib/gemini.js",
+      "sourceFile": "nano-banana-pro/src/lib/gemini-model-routes.js",
       "models": [
         {
           "id": "gemini-3.5-flash",
@@ -62,27 +62,99 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
     },
     "openaiText": {
       "provider": "openai",
-      "sourceFile": "nano-banana-pro/src/lib/openai-text.js",
+      "sourceFile": "nano-banana-pro/src/config/openai-scenario-models.json",
+      "priceSnapshotDate": "2026-09-23",
+      "priceSnapshotSource": "OpenAI official model pricing",
       "models": [
         {
-          "id": "gpt-4.1",
+          "id": "gpt-6-astra",
+          "label": "GPT-6 Astra",
+          "group": "GPT-6",
+          "inputPriceUsdPerM": 10,
+          "outputPriceUsdPerM": 50,
           "role": "Primary",
           "order": 1
         },
         {
-          "id": "gpt-4.1-mini",
+          "id": "gpt-6-sol",
+          "label": "GPT-6 Sol",
+          "group": "GPT-6",
+          "inputPriceUsdPerM": 2,
+          "outputPriceUsdPerM": 10,
           "role": "Backup",
           "order": 2
         },
         {
-          "id": "gpt-4.1-nano",
+          "id": "gpt-5.6-sol",
+          "label": "GPT-5.6 Sol",
+          "group": "GPT-5.6",
+          "inputPriceUsdPerM": 4,
+          "outputPriceUsdPerM": 20,
           "role": "Backup",
           "order": 3
         },
         {
-          "id": "gpt-4o",
-          "role": "Fallback",
+          "id": "gpt-5.6-terra",
+          "label": "GPT-5.6 Terra",
+          "group": "GPT-5.6",
+          "inputPriceUsdPerM": 2,
+          "outputPriceUsdPerM": 12,
+          "role": "Backup",
           "order": 4
+        },
+        {
+          "id": "gpt-6-luna",
+          "label": "GPT-6 Luna",
+          "group": "GPT-6",
+          "inputPriceUsdPerM": 0.1,
+          "outputPriceUsdPerM": 0.5,
+          "role": "Backup",
+          "order": 5
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "label": "GPT-5.6 Luna",
+          "group": "GPT-5.6",
+          "inputPriceUsdPerM": 0.2,
+          "outputPriceUsdPerM": 1.2,
+          "role": "Backup",
+          "order": 6
+        },
+        {
+          "id": "gpt-4.1",
+          "label": "GPT-4.1",
+          "group": "GPT-4.1",
+          "inputPriceUsdPerM": 2,
+          "outputPriceUsdPerM": 8,
+          "role": "Backup",
+          "order": 7
+        },
+        {
+          "id": "gpt-4.1-mini",
+          "label": "GPT-4.1 mini",
+          "group": "GPT-4.1",
+          "inputPriceUsdPerM": 0.4,
+          "outputPriceUsdPerM": 1.6,
+          "role": "Backup",
+          "order": 8
+        },
+        {
+          "id": "gpt-4.1-nano",
+          "label": "GPT-4.1 nano",
+          "group": "GPT-4.1",
+          "inputPriceUsdPerM": 0.1,
+          "outputPriceUsdPerM": 0.4,
+          "role": "Backup",
+          "order": 9
+        },
+        {
+          "id": "gpt-4o",
+          "label": "GPT-4o",
+          "group": "互換",
+          "inputPriceUsdPerM": 2.5,
+          "outputPriceUsdPerM": 10,
+          "role": "Fallback",
+          "order": 10
         }
       ]
     }

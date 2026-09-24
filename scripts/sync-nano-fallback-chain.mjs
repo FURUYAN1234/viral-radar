@@ -13,8 +13,8 @@ const snapshotPath = resolve(appRoot, 'src/lib/nanoBananaFallbackSnapshot.js');
 const sourcePaths = {
   packageJson: resolve(nanoRoot, 'package.json'),
   fallbackHistory: resolve(nanoRoot, 'src/lib/fallback-chain-history.js'),
-  gemini: resolve(nanoRoot, 'src/lib/gemini.js'),
-  openaiText: resolve(nanoRoot, 'src/lib/openai-text.js'),
+  geminiRoutes: resolve(nanoRoot, 'src/lib/gemini-model-routes.js'),
+  openaiScenarioModels: resolve(nanoRoot, 'src/config/openai-scenario-models.json'),
 };
 
 try {
@@ -48,8 +48,9 @@ function main() {
 
 function buildSnapshot() {
   const packageJson = JSON.parse(readFileSync(sourcePaths.packageJson, 'utf8'));
-  const geminiText = extractModelIds(readFileSync(sourcePaths.gemini, 'utf8'), 'TEXT_MODEL_IDS');
-  const openaiText = extractModelIds(readFileSync(sourcePaths.openaiText, 'utf8'), 'TEXT_MODEL_IDS');
+  const geminiText = extractModelIds(readFileSync(sourcePaths.geminiRoutes, 'utf8'), 'GEMINI_TEXT_MODEL_IDS');
+  const openaiScenarioConfig = JSON.parse(readFileSync(sourcePaths.openaiScenarioModels, 'utf8'));
+  const openaiText = normalizeScenarioModels(openaiScenarioConfig.models);
   const syncedAt = checkMode ? readExistingSyncedAt() : new Date().toISOString();
   const sourceFiles = Object.values(sourcePaths).map(sourceInfo);
 
@@ -62,18 +63,41 @@ function buildSnapshot() {
     chains: {
       geminiText: {
         provider: 'gemini',
-        sourceFile: 'nano-banana-pro/src/lib/gemini.js',
+        sourceFile: 'nano-banana-pro/src/lib/gemini-model-routes.js',
         models: toModelEntries(geminiText),
       },
       openaiText: {
         provider: 'openai',
-        sourceFile: 'nano-banana-pro/src/lib/openai-text.js',
-        models: toModelEntries(openaiText),
+        sourceFile: 'nano-banana-pro/src/config/openai-scenario-models.json',
+        priceSnapshotDate: String(openaiScenarioConfig.priceSnapshotDate || ''),
+        priceSnapshotSource: String(openaiScenarioConfig.priceSnapshotSource || ''),
+        models: openaiText.map((model, index) => ({
+          ...model,
+          role: index === 0 ? 'Primary' : index === openaiText.length - 1 ? 'Fallback' : 'Backup',
+          order: index + 1,
+        })),
       },
     },
     updateWorkflow:
       '物語バズメーカーのバグフィックスやアップデート時は npm run check:nano-fallback を必ず実行し、差分があれば npm run sync:nano-fallback でこのスナップショットを更新する。',
   };
+}
+
+function normalizeScenarioModels(models) {
+  if (!Array.isArray(models) || models.length === 0) {
+    throw new Error('Nano Banana Pro scenario model config did not contain models.');
+  }
+  return models.map((model) => {
+    const id = String(model?.id || '').trim();
+    const label = String(model?.label || '').trim();
+    const group = String(model?.group || '').trim();
+    const inputPriceUsdPerM = Number(model?.inputPriceUsdPerM);
+    const outputPriceUsdPerM = Number(model?.outputPriceUsdPerM);
+    if (!id || !label || !group || !Number.isFinite(inputPriceUsdPerM) || !Number.isFinite(outputPriceUsdPerM)) {
+      throw new Error('Nano Banana Pro scenario model config contains an incomplete model.');
+    }
+    return { id, label, group, inputPriceUsdPerM, outputPriceUsdPerM };
+  });
 }
 
 function extractModelIds(source, constName) {

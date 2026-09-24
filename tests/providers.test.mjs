@@ -137,7 +137,7 @@ test('getProviderStatus detects provider from a single API key field', () => {
   assert.equal(geminiStatus.mode, 'gemini');
   assert.equal(getProviderStatus({ apiKey: '' }).mode, 'fixture');
   assert.equal(getProviderStatus({ apiKey: 'not-a-real-provider-key' }).mode, 'unknown');
-  assert.equal(openaiStatus.provider.label, 'OpenAI gpt-4.1');
+  assert.equal(openaiStatus.provider.label, 'OpenAI gpt-6-astra');
   assert.equal(geminiStatus.provider.label, 'Gemini gemini-3.5-flash');
   assert.equal(openaiStatus.provider.label.includes('sk-'), false);
   assert.equal(geminiStatus.provider.label.includes('AIza'), false);
@@ -388,7 +388,26 @@ test('provider model chains follow the Nano Banana Pro text fallback order', () 
     'gemini-flash-latest',
     'gemini-pro-latest',
   ]);
-  assert.deepEqual(getProviderModelChain('openai'), ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o']);
+  assert.deepEqual(getProviderModelChain('openai'), [
+    'gpt-6-astra',
+    'gpt-6-sol',
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'gpt-6-luna',
+    'gpt-5.6-luna',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'gpt-4o',
+  ]);
+  assert.deepEqual(getProviderModelChain('openai', 'gpt-6-luna'), [
+    'gpt-6-luna',
+    'gpt-5.6-luna',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'gpt-4o',
+  ]);
 });
 
 test('runProviderAnalysis uses Authorization header without exposing key in body', async () => {
@@ -413,7 +432,64 @@ test('runProviderAnalysis uses Authorization header without exposing key in body
   assert.equal(result.summary, 'ok');
   assert.equal(captured.init.headers.Authorization, `Bearer ${OPENAI_SECRET_KEY}`);
   assert.equal(captured.init.body.includes(OPENAI_SECRET_KEY), false);
-  assert.equal(result.used_model, 'gpt-4.1');
+  assert.equal(result.used_model, 'gpt-6-astra');
+});
+
+test('all OpenAI generation entry points start with the selected Luna model', async () => {
+  const attemptedModels = [];
+  const respondingWith = (outputText) => async (url, init) => {
+    attemptedModels.push(JSON.parse(init.body).model);
+    return { ok: true, async json() { return { output_text: outputText }; } };
+  };
+
+  const report = providerDesignReport();
+  const analysis = await runProviderAnalysis({
+    provider: 'openai',
+    apiKey: OPENAI_SECRET_KEY,
+    selectedModelId: 'gpt-6-luna',
+    report: { category: { label: 'ストーリー漫画' }, evidenceCards: [] },
+    fetchImpl: respondingWith('{"summary":"luna analysis"}'),
+  });
+  const design = await runPlanDesignGeneration({
+    provider: 'openai',
+    apiKey: OPENAI_SECRET_KEY,
+    selectedModelId: 'gpt-6-luna',
+    report,
+    fetchImpl: respondingWith(JSON.stringify({ plans: [completeProviderPlan()] })),
+  });
+  const draft = await runDraftSample({
+    provider: 'openai',
+    apiKey: OPENAI_SECRET_KEY,
+    selectedModelId: 'gpt-6-luna',
+    draftPrompt: ['使用タイトル: 灰色の査定欄', '主人公: 真白'].join('\n'),
+    fetchImpl: respondingWith(USABLE_STORY_SAMPLE),
+  });
+
+  assert.deepEqual(attemptedModels, ['gpt-6-luna', 'gpt-6-luna', 'gpt-6-luna']);
+  assert.equal(analysis.used_model, 'gpt-6-luna');
+  assert.equal(design.used_model, 'gpt-6-luna');
+  assert.equal(draft.used_model, 'gpt-6-luna');
+});
+
+test('OpenAI routing reports trying and adopted events for the selected model', async () => {
+  const routeEvents = [];
+  const result = await runProviderAnalysis({
+    provider: 'openai',
+    apiKey: OPENAI_SECRET_KEY,
+    selectedModelId: 'gpt-6-luna',
+    onModelRoute: (event) => routeEvents.push(event),
+    report: { category: { label: 'ストーリー漫画' }, evidenceCards: [] },
+    fetchImpl: async () => ({
+      ok: true,
+      async json() { return { output_text: '{"summary":"luna ok"}' }; },
+    }),
+  });
+
+  assert.equal(result.used_model, 'gpt-6-luna');
+  assert.deepEqual(routeEvents.map((event) => `${event.phase}:${event.modelId}`), [
+    'trying:gpt-6-luna',
+    'adopted:gpt-6-luna',
+  ]);
 });
 
 test('runProviderAnalysis sends Gemini keys in a header without URL query exposure', async () => {
@@ -471,33 +547,38 @@ test('runProviderAnalysis falls back to the next Nano Banana Pro model on provid
     },
   });
 
-  assert.deepEqual(attemptedModels, ['gpt-4.1', 'gpt-4.1-mini']);
+  assert.deepEqual(attemptedModels, ['gpt-6-astra', 'gpt-6-sol']);
   assert.equal(result.summary, 'fallback ok');
-  assert.equal(result.used_model, 'gpt-4.1-mini');
+  assert.equal(result.used_model, 'gpt-6-sol');
   assert.deepEqual(
     result.fallback_chain.map((attempt) => `${attempt.model}:${attempt.status}`),
-    ['gpt-4.1:failed', 'gpt-4.1-mini:success'],
+    ['gpt-6-astra:failed', 'gpt-6-sol:success'],
   );
   assert.equal(JSON.stringify(result).includes(OPENAI_SECRET_KEY), false);
 });
 
-test('provider failures redact echoed API key fragments from error text', async () => {
+test('provider authentication failures stop after the selected model and redact echoed key fragments', async () => {
+  const attemptedModels = [];
   await assert.rejects(
     runProviderAnalysis({
       provider: 'openai',
       apiKey: OPENAI_SECRET_KEY,
       report: { category: { label: 'ストーリー漫画' }, evidenceCards: [] },
-      fetchImpl: async () => ({
-        ok: false,
-        status: 401,
-        async json() {
-          return {
-            error: {
-              message: 'Incorrect API key provided: sk-proj-secret********************************7890. You can find your API key at https://platform.openai.com/account/api-keys.',
-            },
-          };
-        },
-      }),
+      selectedModelId: 'gpt-6-luna',
+      fetchImpl: async (url, init) => {
+        attemptedModels.push(JSON.parse(init.body).model);
+        return {
+          ok: false,
+          status: 401,
+          async json() {
+            return {
+              error: {
+                message: 'Incorrect API key provided: sk-proj-secret********************************7890. You can find your API key at https://platform.openai.com/account/api-keys.',
+              },
+            };
+          },
+        };
+      },
     }),
     (error) => {
       const message = String(error?.message ?? '');
@@ -506,6 +587,7 @@ test('provider failures redact echoed API key fragments from error text', async 
       return true;
     },
   );
+  assert.deepEqual(attemptedModels, ['gpt-6-luna']);
 });
 
 test('runProviderAnalysis converts object next actions into readable text', async () => {
@@ -660,7 +742,7 @@ test('runDraftSample routes through the local proxy when proxyBase is set (fixes
   assert.equal(captured.url, '/api/provider-generate');
   const proxyBody = JSON.parse(captured.init.body);
   assert.equal(proxyBody.provider, 'openai');
-  assert.equal(proxyBody.model, 'gpt-4.1');
+  assert.equal(proxyBody.model, 'gpt-6-astra');
   assert.equal(proxyBody.apiKey, OPENAI_SECRET_KEY);
   assert.equal(typeof proxyBody.body, 'object');
   // Authorizationヘッダにキーを載せない（中継先がサーバー側で付与する）。
@@ -1438,7 +1520,7 @@ test('runProviderAnalysis falls back when a model omits visible evidence-card re
     },
   });
 
-  assert.equal(result.used_model, 'gpt-4.1-mini');
+  assert.equal(result.used_model, 'gpt-6-sol');
   assert.equal(result.evidenceCards.length, 2);
   assert.equal(result.fallback_chain[0].status, 'failed');
 });
