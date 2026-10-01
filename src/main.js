@@ -22,7 +22,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.2.6';
+const APP_VERSION = '1.2.7';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -32,10 +32,10 @@ const initialProviderStatus = getProviderStatus(initialSettings);
 
 const state = {
   openAiModelId: DEFAULT_OPENAI_MODEL_ID,
-  openAiModelConfirmed: false,
+  openAiModelConfirmed: true,
   analysisStartConfirmed: false,
   openAiModelRoute: {
-    selected: '',
+    selected: DEFAULT_OPENAI_MODEL_ID,
     attemptedByPath: {},
     adoptedByPath: {},
   },
@@ -217,10 +217,7 @@ function currentProviderRunSignature(providerStatus) {
 function render() {
   const providerStatus = currentProviderStatus();
   const draftStatus = currentProviderStatus({ apiKey: state.apiKeyDraft });
-  const providerLabel =
-    providerStatus.mode === 'openai' && !state.openAiModelConfirmed
-      ? 'OpenAI 接続済み・モデル未選択'
-      : providerStatus.provider.label;
+  const providerLabel = providerStatus.provider.label;
   const showApiPanel = !isApiReady() || state.apiPanelOpen;
   const apiWorking = isApiWorking();
   const uiWorking = isUiWorking();
@@ -250,7 +247,7 @@ function render() {
             <span>対象: 漫画・動画・小説</span>
             ${
               !showApiPanel
-                ? `<button class="api-settings-button" id="api-settings" type="button" ${disabledAttr(uiWorking)}>AI設定</button>`
+                ? `<button class="api-settings-button" id="api-settings" type="button" ${disabledAttr(uiWorking)}>${providerStatus.provider.connected ? 'APIキーを変更' : 'AI設定'}</button>`
                 : ''
             }
           </div>
@@ -384,16 +381,6 @@ function render() {
 }
 
 function renderApiStartGate(providerStatus) {
-  if (providerStatus.mode === 'openai' && !state.openAiModelConfirmed) {
-    return `
-      <div class="api-start-gate" aria-live="polite">
-        ${renderDataLabel('モデル選択待機')}
-        <h2>OpenAIモデルを選ぶまで検索・分析は開始しません。</h2>
-        <p>上のプルダウンでモデルを明示的に選択してください。Astraを使う場合も選択操作が必要です。</p>
-        <button class="primary-action" id="provider-start" type="button" disabled>検索・分析を開始</button>
-      </div>
-    `;
-  }
   if (providerStatus.provider.connected && !state.analysisStartConfirmed) {
     return `
       <div class="api-start-gate" aria-live="polite">
@@ -407,9 +394,9 @@ function renderApiStartGate(providerStatus) {
   return `
     <div class="api-start-gate" aria-live="polite">
       ${renderDataLabel('開始待機')}
-      <h2>APIキーを入力してモデルを選択すると公開Web/RSS取得を開始します。</h2>
-      <p>OpenAIではAPIキー接続後にモデルを明示的に選ぶまで、取得と分析は実行しません。</p>
-      <p>キーはこのブラウザの保存領域にだけ保存し、レポートやDOCX/JSONには含めません。</p>
+      <h2>APIキーを接続後、「検索・分析を開始」ボタンで公開Web/RSS取得を開始します。</h2>
+      <p>OpenAIはGPT-6.1 Solが初期選択されます。開始ボタンを押すまで取得と分析は実行しません。</p>
+      <p>キーはページ内のメモリだけで保持し、レポートやDOCX/JSONには含めません。</p>
     </div>
   `;
 }
@@ -424,7 +411,6 @@ function renderOpenAiModelControl(providerStatus, uiWorking) {
       <label class="openai-model-control" for="openai-model-select">
         <span>OpenAIモデル</span>
         <select id="openai-model-select" ${disabledAttr(uiWorking)}>
-          <option value="" disabled ${state.openAiModelConfirmed ? '' : 'selected'}>OpenAIモデルを選択してください（Astra推奨）</option>
           ${OPENAI_MODEL_OPTIONS.map(
             (model) =>
               `<option value="${escapeAttr(model.id)}" ${state.openAiModelConfirmed && model.id === state.openAiModelId ? 'selected' : ''}>${escapeHtml(model.label)}（${escapeHtml(model.description)}）</option>`,
@@ -433,7 +419,7 @@ function renderOpenAiModelControl(providerStatus, uiWorking) {
       </label>
       <div class="openai-model-details">
         <strong>${escapeHtml(selectedModel.description)}</strong>
-        <span class="openai-model-price">参考単価: ${escapeHtml(formatOpenAIModelPrice(selectedModel))}（${escapeHtml(OPENAI_MODEL_PRICE_SNAPSHOT_DATE)}時点）</span>
+        <span class="openai-model-price">参考単価: ${escapeHtml(formatOpenAIModelPrice(selectedModel))}（${escapeHtml(selectedModel.priceSnapshotDate || OPENAI_MODEL_PRICE_SNAPSHOT_DATE)}時点）</span>
         <small class="openai-model-caveat">${escapeHtml(selectedModel.comparisonNote)}</small>
       </div>
     </div>
@@ -443,11 +429,9 @@ function renderOpenAiModelControl(providerStatus, uiWorking) {
 function renderApiConnectPanel(draftStatus, uiWorking) {
   const currentStatus = currentProviderStatus();
   const isConnected = currentStatus.provider.connected;
-  const currentProviderLabel =
-    currentStatus.mode === 'openai' && !state.openAiModelConfirmed
-      ? 'OpenAI 接続済み・モデル未選択'
-      : currentStatus.provider.label;
+  const currentProviderLabel = currentStatus.provider.label;
   const draftKey = state.apiKeyDraft;
+  const editingKey = !isConnected || state.apiPanelOpen;
   const draftProviderHint =
     draftStatus.mode === 'openai'
       ? 'OpenAI形式（未検証）'
@@ -474,6 +458,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
         }</p>
         ${state.apiGateMessage ? `<p class="gate-warning">${escapeHtml(state.apiGateMessage)}</p>` : ''}
       </div>
+      ${editingKey ? `
       <form class="api-connect-form" id="api-connect-form" autocomplete="off">
         <label for="api-key">APIキー</label>
         <div class="api-connect-row">
@@ -482,11 +467,17 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
         </div>
         <small class="${draftStatus.provider.connected ? 'ok' : ''}">${escapeHtml(draftProviderHint)}</small>
         ${
-          isConnected && isApiReady()
-            ? `<button class="secondary-action compact" id="close-api-settings" type="button" ${inputDisabled}>閉じる</button>`
+          isConnected
+            ? `<button class="secondary-action compact" id="close-api-settings" type="button" ${inputDisabled}>変更をキャンセル</button>`
             : ''
         }
       </form>
+      ` : `<div class="api-connect-form" aria-label="API接続済み">
+        <label for="connected-api-key">APIキー（接続済み）</label>
+        <input id="connected-api-key" type="password" value="" placeholder="••••••••" disabled autocomplete="off" />
+        <small class="ok">${escapeHtml(currentProviderLabel)} 接続済み</small>
+        <button class="secondary-action compact" id="api-settings" type="button" ${inputDisabled}>APIキーを変更</button>
+      </div>`}
       ${renderOpenAiModelControl(currentStatus, uiWorking)}
       ${!isApiReady() ? renderApiStartGate(currentStatus) : ''}
     </section>
@@ -623,7 +614,7 @@ function openApiSettings() {
 }
 
 function closeApiSettings() {
-  if (isUiWorking() || !isApiReady()) return;
+  if (isUiWorking() || !currentProviderStatus().provider.connected) return;
   state.apiPanelOpen = false;
   state.apiKeyDraft = '';
   state.apiGateMessage = '';
@@ -647,15 +638,15 @@ async function connectApiKey() {
   try {
     await wait(API_SAVE_BUSY_MS);
     state.settings.apiKey = cleanKey;
-    state.openAiModelConfirmed = false;
+    state.openAiModelConfirmed = true;
     state.analysisStartConfirmed = false;
     forgetPersistedSettings();
     state.apiKeyDraft = '';
     apiInputUserTouched = false;
-    state.apiPanelOpen = true;
+    state.apiPanelOpen = false;
     state.apiGateMessage =
       providerStatus.mode === 'openai'
-        ? 'OpenAIモデルを選択し、「検索・分析を開始」ボタンを押してください。'
+        ? 'GPT-6.1 Solを初期選択しています。変更する場合はモデルを選び、「検索・分析を開始」ボタンを押してください。'
         : '「検索・分析を開始」ボタンを押すまで検索・分析は開始しません。';
     resetAnalysisSessionForApiChange();
   } finally {
@@ -663,7 +654,7 @@ async function connectApiKey() {
     showActionMessage({
       summary:
         providerStatus.mode === 'openai'
-          ? 'OpenAIキーを接続しました。次にモデルを選択してください。'
+          ? 'OpenAIキーを接続しました。選択モデルを確認して「検索・分析を開始」ボタンを押してください。'
           : 'Geminiキーを接続しました。「検索・分析を開始」ボタンを押してください。',
     });
     render();
@@ -1108,7 +1099,7 @@ function isProviderAuthError(error) {
 
 function handleProviderAuthFailure(providerStatus) {
   state.settings.apiKey = '';
-  state.openAiModelConfirmed = false;
+  state.openAiModelConfirmed = true;
   state.analysisStartConfirmed = false;
   state.apiKeyDraft = '';
   apiInputUserTouched = false;

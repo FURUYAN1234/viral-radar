@@ -1,8 +1,17 @@
 import { NANO_BANANA_FALLBACK_SNAPSHOT } from './nanoBananaFallbackSnapshot.js';
 
-export const DEFAULT_OPENAI_MODEL_ID = 'gpt-6-astra';
+export function resolveDefaultOpenAIModelId() {
+  return 'gpt-6.1-sol';
+}
+
+export const DEFAULT_OPENAI_MODEL_ID = resolveDefaultOpenAIModelId();
 
 const VIRAL_RADAR_MODEL_COPY = Object.freeze({
+  'gpt-6.1-sol': Object.freeze({
+    priceSnapshotDate: '2026-09-30',
+    description: '新しいSolで企画の構成と料金のバランスを重視',
+    comparisonNote: '開発版・公開版の既定候補です。根拠整理と漫画・動画・小説の企画設計に使い、題材ごとの生成結果を確認してください。',
+  }),
   'gpt-6-astra': Object.freeze({
     description: '複雑な制約・複数媒体の企画設計を重視',
     comparisonNote:

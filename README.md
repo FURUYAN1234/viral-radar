@@ -1,6 +1,6 @@
 # Monogatari Buzz Maker / 物語バズメーカー
 
-![Version](https://img.shields.io/badge/version-1.2.6-0f766e)
+![Version](https://img.shields.io/badge/version-1.2.7-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -70,11 +70,11 @@ The local port is fixed to `5180` so this app can run beside the other Antigravi
 
 ---
 
-## Current v1.2.6 Behavior / 現行v1.2.6挙動
+## Current v1.2.7 Behavior / 現行v1.2.7挙動
 
-The current public line is **v1.2.6**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
+The current public line is **v1.2.7**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
 
-現行公開系統は **v1.2.6** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
+現行公開系統は **v1.2.7** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
 
 * **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, categories, and derived metrics. If retrieval fails, the UI reports the failure instead of recycling old or invented topics.
   公開Web/RSS取得では、ソースURL、検索語、観測時刻、カテゴリ、算出指標を含む根拠行を作ります。取得失敗時は古い結果や架空トピックを回さず、失敗状態を表示します。
@@ -481,11 +481,15 @@ The app uses a single API-key input field. OpenAI and Gemini keys are detected f
 
 ### OpenAI Model Selection / OpenAIモデル選択
 
-Default: GPT-6 Astra / 既定: GPT-6 Astra
+Default: GPT-6.1 Sol / 既定: GPT-6.1 Sol
 
-API connection does not start retrieval or analysis for either provider. With OpenAI, the user must explicitly choose a model, including Astra, and then press the `検索・分析を開始` button. With Gemini, the user presses the same button after connecting the key. Astra is shown as the recommended first OpenAI option. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list.
+For this OpenAI update, `node scripts/sync-nano-fallback-chain.mjs --openai-only` updates only the OpenAI catalog. `check:nano-fallback` checks this scope and preserves the current Gemini route. The ordinary `sync:nano-fallback` command still updates both providers; use it only when both providers are intended to change.
 
-どちらのAPIも、キーを接続しただけでは検索・分析を開始しません。OpenAIはAstraを使う場合を含めてモデルを明示的に選び、その後に `検索・分析を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。Astraは推奨の先頭候補として表示します。選択はページ内だけで保持され、再読み込みすると再選択が必要です。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
+今回のGPT更新は `--openai-only` で同期し、Geminiの経路を維持します。通常の `sync:nano-fallback` は両プロバイダーを同期するため、両方を更新する場合に使います。
+
+API connection does not start retrieval or analysis for either provider. With OpenAI, the user must explicitly choose a model, including GPT-6.1 Sol, and then press the `検索・分析を開始` button. With Gemini, the user presses the same button after connecting the key. GPT-6.1 Sol is recommended in both development and production. Astra remains selectable above Sol in the fallback order. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list.
+
+どちらのAPIも、キーを接続しただけでは検索・分析を開始しません。OpenAIはGPT-6.1 Solが初期選択され、必要なら別モデルに変更してから `検索・分析を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。GPT-6.1 Solは開発版・公開版共通の既定モデルです。AstraはSolより上位の選択肢として残します。選択はページ内だけで保持され、再読み込みするとGPT-6.1 Solが初期選択されます。接続後はキー入力を閉じ、接続済みのマスク表示にします。「APIキーを変更」で新規入力を開き、キャンセルや形式不明の入力では現在の接続を維持します。実キーを入力欄へ復元しません。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
 
 API usage fees, terms, model restrictions, and rate limits follow each provider's contract.
 
@@ -957,6 +961,12 @@ It does not call the other apps at runtime. Each app works independently.
 ---
 
 ## Changelog / 更新履歴
+
+### v1.2.7 (2026-10-01)
+
+* Added GPT-6.1 Sol as the default candidate in development and production.
+* Synced the fallback catalog: Astra → 6.1 Sol → 6 Sol, retaining selected-model downward routing across analysis, plan design and drafts.
+* 開発版・公開版の実際の初期選択をGPT-6.1 Solへ統一。Astraと既存モデルの明示選択、API接続後の開始確認は維持します。
 
 ### v1.2.6 (2026-09-24)
 

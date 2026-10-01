@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const checkMode = process.argv.includes('--check');
+const openaiOnly = process.argv.includes('--openai-only');
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(scriptDir, '..');
 const workspaceRoot = resolve(appRoot, '..');
@@ -48,7 +49,10 @@ function main() {
 
 function buildSnapshot() {
   const packageJson = JSON.parse(readFileSync(sourcePaths.packageJson, 'utf8'));
-  const geminiText = extractModelIds(readFileSync(sourcePaths.geminiRoutes, 'utf8'), 'GEMINI_TEXT_MODEL_IDS');
+  // A scoped OpenAI update must not change the other provider's live route.
+  const geminiText = openaiOnly
+    ? readExistingSnapshot().chains.geminiText.models.map((model) => model.id)
+    : extractModelIds(readFileSync(sourcePaths.geminiRoutes, 'utf8'), 'GEMINI_TEXT_MODEL_IDS');
   const openaiScenarioConfig = JSON.parse(readFileSync(sourcePaths.openaiScenarioModels, 'utf8'));
   const openaiText = normalizeScenarioModels(openaiScenarioConfig.models);
   const syncedAt = checkMode ? readExistingSyncedAt() : new Date().toISOString();
@@ -56,6 +60,7 @@ function buildSnapshot() {
 
   return {
     sourceApp: 'nano-banana-pro',
+    syncScope: openaiOnly ? 'openai-only' : 'all-providers',
     sourceVersion: String(packageJson.version),
     syncedAt,
     sourceFingerprint: hashText(sourceFiles.map((file) => `${file.path}:${file.sha256}`).join('\n')),
@@ -131,6 +136,18 @@ function sourceInfo(filePath) {
 
 function hashText(value) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function readExistingSnapshot() {
+  if (!existsSync(snapshotPath)) throw new Error('--openai-only requires an existing fallback snapshot.');
+  const source = readFileSync(snapshotPath, 'utf8');
+  const match = source.match(/export const NANO_BANANA_FALLBACK_SNAPSHOT = ([\s\S]*);\s*$/);
+  if (!match) throw new Error('Existing fallback snapshot could not be parsed.');
+  const snapshot = JSON.parse(match[1]);
+  if (!Array.isArray(snapshot.chains?.geminiText?.models) || snapshot.chains.geminiText.models.length === 0) {
+    throw new Error('--openai-only requires an existing Gemini model chain.');
+  }
+  return snapshot;
 }
 
 function readExistingSyncedAt() {
