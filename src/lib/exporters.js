@@ -184,6 +184,87 @@ function validateReportShape(report) {
       throw new Error(`${key} がないため読み込めません。`);
     }
   }
+
+  // Validate the nested structures consumed by rendering and export before the
+  // import handler replaces state. Text is preserved here and escaped at its
+  // HTML sink; removing markup from data would corrupt legitimate report text.
+  requireTextFields(report.category, 'category', ['id', 'label', 'description']);
+  if (report.trendClusters.length === 0) invalidReport('trendClusters');
+  requireTextFields(report.deepAnalysis, 'deepAnalysis', ['categoryInsight']);
+  for (const key of ['humanMotivation', 'narrativeMechanism']) {
+    if (report.deepAnalysis[key] != null) requireList(report.deepAnalysis[key], `deepAnalysis.${key}`, requireText);
+  }
+  requireList(report.limitations, 'limitations', requireText);
+  const notes = (value, path) => requireList(value, path, (note, notePath) => requireTextFields(note, notePath, ['label', 'detail']));
+  requireList(report.trendClusters, 'trendClusters', (cluster, path) => {
+    requireTextFields(cluster, path, ['label']);
+    for (const key of ['momentumScore', 'saturationScore', 'noveltyScore', 'confidenceScore', 'evidenceCount', 'sourceCount']) {
+      if (typeof cluster[key] !== 'number' || !Number.isFinite(cluster[key])) invalidReport(`${path}.${key}`);
+    }
+    notes(cluster.creatorSignals, `${path}.creatorSignals`);
+    notes(cluster.sourceSignals, `${path}.sourceSignals`);
+    requireList(cluster.observations, `${path}.observations`, (observation, observationPath) => {
+      requireObject(observation, observationPath);
+      for (const key of ['observedAt', 'query']) {
+        if (observation[key] != null) requireText(observation[key], `${observationPath}.${key}`);
+      }
+      if (observation.metrics != null) {
+        requireObject(observation.metrics, `${observationPath}.metrics`);
+        for (const [key, value] of Object.entries(observation.metrics)) {
+          if (typeof value !== 'number' || !Number.isFinite(value)) invalidReport(`${observationPath}.metrics.${key}`);
+        }
+      }
+    });
+  });
+  requireList(report.evidenceCards, 'evidenceCards', (card, path) => {
+    requireTextFields(card, path, ['claim', 'source', 'metricsSummary', 'observation', 'meaningForCreator', 'creativeUse']);
+    if (card.sourceUrls != null) requireList(card.sourceUrls, `${path}.sourceUrls`, requireText);
+  });
+  requireList(report.categoryFitCards, 'categoryFitCards', (card, path) => requireTextFields(card, path, ['title', 'whyThisMedium', 'creatorMove', 'example', 'evidenceAnchor']));
+  requireList(report.categoryReasons, 'categoryReasons', (reason, path) => requireTextFields(reason, path, ['title', 'detail', 'example']));
+  requireList(report.creativePlans, 'creativePlans', (plan, path) => {
+    requireTextFields(plan, path, ['id', 'formatLabel', 'audiencePromise', 'exampleDetail', 'opening', 'aiDraftPrompt']);
+    for (const key of ['titleCandidates', 'reasonToWin', 'outline']) requireList(plan[key], `${path}.${key}`, requireText);
+    if (plan.titleCandidates.length === 0) invalidReport(`${path}.titleCandidates`);
+    requireTextFields(plan.creatorBrief, `${path}.creatorBrief`, ['protagonist', 'setting', 'incitingIncident', 'conflict', 'choice', 'payoff']);
+    requireList(plan.sourceSimilarityFlags, `${path}.sourceSimilarityFlags`, (flag, flagPath) => requireTextFields(flag, flagPath, ['note']));
+    if (plan.properNounUsage != null) requireList(plan.properNounUsage, `${path}.properNounUsage`, requireText);
+    if (plan.craftNotes != null) notes(plan.craftNotes, `${path}.craftNotes`);
+    if (plan.storyArchitecture != null) {
+      requireObject(plan.storyArchitecture, `${path}.storyArchitecture`);
+      if (plan.storyArchitecture.notes != null) notes(plan.storyArchitecture.notes, `${path}.storyArchitecture.notes`);
+    }
+    if (plan.retentionDesign != null) requireTextFields(plan.retentionDesign, `${path}.retentionDesign`, ['lengthGoal', 'openingHook', 'middleKeep', 'payoff', 'continuationHook']);
+  });
+  if (report.beginnerGuide != null) {
+    const guide = report.beginnerGuide;
+    requireTextFields(guide, 'beginnerGuide', ['headline', 'promise', 'firstOutput']);
+    requireList(guide.steps, 'beginnerGuide.steps', (step, path) => requireTextFields(step, path, ['label', 'action', 'output']));
+    requireList(guide.checklist, 'beginnerGuide.checklist', requireText);
+    requireList(guide.avoid, 'beginnerGuide.avoid', requireText);
+  }
+}
+
+function invalidReport(path) {
+  throw new Error(`Invalid report JSON: ${path}`);
+}
+
+function requireObject(value, path) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) invalidReport(path);
+}
+
+function requireText(value, path) {
+  if (typeof value !== 'string') invalidReport(path);
+}
+
+function requireTextFields(value, path, keys) {
+  requireObject(value, path);
+  for (const key of keys) requireText(value[key], `${path}.${key}`);
+}
+
+function requireList(value, path, validateItem) {
+  if (!Array.isArray(value)) invalidReport(path);
+  value.forEach((item, index) => validateItem(item, `${path}[${index}]`));
 }
 
 function scrubSecrets(value) {

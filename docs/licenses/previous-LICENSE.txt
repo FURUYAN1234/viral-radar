@@ -1,0 +1,7 @@
+Copyright (c) 2026 FURUYAN1234
+
+All rights reserved.
+
+This project is provided as source-available software for viewing and use by
+the repository owner. No permission is granted to copy, redistribute, sublicense,
+sell, or use this software commercially without explicit written permission.

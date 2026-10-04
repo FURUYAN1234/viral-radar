@@ -4,14 +4,14 @@
 export const NANO_BANANA_FALLBACK_SNAPSHOT = {
   "sourceApp": "nano-banana-pro",
   "syncScope": "openai-only",
-  "sourceVersion": "6.7.5",
-  "syncedAt": "2026-10-01T00:28:52.744Z",
-  "sourceFingerprint": "c34dc25ae0a19529b59b59ebda328bc357ae30989bf39b0cb124f0697eebd548",
+  "sourceVersion": "6.8.3",
+  "syncedAt": "2026-10-04T07:25:41.224Z",
+  "sourceFingerprint": "187cce503c066cb6121ed6e0a7d0e27bf1b6ebce2f6fba3e67d6e7fcd6141ea1",
   "sourceFiles": [
     {
       "path": "nano-banana-pro/package.json",
-      "bytes": 1503,
-      "sha256": "a748dd478ac7b3abe3d40ba13b757ea90d9dfb89e405d98a45fed2809cbd01c4"
+      "bytes": 1542,
+      "sha256": "33d541d7e45894089a62de63b415b6c2a13d38c5657b050a0d8cc9fc1bb0b9c3"
     },
     {
       "path": "nano-banana-pro/src/lib/fallback-chain-history.js",
@@ -26,7 +26,7 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
     {
       "path": "nano-banana-pro/src/config/openai-scenario-models.json",
       "bytes": 3896,
-      "sha256": "f92255f05f484ac73f323aaa3fe5df30b8a48e41ca1e823a922a8e3c545b97c1"
+      "sha256": "6fdb4ae15cea18952117d0342fd70291bd9be5422a106860fce4416c8655945e"
     }
   ],
   "chains": {

@@ -22,7 +22,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.2.7';
+const APP_VERSION = '1.2.8';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -313,9 +313,9 @@ function render() {
       <section class="report-layout" aria-live="polite">
         <aside class="panel summary-panel">
           ${renderDataLabel('取得根拠', dataTimestamp)}
-          <h2>${selectedCategory.label}</h2>
-          <p>${selectedCategory.description}</p>
-          <div class="cluster-name">${cluster.label}</div>
+          <h2>${escapeHtml(selectedCategory.label)}</h2>
+          <p>${escapeHtml(selectedCategory.description)}</p>
+          <div class="cluster-name">${escapeHtml(cluster.label)}</div>
           <h3>このカテゴリの取得根拠</h3>
           <div class="signal-list">${cluster.creatorSignals.map(renderCreatorSignal).join('')}</div>
           <h3>取得元</h3>
@@ -2009,7 +2009,7 @@ function escapeAttr(value) {
 }
 
 function escapeTextarea(value) {
-  return String(value).replaceAll('&', '&amp;').replaceAll('</textarea', '&lt;/textarea');
+  return escapeHtml(value);
 }
 
 function formatMultilineText(value) {

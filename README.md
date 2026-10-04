@@ -1,10 +1,10 @@
 # Monogatari Buzz Maker / 物語バズメーカー
 
-![Version](https://img.shields.io/badge/version-1.2.7-0f766e)
+![Version](https://img.shields.io/badge/version-1.2.8-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
-![License](https://img.shields.io/badge/license-UNLICENSED-red)
+[![License](https://img.shields.io/badge/license-FURU_Terms-blue)](LICENSE)
 
 Monogatari Buzz Maker is a creative planning app that turns topics retrieved from public Web/RSS sources into story manga, short-video, explainer-video, and novel planning materials.
 
@@ -70,11 +70,11 @@ The local port is fixed to `5180` so this app can run beside the other Antigravi
 
 ---
 
-## Current v1.2.7 Behavior / 現行v1.2.7挙動
+## Current v1.2.8 Behavior / 現行v1.2.8挙動
 
-The current public line is **v1.2.7**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
+The current public line is **v1.2.8**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
 
-現行公開系統は **v1.2.7** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
+現行公開系統は **v1.2.8** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
 
 * **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, categories, and derived metrics. If retrieval fails, the UI reports the failure instead of recycling old or invented topics.
   公開Web/RSS取得では、ソースURL、検索語、観測時刻、カテゴリ、算出指標を含む根拠行を作ります。取得失敗時は古い結果や架空トピックを回さず、失敗状態を表示します。
@@ -503,6 +503,10 @@ API利用料、利用規約、モデル制限、レート制限は、各サー�
 
 JSON saves the screen's analysis results and production plans as structured data.
 
+Imported report text is displayed as text, including HTML-like content. JSON with invalid report structures is rejected while keeping the current report.
+
+JSON内のHTMLのような文字列もテキストとして表示します。レポートの構造が不正なJSONは読み込まず、現在のレポートを保持します。
+
 JSONは、画面の分析結果と制作案を構造化データとして保存します。
 
 Primary uses:
@@ -847,17 +851,13 @@ monogatari-buzz-maker-story-manga-20260625123045.docx
 
 ## License & Rights / ライセンス・権利関係
 
-This project is `UNLICENSED`.
+この条件を添付して今後公開する版から、[FURU アプリ利用条件](LICENSE)を適用します（準備日: 2026-10-04）。個人利用・業務利用・受託制作は無料で、利用者自身の投稿・作品の収益化もできます。外部APIなどの料金は別です。
 
-このプロジェクトは `UNLICENSED` です。
+アプリ本体や改変版の転売・有料再配布・有料サービス化・有料商材への同梱は、FURU の事前の書面による許可が必要です。第三者のライセンス、適法な引用、アプリを同梱しない独立した解説・教育は制限しません。生成物について、第三者の権利がすべて処理済みになることを保証するものではありません。
 
-Do not redistribute, republish, sublicense, sell, or commercially use this repository without explicit permission from the copyright holder.
+有効に付与済みの過去版の許諾は取り消しません。引き継いだ部分の従前の権利も保持します。[以前の表示と適用範囲](docs/licenses/previous-notices.md)をご確認ください。本条件は商用再配布等を制限する独自条件で、OSIの意味でのオープンソースライセンスではありません。
 
-著作権者の明示的な許可なく、再配布、再公開、サブライセンス、販売、商用利用をしないでください。
-
-This repository is published for viewing, evaluation, local execution, and personal-environment verification.
-
-このリポジトリは、閲覧、評価、ローカル実行、個人環境での検証を目的として公開されます。
+Future versions distributed with these [FURU Application Terms](LICENSE) allow free personal, business and commissioned use, including monetization of users' own outputs. Prior written permission is required to sell or redistribute the app for a fee, offer its functionality as a paid service, or bundle it with paid information products. Third-party terms, lawful quotation and independent explanation remain unaffected. Valid prior grants remain available for earlier versions and inherited portions. Third-party rights in outputs are not guaranteed. These are custom source-available terms, not an OSI open-source license.
 
 ### Third-Party Services / 外部サービス
 
@@ -962,6 +962,13 @@ It does not call the other apps at runtime. Each app works independently.
 
 ## Changelog / 更新履歴
 
+### v1.2.8 (2026-10-04)
+
+- Escape imported labels and descriptions, reject malformed nested reports, and preserve the existing report on rejection. / 取り込むラベル・説明を安全に表示し、不正な入れ子JSONを拒否して元のレポートを保持します。
+- Publish common application terms while preserving valid prior grants and third-party conditions. / 共通利用条件を公開し、過去の有効な許諾と第三者条件を保持します。
+- Refresh only Nano source metadata; model order, prices and Gemini routes are unchanged. / Nano参照元metadataだけを同期し、モデル順序・価格・Gemini経路は変更しません。
+
+
 ### v1.2.7 (2026-10-01)
 
 * Added GPT-6.1 Sol as the default candidate in development and production.
@@ -1052,4 +1059,4 @@ It does not call the other apps at runtime. Each app works independently.
 | Repository / リポジトリ | [FURUYAN1234/viral-radar](https://github.com/FURUYAN1234/viral-radar) |
 | Local Port / ローカルポート | `5180` |
 | Public URL / 公開URL | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) |
-| License / ライセンス | `UNLICENSED` |
+| License / ライセンス | [FURU アプリ利用条件](LICENSE) |
