@@ -1,8 +1,0 @@
-dist/
-node_modules/
-output/
-scratch/
-.claude/
-HANDOFF.md
-.env
-.env.local

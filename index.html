@@ -2,7 +2,11 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-rX+GKtpH4et117mFmz6cdUMEH4gjJR/xBJdF/ezzna0='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' blob: data: https://api.openai.com https://generativelanguage.googleapis.com https://api.allorigins.win https://api.codetabs.com https://corsproxy.io https://cors.isomorphic-git.org https://news.google.com https://www.bing.com https://trends.google.co.jp https://news.yahoo.co.jp https://b.hatena.ne.jp; media-src 'self' data: blob: https:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+<meta name="referrer" content="no-referrer">
+<style id="app-frame-guard">html{display:none!important}</style>
+<script>if(window.top===window.self){document.getElementById('app-frame-guard').remove();}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
       content="物語バズメーカー: 公開Web/RSSトレンドを根拠に、漫画、ショート動画、解説動画、小説の制作案を整理する創作支援ツール"
@@ -11,8 +15,8 @@
       name="keywords"
       content="物語バズメーカー, viral radar, 漫画企画, 小説企画, ショート動画企画, トレンド分析, 創作支援, Web小説, 縦読み漫画"
     />
-    <title>物語バズメーカー v1.2.8</title>
-    <script type="module" crossorigin src="/viral-radar/assets/index-DUPg_owX.js"></script>
+    <title>物語バズメーカー v1.2.9</title>
+    <script type="module" crossorigin src="/viral-radar/assets/index-ePmD3wri.js"></script>
     <link rel="stylesheet" crossorigin href="/viral-radar/assets/index-Bkgg8wsf.css">
   </head>
   <body>
