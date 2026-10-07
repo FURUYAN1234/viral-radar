@@ -42,7 +42,8 @@ test('nano banana pro fallback snapshot is synced from source model arrays', asy
       'gpt-4o',
     ],
   );
-  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate, '2026-09-28');
+  const sourcePrices = JSON.parse(readFileSync(resolve(appRoot, '../nano-banana-pro/src/config/openai-scenario-models.json'), 'utf8'));
+  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate, sourcePrices.priceSnapshotDate);
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[0].label, 'GPT-6 Astra');
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[5].inputPriceUsdPerM, 0.1);
   assert.match(NANO_BANANA_FALLBACK_SNAPSHOT.updateWorkflow, /check:nano-fallback/);

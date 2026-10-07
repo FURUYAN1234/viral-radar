@@ -17,7 +17,7 @@ test('OpenAI model catalog defaults to 6.1 Sol and keeps the synced display meta
   assert.equal(DEFAULT_OPENAI_MODEL_ID, 'gpt-6.1-sol');
   assert.equal(OPENAI_MODEL_OPTIONS[0].id, 'gpt-6-astra');
   assert.equal(OPENAI_MODEL_OPTIONS[0].label, 'GPT-6 Astra');
-  assert.equal(OPENAI_MODEL_PRICE_SNAPSHOT_DATE, '2026-09-28');
+  assert.equal(OPENAI_MODEL_PRICE_SNAPSHOT_DATE, NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate);
   assert.equal(getOpenAIModelOption('gpt-6.1-sol').priceSnapshotDate, '2026-09-30');
   assert.match(formatOpenAIModelPrice(getOpenAIModelOption('gpt-6-luna')), /入力 \$0\.1 \/ 出力 \$0\.5/);
   assert.equal(
