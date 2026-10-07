@@ -1,6 +1,6 @@
 {
   "name": "monogatari-buzz-maker",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "private": true,
   "homepage": "https://FURUYAN1234.github.io/viral-radar",
   "description": "物語バズメーカー - 公開Web/RSSトレンドを漫画・動画・小説の制作案へ整理する創作支援ツール",
@@ -18,10 +18,11 @@
     "check:nano-fallback": "node scripts/sync-nano-fallback-chain.mjs --check --openai-only",
     "check:upstreams": "npm run check:nano-fallback",
     "pretest": "npm run check:upstreams",
-    "test": "node --test"
+    "test": "node --test",
+    "postbuild": "node scripts/web-security.mjs --verify-dist"
   },
   "devDependencies": {
-    "gh-pages": "^6.3.0",
+    "gh-pages": "6.1.1",
     "vite": "^6.0.0"
   }
 }

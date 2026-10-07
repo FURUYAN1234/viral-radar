@@ -1,3 +1,4 @@
+import { webSecurity } from './scripts/web-security.mjs';
 import { writeFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -9,7 +10,7 @@ const GITHUB_PAGES_BASE = '/viral-radar/';
 
 export default defineConfig({
   base: GITHUB_PAGES_BASE,
-  plugins: [nativeSaveDialogPlugin(), trendSearchPlugin(), providerProxyPlugin()],
+  plugins: [webSecurity({ connectSources: ["https://api.openai.com","https://generativelanguage.googleapis.com","https://api.allorigins.win","https://api.codetabs.com","https://corsproxy.io","https://cors.isomorphic-git.org","https://news.google.com","https://www.bing.com","https://trends.google.co.jp","https://news.yahoo.co.jp","https://b.hatena.ne.jp"] }), nativeSaveDialogPlugin(), trendSearchPlugin(), providerProxyPlugin()],
   server: {
     host: '127.0.0.1',
     port: 5180,

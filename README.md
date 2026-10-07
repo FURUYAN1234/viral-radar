@@ -1,6 +1,6 @@
 # Monogatari Buzz Maker / 物語バズメーカー
 
-![Version](https://img.shields.io/badge/version-1.2.8-0f766e)
+![Version](https://img.shields.io/badge/version-1.2.9-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -70,11 +70,11 @@ The local port is fixed to `5180` so this app can run beside the other Antigravi
 
 ---
 
-## Current v1.2.8 Behavior / 現行v1.2.8挙動
+## Current v1.2.9 Behavior / 現行v1.2.9挙動
 
-The current public line is **v1.2.8**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
+The current public line is **v1.2.9**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists.
 
-現行公開系統は **v1.2.8** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
+現行公開系統は **v1.2.9** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
 
 * **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, categories, and derived metrics. If retrieval fails, the UI reports the failure instead of recycling old or invented topics.
   公開Web/RSS取得では、ソースURL、検索語、観測時刻、カテゴリ、算出指標を含む根拠行を作ります。取得失敗時は古い結果や架空トピックを回さず、失敗状態を表示します。
@@ -960,7 +960,18 @@ It does not call the other apps at runtime. Each app works independently.
 
 ---
 
+
+## Browser security / ブラウザーの安全対策
+
+The app limits script execution and API connections with Content Security Policy, disables embedded frames and form submissions, and sends no referrer. Open the app directly in its own tab. API keys remain sensitive while in memory; these protections do not guarantee the absence of every vulnerability. Every deployment checks dependencies, source safeguards and the built policy.
+
+CSPでスクリプト実行・API接続先を制限し、埋め込み表示とフォーム送信を禁止、参照元情報を送信しません。アプリは直接タブで開いてください。メモリー内のAPIキーも機密情報であり、すべての脆弱性がないことを保証するものではありません。毎回のデプロイで依存ライブラリ・ソースの防御・ビルド後の設定を検査します。
+
 ## Changelog / 更新履歴
+
+### v1.2.9 (2026-10-07)
+
+- Security: CSP and frame protection, dependency updates, and mandatory release checks. / CSP・埋め込み防御・依存更新・公開前検査を追加。
 
 ### v1.2.8 (2026-10-04)
 
