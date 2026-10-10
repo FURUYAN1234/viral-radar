@@ -686,7 +686,15 @@ Interpretation of app usage is based on Japanese law. / 本アプリの利用に
 
 ---
 
+## Browser security / ブラウザーの安全対策
+
+This update further strengthens security while preserving the existing creation workflow. / 今回の更新では、既存の制作フローを保ちながらセキュリティをさらに強化しました。
+
+The app limits script execution and API connections with Content Security Policy, disables embedded frames and form submissions, and sends no referrer. Open the app directly in its own tab. API keys remain sensitive while in memory; these protections do not guarantee the absence of every vulnerability. Every deployment checks dependencies, source safeguards and the built policy. / CSPでスクリプト実行・API接続先を制限し、埋め込み表示とフォーム送信を禁止、参照元情報を送信しません。アプリは直接タブで開いてください。メモリー内のAPIキーも機密情報であり、すべての脆弱性がないことを保証するものではありません。毎回のデプロイで依存ライブラリ・ソースの防御・ビルド後の設定を検査します。
+
 ## AI Manga Creative Suite / AIまんが制作エコシステム
+
+This app is one component in a broader AI-assisted manga and story production workflow. / このアプリは、AIを活用した漫画・物語制作ワークフローの一部です。
 
 Monogatari Buzz Maker is designed as one tool in the Antigravity AI creative support suite. / 物語バズメーカーは、Antigravity内のAI制作支援群の一部として設計されています。
 
@@ -694,24 +702,16 @@ It does not call the other apps at runtime. Each app works independently. / た�
 
 ### Ecosystem Components / 構成システム
 
-| App / アプリ | Role / 役割 | Links / リンク |
-|---|---|---|
-| Nano Banana Pro / Super FURU AI 4-koma System | 4-koma manga and image-generation prompt support / 4コマ漫画・画像生成プロンプト生成 | [Explanation / 解説](https://note.com/happy_duck780/n/ndf063558c1f5) / [Demo / デモ](https://furuyan1234.github.io/nano-banana-pro/) / [Code / コード](https://github.com/FURUYAN1234/nano-banana-pro) |
-| AI Story Maker / Story Maker | Story text, scripts, short stories, and mid-length generation / 物語本文・脚本・短編・中編生成 | [Explanation / 解説](https://note.com/happy_duck780/n/nd3d972922868) / [Demo / デモ](https://furuyan1234.github.io/story-maker/) / [Code / コード](https://github.com/FURUYAN1234/story-maker) |
-| AI Character Sheet Maker / キャラクターシートメーカー | Character settings and image-prompt support / キャラクター設定と画像プロンプト支援 | [Explanation / 解説](https://note.com/happy_duck780/n/neccbebd7d957) / [Demo / デモ](https://furuyan1234.github.io/character-sheet-maker/) / [Code / コード](https://github.com/FURUYAN1234/character-sheet-maker) |
-| AI Comic Translation Tool / 漫画翻訳ツール | Manga translation and translated-image processing / 漫画翻訳・翻訳画像処理支援 | [Explanation / 解説](https://note.com/happy_duck780/n/ne462dfc55ec8) / [Demo / デモ](https://furuyan1234.github.io/comic-translation/) / [Code / コード](https://github.com/FURUYAN1234/comic-translation) |
-| 360° AI Panorama Generator / 360度パノラマ生成 | Background and panorama material generation / 背景・パノラマ素材生成 | [Explanation / 解説](https://note.com/happy_duck780/n/nb53b121fef88) / [Demo / デモ](https://furuyan1234.github.io/panoforge/) / [Code / コード](https://github.com/FURUYAN1234/panoforge) |
-| AI Voice Comic Maker / フルボイス動画メーカー | Short-video and voiced-video generation from manga material / 漫画素材からショート動画・音声動画を生成 | [Explanation / 解説](https://note.com/happy_duck780/n/ndc6533c1512f) / [Code / コード](https://github.com/FURUYAN1234/ai-voice-comic-maker) |
-| Monogatari Buzz Maker / 物語バズメーカー | Convert public Web/RSS trends into creative plans / 公開Web/RSSトレンドを創作企画へ変換 | [Explanation / 解説](https://note.com/happy_duck780/n/ncc593101d77f) / [Demo / デモ](https://furuyan1234.github.io/viral-radar/) / [Code / コード](https://github.com/FURUYAN1234/viral-radar) |
-
----
-
-
-## Browser security / ブラウザーの安全対策
-
-This update further strengthens security while preserving the existing creation workflow. / 今回の更新では、既存の制作フローを保ちながらセキュリティをさらに強化しました。
-
-The app limits script execution and API connections with Content Security Policy, disables embedded frames and form submissions, and sends no referrer. Open the app directly in its own tab. API keys remain sensitive while in memory; these protections do not guarantee the absence of every vulnerability. Every deployment checks dependencies, source safeguards and the built policy. / CSPでスクリプト実行・API接続先を制限し、埋め込み表示とフォーム送信を禁止、参照元情報を送信しません。アプリは直接タブで開いてください。メモリー内のAPIキーも機密情報であり、すべての脆弱性がないことを保証するものではありません。毎回のデプロイで依存ライブラリ・ソースの防御・ビルド後の設定を検査します。
+| **Tool / ツール** | **Role / 役割** | **Repository / リポジトリ** |
+| --- | --- | --- |
+| Super FURU AI 4-koma System / Super FURU AI 4コマシステム | AI 4-panel manga generation / AI 4コマ漫画生成 | [nano-banana-pro](https://github.com/FURUYAN1234/nano-banana-pro) |
+| Story Maker | Story and plot generation / 物語・プロット生成 | [story-maker](https://github.com/FURUYAN1234/story-maker) |
+| AI Character Sheet Maker / AIキャラクターシートメーカー | Character reference generation / キャラクター資料生成 | [character-sheet-maker](https://github.com/FURUYAN1234/character-sheet-maker) |
+| AI Comic Translation Tool / AI漫画翻訳ツール | Manga translation and regeneration / 漫画翻訳・再生成 | [comic-translation](https://github.com/FURUYAN1234/comic-translation) |
+| 360° AI Panorama Generator / 360度AIパノラマ生成ツール | 360-degree background generation / 360度背景生成 | [panoforge](https://github.com/FURUYAN1234/panoforge) |
+| AI Voice Comic Maker / AI音声コミックメーカー | Voice comic video generation / フルボイス動画化 | [ai-voice-comic-maker](https://github.com/FURUYAN1234/ai-voice-comic-maker) |
+| Monogatari Buzz Maker / 物語バズメーカー | Trend research and creative planning / トレンド調査・創作企画 | [viral-radar](https://github.com/FURUYAN1234/viral-radar) |
+| Narration Video Maker / ナレーション動画メーカー | Video generation with narration, subtitles, and BGM / ナレーション・字幕・BGM付き動画生成 | [gemini-narration-studio](https://github.com/FURUYAN1234/gemini-narration-studio) |
 
 ## Changelog / 更新履歴
 
