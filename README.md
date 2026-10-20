@@ -2,6 +2,10 @@
 
 > **Source code available; free to use.** Ordinary use, free integration and free provision require no application, prior contact or permission from FURU. You may sell and monetize your own works. External API costs and third-party terms are separate. See Terms & Output Rights below. / **ソースコード公開・利用無料。** 通常利用と無料の組み込み・無料提供に、申請・事前連絡・FURUの許可は不要です。自分の作品は販売・収益化できます。外部API料金と第三者の条件は別です。詳しくは「利用条件・作品の権利」をご確認ください。
 
+[![物語バズメーカー デモサイトを開く。リンク先: https://furuyan1234.github.io/viral-radar/](docs/assets/demo-site-button.png)](https://furuyan1234.github.io/viral-radar/)
+
+Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
+
 
 ![Version](https://img.shields.io/badge/version-1.2.9-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
