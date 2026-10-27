@@ -7,7 +7,7 @@
 Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
 
 
-![Version](https://img.shields.io/badge/version-1.2.9-0f766e)
+![Version](https://img.shields.io/badge/version-1.2.10-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -56,9 +56,9 @@ The local port is fixed to `5180` so this app can run beside the other Antigravi
 
 ---
 
-## Current v1.2.9 Behavior / 現行v1.2.9挙動
+## Current v1.2.10 Behavior / 現行v1.2.10挙動
 
-The current public line is **v1.2.9**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists. / 現行公開系統は **v1.2.9** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
+The current release line is **v1.2.10**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists. / 現行リリース系統は **v1.2.10** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
 
 * **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, categories, and derived metrics. If retrieval fails, the UI reports the failure instead of recycling old or invented topics. / 公開Web/RSS取得では、ソースURL、検索語、観測時刻、カテゴリ、算出指標を含む根拠行を作ります。取得失敗時は古い結果や架空トピックを回さず、失敗状態を表示します。
 * **Provider analysis / プロバイダー分析**: OpenAI or Gemini analysis runs only when the user supplies a valid UI-entered key and the provider returns usable content. Local templates do not pretend to be AI analysis or reference prose.
@@ -718,6 +718,10 @@ It does not call the other apps at runtime. Each app works independently. / た�
 | Narration Video Maker / ナレーション動画メーカー | Video generation with narration, subtitles, and BGM / ナレーション・字幕・BGM付き動画生成 | [gemini-narration-studio](https://github.com/FURUYAN1234/gemini-narration-studio) |
 
 ## Changelog / 更新履歴
+
+### v1.2.10 (2026-10-27)
+
+- Added GPT-6.1 Terra between Sol and GPT-6 Sol in the OpenAI selection and fallback route at $1 input / $5 output per million tokens. Preserved Viral Radar's GPT-4 compatibility choices and Gemini route. / OpenAIの選択肢とフォールバックでGPT-6.1 TerraをSolとGPT-6 Solの間に追加しました。入力$1・出力$5／100万トークンです。Viral RadarのGPT-4互換選択肢とGemini経路は維持しています。
 
 ### v1.2.9 (2026-10-07)
 

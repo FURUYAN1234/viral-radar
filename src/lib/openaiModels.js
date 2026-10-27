@@ -12,6 +12,11 @@ const VIRAL_RADAR_MODEL_COPY = Object.freeze({
     description: '新しいSolで企画の構成と料金のバランスを重視',
     comparisonNote: '開発版・公開版の既定候補です。根拠整理と漫画・動画・小説の企画設計に使い、題材ごとの生成結果を確認してください。',
   }),
+  'gpt-6.1-terra': Object.freeze({
+    priceSnapshotDate: '2026-10-27',
+    description: '画像の理解と企画文を素早く低コストで処理',
+    comparisonNote: 'GPT-6.1 Solの半額の通常単価。根拠整理や媒体別の企画結果は題材ごとに確認してください。',
+  }),
   'gpt-6-astra': Object.freeze({
     description: '複雑な制約・複数媒体の企画設計を重視',
     comparisonNote:
@@ -39,7 +44,7 @@ const VIRAL_RADAR_MODEL_COPY = Object.freeze({
   }),
   'gpt-4.1': Object.freeze({
     description: '高速な非推論モデルで安定した企画整理',
-    comparisonNote: 'Terraより出力単価が低めです。定型に近い根拠整理や企画案を速く構成したい場合に向きます。',
+    comparisonNote: '定型に近い根拠整理や企画案を速く構成したい場合に向きます。',
   }),
   'gpt-4.1-mini': Object.freeze({
     description: '軽量・高速な非推論モデル',
@@ -55,13 +60,33 @@ const VIRAL_RADAR_MODEL_COPY = Object.freeze({
   }),
 });
 
+// Viral Radar still offers these previously selectable compatibility models.
+// The Nano snapshot contains only Nano's current model chain.
+const VIRAL_RADAR_COMPATIBILITY_MODELS = Object.freeze([
+  { id: 'gpt-4.1', label: 'GPT-4.1', group: 'GPT-4.1', inputPriceUsdPerM: 2, outputPriceUsdPerM: 8 },
+  { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini', group: 'GPT-4.1', inputPriceUsdPerM: 0.4, outputPriceUsdPerM: 1.6 },
+  { id: 'gpt-4.1-nano', label: 'GPT-4.1 nano', group: 'GPT-4.1', inputPriceUsdPerM: 0.1, outputPriceUsdPerM: 0.4 },
+  { id: 'gpt-4o', label: 'GPT-4o', group: '互換', inputPriceUsdPerM: 2.5, outputPriceUsdPerM: 10 },
+]);
+
+const nanoModels = NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models;
+const modelChain = [
+  ...nanoModels,
+  ...VIRAL_RADAR_COMPATIBILITY_MODELS.filter((model) => !nanoModels.some((source) => source.id === model.id)),
+];
+
 export const OPENAI_MODEL_OPTIONS = Object.freeze(
-  NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models.map((model) => {
+  modelChain.map((model, index) => {
     const productCopy = VIRAL_RADAR_MODEL_COPY[model.id] || {
       description: '用途と料金を確認して選択',
       comparisonNote: '物語バズメーカーでの生成結果を確認して利用してください。',
     };
-    return Object.freeze({ ...model, ...productCopy });
+    return Object.freeze({
+      ...model,
+      role: index === 0 ? 'Primary' : index === modelChain.length - 1 ? 'Fallback' : 'Backup',
+      order: index + 1,
+      ...productCopy,
+    });
   }),
 );
 export const OPENAI_MODEL_PRICE_SNAPSHOT_DATE =

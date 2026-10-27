@@ -390,6 +390,7 @@ test('provider model chains follow the Nano Banana Pro text fallback order', () 
   ]);
   assert.deepEqual(getProviderModelChain('openai'), [
     'gpt-6.1-sol',
+    'gpt-6.1-terra',
     'gpt-6-sol',
     'gpt-5.6-sol',
     'gpt-5.6-terra',
@@ -587,12 +588,12 @@ test('runProviderAnalysis falls back to the next Nano Banana Pro model on provid
     },
   });
 
-  assert.deepEqual(attemptedModels, ['gpt-6.1-sol', 'gpt-6-sol']);
+  assert.deepEqual(attemptedModels, ['gpt-6.1-sol', 'gpt-6.1-terra']);
   assert.equal(result.summary, 'fallback ok');
-  assert.equal(result.used_model, 'gpt-6-sol');
+  assert.equal(result.used_model, 'gpt-6.1-terra');
   assert.deepEqual(
     result.fallback_chain.map((attempt) => `${attempt.model}:${attempt.status}`),
-    ['gpt-6.1-sol:failed', 'gpt-6-sol:success'],
+    ['gpt-6.1-sol:failed', 'gpt-6.1-terra:success'],
   );
   assert.equal(JSON.stringify(result).includes(OPENAI_SECRET_KEY), false);
 });
@@ -1560,7 +1561,7 @@ test('runProviderAnalysis falls back when a model omits visible evidence-card re
     },
   });
 
-  assert.equal(result.used_model, 'gpt-6-sol');
+  assert.equal(result.used_model, 'gpt-6.1-terra');
   assert.equal(result.evidenceCards.length, 2);
   assert.equal(result.fallback_chain[0].status, 'failed');
 });

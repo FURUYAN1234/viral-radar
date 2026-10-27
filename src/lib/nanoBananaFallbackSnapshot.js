@@ -4,29 +4,29 @@
 export const NANO_BANANA_FALLBACK_SNAPSHOT = {
   "sourceApp": "nano-banana-pro",
   "syncScope": "openai-only",
-  "sourceVersion": "6.9.4",
-  "syncedAt": "2026-10-07T05:02:46.099Z",
-  "sourceFingerprint": "6a6915d725098949d2090c2d9448bcbe91be8d1f76006d4f22586cad67b634cd",
+  "sourceVersion": "7.2.0",
+  "syncedAt": "2026-10-27T02:06:25.625Z",
+  "sourceFingerprint": "5057285b2517df7bac349a0653695737329eaa4bb474ad332d3713b3597732bd",
   "sourceFiles": [
     {
       "path": "nano-banana-pro/package.json",
       "bytes": 1605,
-      "sha256": "d7fa33a16edf585c6236083e6bce4589a22aa1c3694df6c5641284435475f4a7"
+      "sha256": "11405b012770b6a433f0938a130bccb33580643cb0a1a004772a893bc521b5fc"
     },
     {
       "path": "nano-banana-pro/src/lib/fallback-chain-history.js",
-      "bytes": 16698,
-      "sha256": "1f60a328c35300c988a60c37f1d4cb0e9a803014889a48909f0d63835dbd8dfa"
+      "bytes": 17753,
+      "sha256": "ecc6a3529babd20dd188da346856c6a007deabd6766ded795ea920e9dcb96497"
     },
     {
       "path": "nano-banana-pro/src/lib/gemini-model-routes.js",
-      "bytes": 915,
-      "sha256": "de1fd370808aea14555af608a4813436918dea0b4e6a6a6e0ae234078ae4c457"
+      "bytes": 856,
+      "sha256": "6fdc75cb196c772d95c0d167c8177a873d443d597f42b42b4aae6a3d46e8cb27"
     },
     {
       "path": "nano-banana-pro/src/config/openai-scenario-models.json",
-      "bytes": 3896,
-      "sha256": "7b7a77e3e834b3c697a37fbc623725cf30effd801fd82816bcc196869b6bcebd"
+      "bytes": 3301,
+      "sha256": "9f19b6d4a6988c1d0aaea2ae93d487d11524e9491ddc4ccf6b8708027c069ba1"
     }
   ],
   "chains": {
@@ -64,7 +64,7 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
     "openaiText": {
       "provider": "openai",
       "sourceFile": "nano-banana-pro/src/config/openai-scenario-models.json",
-      "priceSnapshotDate": "2026-10-07",
+      "priceSnapshotDate": "2026-10-27",
       "priceSnapshotSource": "OpenAI official model pricing",
       "models": [
         {
@@ -86,13 +86,22 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
           "order": 2
         },
         {
+          "id": "gpt-6.1-terra",
+          "label": "GPT-6.1 Terra",
+          "group": "GPT-6.1",
+          "inputPriceUsdPerM": 1,
+          "outputPriceUsdPerM": 5,
+          "role": "Backup",
+          "order": 3
+        },
+        {
           "id": "gpt-6-sol",
           "label": "GPT-6 Sol",
           "group": "GPT-6",
           "inputPriceUsdPerM": 2,
           "outputPriceUsdPerM": 10,
           "role": "Backup",
-          "order": 3
+          "order": 4
         },
         {
           "id": "gpt-5.6-sol",
@@ -101,7 +110,7 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
           "inputPriceUsdPerM": 4,
           "outputPriceUsdPerM": 20,
           "role": "Backup",
-          "order": 4
+          "order": 5
         },
         {
           "id": "gpt-5.6-terra",
@@ -110,7 +119,7 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
           "inputPriceUsdPerM": 2,
           "outputPriceUsdPerM": 12,
           "role": "Backup",
-          "order": 5
+          "order": 6
         },
         {
           "id": "gpt-6-luna",
@@ -119,7 +128,7 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
           "inputPriceUsdPerM": 0.1,
           "outputPriceUsdPerM": 0.5,
           "role": "Backup",
-          "order": 6
+          "order": 7
         },
         {
           "id": "gpt-5.6-luna",
@@ -127,44 +136,8 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
           "group": "GPT-5.6",
           "inputPriceUsdPerM": 0.2,
           "outputPriceUsdPerM": 1.2,
-          "role": "Backup",
-          "order": 7
-        },
-        {
-          "id": "gpt-4.1",
-          "label": "GPT-4.1",
-          "group": "GPT-4.1",
-          "inputPriceUsdPerM": 2,
-          "outputPriceUsdPerM": 8,
-          "role": "Backup",
-          "order": 8
-        },
-        {
-          "id": "gpt-4.1-mini",
-          "label": "GPT-4.1 mini",
-          "group": "GPT-4.1",
-          "inputPriceUsdPerM": 0.4,
-          "outputPriceUsdPerM": 1.6,
-          "role": "Backup",
-          "order": 9
-        },
-        {
-          "id": "gpt-4.1-nano",
-          "label": "GPT-4.1 nano",
-          "group": "GPT-4.1",
-          "inputPriceUsdPerM": 0.1,
-          "outputPriceUsdPerM": 0.4,
-          "role": "Backup",
-          "order": 10
-        },
-        {
-          "id": "gpt-4o",
-          "label": "GPT-4o",
-          "group": "互換",
-          "inputPriceUsdPerM": 2.5,
-          "outputPriceUsdPerM": 10,
           "role": "Fallback",
-          "order": 11
+          "order": 8
         }
       ]
     }

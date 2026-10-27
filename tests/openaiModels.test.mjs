@@ -19,6 +19,16 @@ test('OpenAI model catalog defaults to 6.1 Sol and keeps the synced display meta
   assert.equal(OPENAI_MODEL_OPTIONS[0].label, 'GPT-6 Astra');
   assert.equal(OPENAI_MODEL_PRICE_SNAPSHOT_DATE, NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate);
   assert.equal(getOpenAIModelOption('gpt-6.1-sol').priceSnapshotDate, '2026-09-30');
+  const terra = getOpenAIModelOption('gpt-6.1-terra');
+  assert.equal(terra.id, 'gpt-6.1-terra');
+  assert.equal(terra.inputPriceUsdPerM, 1);
+  assert.equal(terra.outputPriceUsdPerM, 5);
+  assert.equal(terra.priceSnapshotDate, '2026-10-27');
+  assert.deepEqual(OPENAI_MODEL_OPTIONS.slice(-4).map((model) => model.id), [
+    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o',
+  ]);
+  assert.equal(getOpenAIModelOption('gpt-4.1').inputPriceUsdPerM, 2);
+  assert.equal(getOpenAIModelOption('gpt-4o').outputPriceUsdPerM, 10);
   assert.match(formatOpenAIModelPrice(getOpenAIModelOption('gpt-6-luna')), /入力 \$0\.1 \/ 出力 \$0\.5/);
   assert.equal(
     OPENAI_MODEL_OPTIONS.every((model) => typeof model.comparisonNote === 'string' && model.comparisonNote.length > 0),
@@ -46,8 +56,9 @@ test('model routing metadata is synced without importing Nano Banana product cop
 });
 
 test('OpenAI model route starts at the selected model and only moves downward', () => {
-  assert.deepEqual(getOpenAIModelRoute('gpt-6-astra').slice(0, 3), ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol']);
-  assert.deepEqual(getOpenAIModelRoute().slice(0, 2), ['gpt-6.1-sol', 'gpt-6-sol']);
+  assert.deepEqual(getOpenAIModelRoute('gpt-6-astra').slice(0, 4), ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol']);
+  assert.deepEqual(getOpenAIModelRoute().slice(0, 3), ['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol']);
+  assert.equal(getOpenAIModelRoute('gpt-6.1-terra').includes('gpt-6.1-sol'), false);
   assert.equal(getOpenAIModelRoute().includes('gpt-6-astra'), false);
   assert.equal(getOpenAIModelRoute('gpt-6-sol').includes('gpt-6.1-sol'), false);
   assert.deepEqual(getOpenAIModelRoute('gpt-6-luna'), [
