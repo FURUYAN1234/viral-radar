@@ -3,15 +3,15 @@
 
 export const NANO_BANANA_FALLBACK_SNAPSHOT = {
   "sourceApp": "nano-banana-pro",
-  "syncScope": "openai-only",
-  "sourceVersion": "7.2.0",
-  "syncedAt": "2026-10-27T02:06:25.625Z",
-  "sourceFingerprint": "5057285b2517df7bac349a0653695737329eaa4bb474ad332d3713b3597732bd",
+  "syncScope": "all-providers",
+  "sourceVersion": "7.2.6",
+  "syncedAt": "2026-11-03T08:51:21.004Z",
+  "sourceFingerprint": "fa3617a76316f3e8842106dbdcaab34707c2585110fe1e4ae4f5acf99d71cfe3",
   "sourceFiles": [
     {
       "path": "nano-banana-pro/package.json",
-      "bytes": 1605,
-      "sha256": "11405b012770b6a433f0938a130bccb33580643cb0a1a004772a893bc521b5fc"
+      "bytes": 1648,
+      "sha256": "725e5dddda1976a3909d1a653ac058e68e61bae3046f438b7a107d1ed38c458d"
     },
     {
       "path": "nano-banana-pro/src/lib/fallback-chain-history.js",
@@ -21,12 +21,12 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
     {
       "path": "nano-banana-pro/src/lib/gemini-model-routes.js",
       "bytes": 856,
-      "sha256": "6fdc75cb196c772d95c0d167c8177a873d443d597f42b42b4aae6a3d46e8cb27"
+      "sha256": "0bec4c1fe455e058611c7df4eec9f57e3a48341d5b0a4ff76c4983846963d146"
     },
     {
       "path": "nano-banana-pro/src/config/openai-scenario-models.json",
       "bytes": 3301,
-      "sha256": "9f19b6d4a6988c1d0aaea2ae93d487d11524e9491ddc4ccf6b8708027c069ba1"
+      "sha256": "4f781a3218656d57e78ed10279628ac587bed873cf293ed503e297eda7e7744e"
     }
   ],
   "chains": {
@@ -35,36 +35,31 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
       "sourceFile": "nano-banana-pro/src/lib/gemini-model-routes.js",
       "models": [
         {
-          "id": "gemini-3.5-flash",
+          "id": "gemini-3.8-flash",
           "role": "Primary",
           "order": 1
         },
         {
-          "id": "gemini-2.5-flash",
+          "id": "gemini-3.6-flash",
           "role": "Backup",
           "order": 2
         },
         {
-          "id": "gemini-2.5-pro",
+          "id": "gemini-3.5-flash-lite",
           "role": "Backup",
           "order": 3
         },
         {
-          "id": "gemini-flash-latest",
-          "role": "Backup",
-          "order": 4
-        },
-        {
-          "id": "gemini-pro-latest",
+          "id": "gemini-3.1-flash-lite",
           "role": "Fallback",
-          "order": 5
+          "order": 4
         }
       ]
     },
     "openaiText": {
       "provider": "openai",
       "sourceFile": "nano-banana-pro/src/config/openai-scenario-models.json",
-      "priceSnapshotDate": "2026-10-27",
+      "priceSnapshotDate": "2026-11-03",
       "priceSnapshotSource": "OpenAI official model pricing",
       "models": [
         {

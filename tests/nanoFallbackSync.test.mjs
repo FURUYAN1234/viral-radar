@@ -14,17 +14,17 @@ test('nano banana pro fallback snapshot is synced from source model arrays', asy
   const scriptPath = resolve(appRoot, 'scripts/sync-nano-fallback-chain.mjs');
 
   assert.equal(packageJson.scripts['sync:nano-fallback'], 'node scripts/sync-nano-fallback-chain.mjs');
-  assert.equal(packageJson.scripts['check:nano-fallback'], 'node scripts/sync-nano-fallback-chain.mjs --check --openai-only');
+  assert.equal(packageJson.scripts['check:nano-fallback'], 'node scripts/sync-nano-fallback-chain.mjs --check');
   assert.equal(existsSync(scriptPath), true);
   assert.equal(existsSync(snapshotPath), true);
 
   const { NANO_BANANA_FALLBACK_SNAPSHOT } = await import(`../src/lib/nanoBananaFallbackSnapshot.js?test=${Date.now()}`);
 
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.sourceApp, 'nano-banana-pro');
-  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.syncScope, 'openai-only');
+  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.syncScope, 'all-providers');
   assert.deepEqual(
     NANO_BANANA_FALLBACK_SNAPSHOT.chains.geminiText.models.map((model) => model.id),
-    ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest', 'gemini-pro-latest'],
+    ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'],
   );
   assert.deepEqual(
     NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models.map((model) => model.id),
@@ -72,11 +72,15 @@ test('OpenAI-only synchronization preserves Gemini while ordinary synchronizatio
     assert.equal(readSnapshot().syncScope, 'openai-only');
     assert.equal(readSnapshot().chains.openaiText.models[1].id, 'gpt-6.1-sol');
     assert.equal(readSnapshot().chains.openaiText.models[2].id, 'gpt-6.1-terra');
+    const stale = spawnSync(process.execPath, [fixtureScript, '--check'], { encoding: 'utf8' });
+    assert.notEqual(stale.status, 0, 'normal upstream gate must reject a stale Gemini chain');
     const full = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' });
     assert.equal(full.status, 0, full.stderr);
     assert.notDeepEqual(readSnapshot().chains.geminiText, originalGemini);
     assert.equal(readSnapshot().syncScope, 'all-providers');
     assert.equal(readSnapshot().chains.geminiText.models[0].id, 'gemini-test-route');
+    const current = spawnSync(process.execPath, [fixtureScript, '--check'], { encoding: 'utf8' });
+    assert.equal(current.status, 0, current.stderr);
     rmSync(fixtureSnapshot);
     const missing = spawnSync(process.execPath, [fixtureScript, '--openai-only'], { encoding: 'utf8' });
     assert.notEqual(missing.status, 0);

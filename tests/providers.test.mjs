@@ -138,7 +138,7 @@ test('getProviderStatus detects provider from a single API key field', () => {
   assert.equal(getProviderStatus({ apiKey: '' }).mode, 'fixture');
   assert.equal(getProviderStatus({ apiKey: 'not-a-real-provider-key' }).mode, 'unknown');
   assert.equal(openaiStatus.provider.label, 'OpenAI gpt-6.1-sol');
-  assert.equal(geminiStatus.provider.label, 'Gemini gemini-3.5-flash');
+  assert.equal(geminiStatus.provider.label, 'Gemini gemini-3.8-flash');
   assert.equal(openaiStatus.provider.label.includes('sk-'), false);
   assert.equal(geminiStatus.provider.label.includes('AIza'), false);
 });
@@ -381,13 +381,7 @@ test('runPlanDesignGeneration drops typo-like provider notes instead of showing 
 });
 
 test('provider model chains follow the Nano Banana Pro text fallback order', () => {
-  assert.deepEqual(getProviderModelChain('gemini'), [
-    'gemini-3.5-flash',
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-flash-latest',
-    'gemini-pro-latest',
-  ]);
+  assert.deepEqual(getProviderModelChain('gemini'), ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
   assert.deepEqual(getProviderModelChain('openai'), [
     'gpt-6.1-sol',
     'gpt-6.1-terra',
@@ -556,7 +550,7 @@ test('runProviderAnalysis sends Gemini keys in a header without URL query exposu
   assert.doesNotMatch(captured.url, /\?key=/);
   assert.equal(captured.init.headers['x-goog-api-key'], GEMINI_TEST_KEY);
   assert.equal(captured.init.body.includes(GEMINI_TEST_KEY), false);
-  assert.equal(result.used_model, 'gemini-3.5-flash');
+  assert.equal(result.used_model, 'gemini-3.8-flash');
 });
 
 test('runProviderAnalysis falls back to the next Nano Banana Pro model on provider failure', async () => {

@@ -1,5 +1,7 @@
 # Monogatari Buzz Maker / 物語バズメーカー
 
+**Gemini model route / Geminiモデル候補**: `gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite`. Explicit stable IDs avoid the December 1, 2026 redirects; image-generation models keep their dedicated routes. / 2026年12月1日の旧モデル自動転送に依存しないよう、現行GAモデルを明示します。画像生成は専用のモデル経路を使います。
+
 > **Source code available; free to use.** Ordinary use, free integration and free provision require no application, prior contact or permission from FURU. You may sell and monetize your own works. External API costs and third-party terms are separate. See Terms & Output Rights below. / **ソースコード公開・利用無料。** 通常利用と無料の組み込み・無料提供に、申請・事前連絡・FURUの許可は不要です。自分の作品は販売・収益化できます。外部API料金と第三者の条件は別です。詳しくは「利用条件・作品の権利」をご確認ください。
 
 [![物語バズメーカー デモサイトを開く。リンク先: https://furuyan1234.github.io/viral-radar/](docs/assets/demo-site-button.png)](https://furuyan1234.github.io/viral-radar/)
@@ -7,7 +9,7 @@
 Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
 
 
-![Version](https://img.shields.io/badge/version-1.2.10-0f766e)
+![Version](https://img.shields.io/badge/version-1.3.0-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -56,9 +58,9 @@ The local port is fixed to `5180` so this app can run beside the other Antigravi
 
 ---
 
-## Current v1.2.10 Behavior / 現行v1.2.10挙動
+## Current v1.3.0 Behavior / 現行v1.3.0挙動
 
-The current release line is **v1.2.10**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists. / 現行リリース系統は **v1.2.10** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
+The current release line is **v1.3.0**. It is evidence-first by design: retrieval, scoring, provider analysis, creative planning, and exports are separated so the UI does not pretend that missing data exists. / 現行リリース系統は **v1.3.0** です。根拠優先の設計で、取得、スコアリング、プロバイダー分析、制作案、エクスポートを分離し、存在しないデータをあるように見せません。
 
 * **Retrieval boundary / 取得境界**: Public Web/RSS retrieval can produce evidence rows with source URLs, query terms, timestamps, categories, and derived metrics. If retrieval fails, the UI reports the failure instead of recycling old or invented topics. / 公開Web/RSS取得では、ソースURL、検索語、観測時刻、カテゴリ、算出指標を含む根拠行を作ります。取得失敗時は古い結果や架空トピックを回さず、失敗状態を表示します。
 * **Provider analysis / プロバイダー分析**: OpenAI or Gemini analysis runs only when the user supplies a valid UI-entered key and the provider returns usable content. Local templates do not pretend to be AI analysis or reference prose.
@@ -318,7 +320,7 @@ The app uses a single API-key input field. OpenAI and Gemini keys are detected f
 
 Default: GPT-6.1 Sol / 既定: GPT-6.1 Sol
 
-For this OpenAI update, `node scripts/sync-nano-fallback-chain.mjs --openai-only` updates only the OpenAI catalog. `check:nano-fallback` checks this scope and preserves the current Gemini route. The ordinary `sync:nano-fallback` command still updates both providers; use it only when both providers are intended to change. / 今回のGPT更新は `--openai-only` で同期し、Geminiの経路を維持します。通常の `sync:nano-fallback` は両プロバイダーを同期するため、両方を更新する場合に使います。
+The normal `check:nano-fallback` gate checks both Gemini and OpenAI against Nano. Run `npm run sync:nano-fallback` when either catalog changes. Explicit `--openai-only` remains available for a scoped manual update, but does not replace the normal gate. / 通常の `check:nano-fallback` はGeminiとOpenAIの両方をNanoと照合します。いずれかの候補が変わった場合は `npm run sync:nano-fallback` で同期します。明示的な `--openai-only` は限定更新用に残しますが、通常検査の代わりにはしません。
 
 API connection does not start retrieval or analysis for either provider. With OpenAI, the user must explicitly choose a model, including GPT-6.1 Sol, and then press the `検索・分析を開始` button. With Gemini, the user presses the same button after connecting the key. GPT-6.1 Sol is recommended in both development and production. Astra remains selectable above Sol in the fallback order. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list. / どちらのAPIも、キーを接続しただけでは検索・分析を開始しません。OpenAIはGPT-6.1 Solが初期選択され、必要なら別モデルに変更してから `検索・分析を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。GPT-6.1 Solは開発版・公開版共通の既定モデルです。AstraはSolより上位の選択肢として残します。選択はページ内だけで保持され、再読み込みするとGPT-6.1 Solが初期選択されます。接続後はキー入力を閉じ、接続済みのマスク表示にします。「APIキーを変更」で新規入力を開き、キャンセルや形式不明の入力では現在の接続を維持します。実キーを入力欄へ復元しません。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
 
