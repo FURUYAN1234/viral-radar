@@ -4,7 +4,7 @@
   "private": true,
   "homepage": "https://FURUYAN1234.github.io/viral-radar",
   "description": "物語バズメーカー - 公開Web/RSSトレンドを漫画・動画・小説の制作案へ整理する創作支援ツール",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5180 --strictPort",
