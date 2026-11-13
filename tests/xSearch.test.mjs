@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { searchX, xApiMiddleware, xApiPlugin } from '../server/xApi.mjs';
 import { xSearchOptions, normalizeXResponse, applyXHistory, formatXMetrics, xEvidenceScore } from '../src/lib/xSearch.js';
-import { renderXPanel, createXState } from '../src/lib/xPanel.js';
+import { renderXPanel, createXState, canUseLocalApi } from '../src/lib/xPanel.js';
 import { runDraftSample } from '../src/lib/providers.js';
 
 const now = Date.parse('2026-11-13T00:00:00Z');
@@ -98,6 +98,19 @@ test('X panel escapes posts, has no token value, and hosted mode cannot send sec
   assert.match(html, /接続確認済み/);
   const hosted = renderXPanel(createXState(), { local: false, busy: false, categoryId: 'story-manga' });
   assert.ok(!hosted.includes('id="x-token"'));
+  assert.match(hosted, /このデモではX連携は利用できません/);
+  assert.doesNotMatch(hosted, /x-panel|x-source-mode|<input|<select|<button/);
+  assert.match(hosted, /archive\/refs\/heads\/main\.zip/);
+  assert.match(hosted, /#local-setup/);
+  const imported = renderXPanel(x, { local: false, busy: false, categoryId: 'story-manga' });
+  assert.doesNotMatch(imported, /x-panel|x-source-mode|id="x-token"|fixture-only|test-only/);
+  assert.match(html, /ローカル実行 · X利用可/);
+});
+
+test('local API availability requires a loopback HTTP origin, never a public or file URL', () => {
+  for (const url of ['http://127.0.0.1:5180/viral-radar/', 'http://localhost:5180/', 'http://[::1]:5180/']) assert.equal(canUseLocalApi(new URL(url)), true);
+  for (const url of ['https://furuyan1234.github.io/viral-radar/', 'https://example.com/', 'file:///C:/app/index.html', 'https://localhost.evil.example/', 'http://127.0.0.1.evil.example/']) assert.equal(canUseLocalApi(new URL(url)), false);
+  assert.equal(canUseLocalApi({}), false);
 });
 
 test('X is explicitly optional and off by default, with settings only when enabled', () => {

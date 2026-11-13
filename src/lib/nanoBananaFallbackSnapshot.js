@@ -4,14 +4,14 @@
 export const NANO_BANANA_FALLBACK_SNAPSHOT = {
   "sourceApp": "nano-banana-pro",
   "syncScope": "all-providers",
-  "sourceVersion": "7.5.0",
-  "syncedAt": "2026-11-13T01:05:30.033Z",
-  "sourceFingerprint": "69e23cac72d05e73da5ffead22c5d0e63ec50d48568eaf2c1f2a7f5223c34f80",
+  "sourceVersion": "7.5.1",
+  "syncedAt": "2026-11-13T03:27:38.239Z",
+  "sourceFingerprint": "ad60990f1b9e1fcb7341e715d0dafc057213e303ad39c4be41b330cbb22cb7c4",
   "sourceFiles": [
     {
       "path": "nano-banana-pro/package.json",
       "bytes": 1704,
-      "sha256": "e9878fc542cf88f00cb82a3e65804022ff2e2de46af44648695708d4dbb7be1d"
+      "sha256": "cecc1e85fdb4f7c4c966d9712fd7b27b1408e3ab07586c087cabdeff88929126"
     },
     {
       "path": "nano-banana-pro/src/lib/fallback-chain-history.js",

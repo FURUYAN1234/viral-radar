@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const checkMode = process.argv.includes('--check');
+const bundledCheckMode = process.argv.includes('--check-bundled');
 const openaiOnly = process.argv.includes('--openai-only');
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(scriptDir, '..');
@@ -26,6 +27,23 @@ try {
 }
 
 function main() {
+  if (bundledCheckMode) {
+    const snapshot = readExistingSnapshot();
+    if (snapshot.sourceApp !== 'nano-banana-pro' || !/^\d+\.\d+\.\d+/.test(snapshot.sourceVersion || '')) throw new Error('Bundled model provenance is invalid.');
+    for (const [name, provider] of [['geminiText', 'gemini'], ['openaiText', 'openai']]) {
+      const chain = snapshot.chains?.[name];
+      if (chain?.provider !== provider || !Array.isArray(chain.models) || !chain.models.length) throw new Error(`Bundled ${provider} model list is missing.`);
+      const ids = new Set();
+      for (const [index, model] of chain.models.entries()) {
+        if (!/^[a-z0-9][a-z0-9.-]+$/.test(model.id || '') || ids.has(model.id) || model.order !== index + 1) throw new Error(`Bundled ${provider} model order or ID is invalid.`);
+        ids.add(model.id);
+      }
+    }
+    normalizeScenarioModels(snapshot.chains.openaiText.models);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.chains.openaiText.priceSnapshotDate || '')) throw new Error('Bundled price snapshot date is missing.');
+    console.log('同梱のモデル設定を確認しました。他アプリのインストールは不要です。');
+    return;
+  }
   assertSources();
 
   const snapshot = buildSnapshot();

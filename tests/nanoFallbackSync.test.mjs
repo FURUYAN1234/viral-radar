@@ -8,6 +8,34 @@ import { resolve } from 'node:path';
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
+test('downloaded app validates its bundled models without another app, while release checks stay strict', () => {
+  const temporary = mkdtempSync(resolve(tmpdir(), 'viral-portable-check-'));
+  try {
+    for (const file of ['scripts/sync-nano-fallback-chain.mjs', 'src/lib/nanoBananaFallbackSnapshot.js']) {
+      const target = resolve(temporary, 'app', file);
+      mkdirSync(resolve(target, '..'), { recursive: true });
+      copyFileSync(resolve(appRoot, file), target);
+    }
+    const script = resolve(temporary, 'app/scripts/sync-nano-fallback-chain.mjs');
+    const check = () => spawnSync(process.execPath, [script, '--check-bundled'], { encoding: 'utf8' });
+    const valid = check();
+    assert.equal(valid.status, 0, valid.stderr);
+    const releaseCheck = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
+    assert.notEqual(releaseCheck.status, 0, 'strict author-side upstream check must not skip missing sources');
+    const file = resolve(temporary, 'app/src/lib/nanoBananaFallbackSnapshot.js');
+    const original = readFileSync(file, 'utf8');
+    const data = JSON.parse(original.match(/= ([\s\S]*);\s*$/)[1]);
+    data.chains.openaiText.models = [];
+    writeFileSync(file, 'export const NANO_BANANA_FALLBACK_SNAPSHOT = '+JSON.stringify(data)+';\n');
+    assert.notEqual(check().status, 0, 'broken bundled model list must fail');
+    writeFileSync(file, original);
+    assert.equal(check().status, 0);
+  } finally {
+    rmSync(temporary, {recursive: true, force: true});
+  }
+});
+
+
 test('nano banana pro fallback snapshot is synced from source model arrays', async () => {
   const packageJson = JSON.parse(readFileSync(resolve(appRoot, 'package.json'), 'utf8'));
   const snapshotPath = resolve(appRoot, 'src/lib/nanoBananaFallbackSnapshot.js');
@@ -39,8 +67,7 @@ test('nano banana pro fallback snapshot is synced from source model arrays', asy
       'gpt-5.6-luna',
     ],
   );
-  const sourcePrices = JSON.parse(readFileSync(resolve(appRoot, '../nano-banana-pro/src/config/openai-scenario-models.json'), 'utf8'));
-  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate, sourcePrices.priceSnapshotDate);
+  assert.match(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[0].label, 'GPT-6 Astra');
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[2].inputPriceUsdPerM, 1);
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[6].inputPriceUsdPerM, 0.1);
@@ -59,8 +86,17 @@ test('OpenAI-only synchronization preserves Gemini while ordinary synchronizatio
     copyAt(resolve(appRoot, 'scripts/sync-nano-fallback-chain.mjs'), fixtureScript);
     const fixtureSnapshot = resolve(fixtureApp, 'src/lib/nanoBananaFallbackSnapshot.js');
     copyAt(resolve(appRoot, 'src/lib/nanoBananaFallbackSnapshot.js'), fixtureSnapshot);
-    for (const file of ['package.json', 'src/lib/fallback-chain-history.js', 'src/lib/gemini-model-routes.js', 'src/config/openai-scenario-models.json']) {
-      copyAt(resolve(appRoot, '../nano-banana-pro', file), resolve(temporary, 'nano-banana-pro', file));
+    const bundled = JSON.parse(readFileSync(fixtureSnapshot, 'utf8').match(/= ([\s\S]*);\s*$/)[1]);
+    const fixtureSources = {
+      'package.json': JSON.stringify({ version: '0.0.0' }),
+      'src/lib/fallback-chain-history.js': '// Test fixture provenance\n',
+      'src/lib/gemini-model-routes.js': `const GEMINI_TEXT_MODEL_IDS = ${JSON.stringify(bundled.chains.geminiText.models.map(model => model.id))};\n`,
+      'src/config/openai-scenario-models.json': JSON.stringify(bundled.chains.openaiText),
+    };
+    for (const [file, content] of Object.entries(fixtureSources)) {
+      const target = resolve(temporary, 'nano-banana-pro', file);
+      mkdirSync(resolve(target, '..'), { recursive: true });
+      writeFileSync(target, content);
     }
     const fixtureGeminiRoutes = resolve(temporary, 'nano-banana-pro/src/lib/gemini-model-routes.js');
     writeFileSync(fixtureGeminiRoutes, "const GEMINI_TEXT_MODEL_IDS = ['gemini-test-route'];\n");

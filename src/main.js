@@ -17,7 +17,7 @@ import { buildPlanDraftPrompt, buildReport } from './lib/reportEngine.js';
 import { getProviderStatus, runDraftSample, runPlanDesignGeneration, runProviderAnalysis, validateDraftSampleText } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
 import { loadSettingsFromStorage } from './lib/settings.js';
-import { createXState, renderXPanel } from './lib/xPanel.js';
+import { createXState, renderXPanel, canUseLocalApi } from './lib/xPanel.js';
 import { xSearchOptions, applyXHistory } from './lib/xSearch.js';
 
 const STORAGE_KEY = 'viral-radar-settings-v1';
@@ -25,7 +25,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -231,6 +231,7 @@ function currentProviderRunSignature(providerStatus) {
 }
 
 function render() {
+  const pendingXToken = document.querySelector('#x-token')?.value || '';
   const providerStatus = currentProviderStatus();
   const draftStatus = currentProviderStatus({ apiKey: state.apiKeyDraft });
   const providerLabel = providerStatus.provider.label;
@@ -260,7 +261,7 @@ function render() {
         <div class="header-api-block">
           <div class="status-strip" aria-label="API接続状態">
             <span class="${providerStatus.provider.connected ? 'ok' : ''}">生成AI: ${escapeHtml(providerLabel)}</span>
-            <span>${state.x.mode === 'rss' ? 'Xは使わない' : 'Xを使う'}</span>
+            ${shouldUseLocalTrendApi() ? `<span>${state.x.mode === 'rss' ? 'Xは使わない' : 'Xを使う'}</span>` : ''}
             ${
               !showApiPanel
                 ? `<button class="api-settings-button" id="api-settings" type="button" ${disabledAttr(uiWorking)}>${providerStatus.provider.connected ? 'APIキーを変更' : 'AI設定'}</button>`
@@ -307,8 +308,9 @@ function render() {
         </label>
       </section>
 
-      ${renderXPanel(state.x, { local: shouldUseLocalTrendApi(), busy: uiWorking, categoryId: state.selectedCategoryId, searchSeed:state.searchSeed })}
       ${showApiPanel ? renderApiConnectPanel(draftStatus, uiWorking) : ''}
+      ${renderXPanel(state.x, { local: shouldUseLocalTrendApi(), busy: uiWorking, categoryId: state.selectedCategoryId, searchSeed:state.searchSeed })}
+      ${!isApiReady() ? `<section class="api-start-panel">${renderApiStartGate(providerStatus)}</section>` : ''}
 
       <section class="action-row ${isLocked ? 'is-disabled' : ''}" aria-label="操作" ${isLocked ? 'aria-disabled="true"' : ''}>
         <button class="secondary-action" id="run-provider" type="button" ${disabled}>AI分析サマリーを更新</button>
@@ -397,6 +399,8 @@ function render() {
     </main>
   `;
 
+  const xTokenInput = document.querySelector('#x-token');
+  if (xTokenInput && pendingXToken) xTokenInput.value = pendingXToken;
   bindEvents(isLocked, showApiPanel);
   if (!providerStatus.provider.connected && showApiPanel) focusApiInputSoon();
 }
@@ -492,7 +496,6 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
         <button class="secondary-action compact" id="api-settings" type="button" ${inputDisabled}>APIキーを変更</button>
       </div>`}
       ${renderOpenAiModelControl(currentStatus, uiWorking)}
-      ${!isApiReady() ? renderApiStartGate(currentStatus) : ''}
     </section>
   `;
 }
@@ -785,6 +788,7 @@ function bindXControls() {
   bind('#x-token-clear', 'click', () => { state.x = createXState(); render(); });
   document.querySelectorAll('[name="x-source-mode"]').forEach(input => input.addEventListener('change', event => {
     if (isUiWorking()) return;
+    if (event.target.value !== 'rss' && !shouldUseLocalTrendApi()) return;
     x.mode = event.target.value; x.error = ''; render();
   }));
   for (const [selector, key, type] of [['#x-query','query'],['#x-period','period'],['#x-sort','sortOrder'],['#x-limit','maxResults','number'],['#x-exclude-replies','excludeReplies','boolean'],['#x-authors','includeAuthors','boolean']]) {
@@ -800,8 +804,7 @@ function isStaticPagesRuntime() {
 }
 
 function shouldUseLocalTrendApi() {
-  const hostname = globalThis.location?.hostname ?? '';
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  return canUseLocalApi(globalThis.location);
 }
 
 async function refreshTrendObservations({ runProvider = false, announce = false } = {}) {

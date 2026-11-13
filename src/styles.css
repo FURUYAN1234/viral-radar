@@ -1530,9 +1530,16 @@ textarea {
 }
 
 /* Keep setup choices visible together; disclosures hold secondary explanations. */
-.x-source-options { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; border: 0; padding: 0; margin: 8px 0; }
+.x-source-options { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; border: 0; padding: 0; margin: 8px 0; }
 .x-source-options label { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--x-panel-border); background: #fff; cursor: pointer; }
 .x-source-options label:has(input:checked) { border-color: #0b7f78; background: #f3fbfa; }
+.x-source-options label:has(input:disabled):not(:has(input:checked)) { color: #59645e; background: #edf0ed; border-style: dashed; cursor: not-allowed; }
+.x-runtime-note { line-height: 1.4; }
+.local-x-guide { margin: 6px 0; font-size: 12px; line-height: 1.4; }
+.local-x-guide a { text-decoration: underline; text-underline-offset: 2px; }
+.api-start-panel { margin: 8px 0; }
+.api-start-panel .query-note { margin: 0; font-size: 12px; }
+.x-runtime-note a { text-decoration: underline; text-underline-offset: 2px; }
 .x-source-options input { min-height: 18px; width: 18px; margin: 0; flex: 0 0 auto; accent-color: #0b7f78; }
 .x-source-options strong { font-size: 14px; }
 .x-source-options label span { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -1577,9 +1584,9 @@ textarea {
 .api-connect-panel .openai-model-details summary { cursor: pointer; }
 .api-connect-panel .openai-model-details span { display: block; }
 .api-connect-panel .query-note { margin: 0; font-size: 12px; }
-.api-connect-panel .api-start-gate { display: flex; align-items: center; gap: 10px; }
-.api-connect-panel .api-start-gate p { flex: 1; font-size: 12px; margin: 0; }
-.api-connect-panel .api-start-gate button { width: auto; flex: 0 0 auto; font-size: 14px; padding: 10px 14px; }
+.api-start-panel .api-start-gate { display: flex; align-items: center; gap: 10px; }
+.api-start-panel .api-start-gate p { flex: 1; font-size: 12px; margin: 0; }
+.api-start-panel .api-start-gate button { width: auto; flex: 0 0 auto; font-size: 14px; padding: 10px 14px; }
 @media (min-width: 761px) { .api-connect-panel { grid-template-columns: minmax(0,1fr) minmax(0,1fr); } }
 @media (max-width: 760px) {
   .category-band { display: flex; flex-wrap: wrap; }
@@ -1590,7 +1597,7 @@ textarea {
   .x-controls { grid-template-columns: 1fr 1fr; }
   .x-query-field { grid-column: 1 / -1; }
   .x-token-form > button { width: auto; }
-  .api-connect-panel .api-start-gate { flex-wrap: wrap; }
+  .api-start-panel .api-start-gate { flex-wrap: wrap; }
   .x-search-action { flex-wrap: wrap; gap: 4px; }
   .x-search-action button { width: auto; }
   .header-api-block { justify-items: start; }

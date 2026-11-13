@@ -1,6 +1,16 @@
 # Monogatari Buzz Maker / 物語バズメーカー
 
-**v1.4.0**: Public Web context and optional X reactions are synthesized into manga, video and fiction ideas. X-post drafting and X-only analysis are not offered. X requires the local relay. / 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。X向け投稿文とX単独分析は提供しません。X連携はローカル専用です。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.0.md)
+**v1.4.1**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.1.md)
+
+| Feature / 機能 | GitHub Pages / 公開Web版 | Download and run locally / ダウンロードしてローカル起動 |
+| --- | --- | --- |
+| Web research + AI story planning / 公開Web＋生成AIによる企画・本文 | Available with your AI key / 自分の生成AIキーで利用可 | Available with your AI key / 自分の生成AIキーで利用可 |
+| Add X evidence / Xの根拠を追加 | Settings hidden; local-use guide only / 設定欄は非表示・ローカル利用案内のみ | Select “Use X” and enter your Bearer Token / 「Xを使う」を選び、自分のBearer Tokenを入力 |
+| Where X requests run / Xへの接続処理 | No X requests / Xへ通信しない | Your own PC / 利用者自身のPC |
+
+**To use X / Xを使う場合：** [Download the source ZIP / ソースZIPをダウンロード](https://github.com/FURUYAN1234/viral-radar/archive/refs/heads/main.zip) → extract / 展開 → [local launch instructions / ローカル起動手順](#local-setup)。This is the same app and version, not a separate X edition. / X専用の別アプリ・別バージョンではありません。
+
+GitHub Pages cannot run the server-side connection needed for X. No shared author-operated relay, author API credentials, browser extension or Cloudflare account is required. Each user supplies their own X and OpenAI/Gemini API keys and pays their own API usage. / GitHub PagesではX接続に必要なサーバー処理を実行できません。作者の共有中継やAPI認証は使わず、拡張機能やCloudflareアカウントも不要です。APIキーとAPI利用料は利用者各自のものです。X向け投稿文・X単独分析は提供しません。
 
 **Gemini model route / Geminiモデル候補**: `gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite`. Explicit stable IDs avoid the December 1, 2026 redirects; image-generation models keep their dedicated routes. / 2026年12月1日の旧モデル自動転送に依存しないよう、現行GAモデルを明示します。画像生成は専用のモデル経路を使います。
 
@@ -11,7 +21,7 @@
 Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
 
 
-![Version](https://img.shields.io/badge/version-1.4.0-0f766e)
+![Version](https://img.shields.io/badge/version-1.4.1-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -386,12 +396,26 @@ Enter a provider key in the initial `AI Settings` panel. For OpenAI, select a mo
 
 Until AI setup is completed, the main UI remains locked. Public Web/RSS retrieval, deep analysis, reference-draft generation, and save/export operations become available only after the user explicitly starts the workflow. / AI設定が完了するまでは主要UIをロックします。公開Web/RSS取得、詳細分析、参考本文生成、保存系操作は、利用者が明示的に開始したあとに有効になります。
 
+<a id="local-setup"></a>
+
 ### Local Launch (Windows) / ローカルでの起動
+
+1. [Download the source ZIP](https://github.com/FURUYAN1234/viral-radar/archive/refs/heads/main.zip) and extract the entire folder. / ソースZIPをダウンロードし、フォルダー全体を展開します。
+2. Double-click `start_monogatari_buzz_maker.bat`. The first run prepares Node.js if needed, installs the required components, and opens the app. / 展開先の `start_monogatari_buzz_maker.bat` をダブルクリックします。初回は不足するNode.jsと必要な部品を自動で準備し、アプリ画面を開きます。
+3. Connect your OpenAI/Gemini key first. Below it, select “Xを使う” and enter your X Bearer Token. / 先に生成AIキーを接続します。その下の「Xの追加接続」で「Xを使う」を選び、自分のBearer Tokenを設定します。APIキーの発行と入力は利用者本人が行います。
+
+Windows 10/11 (64-bit x64 or ARM64) and an Internet connection are required. No administrator access, manual Node.js installation, or other app is needed. If a compatible Node.js is already installed, it is reused; otherwise the launcher downloads the pinned official Node.js LTS ZIP, verifies its SHA-256, and places it in this app's `.runtime` folder. It does not change the system PATH. / Windows 10/11（64bit x64・ARM64）とインターネット接続が必要です。管理者権限・Node.jsの手動インストール・他アプリは不要です。利用可能なNode.jsがあれば再利用し、なければ公式の固定版LTSを取得してSHA-256を照合し、このアプリ内の `.runtime` に置きます。PC全体のPATH設定は変更しません。
+
+Later launches reuse the prepared files. Dependencies are reinstalled if the lockfile/runtime changes or required components are broken. If setup fails, the window shows the cause; resolve it and run the same batch again. / 2回目以降は準備済みのファイルを使います。依存関係・実行環境の更新や必要部品の破損時は再準備します。失敗時は起動画面に原因を表示します。通信状態などを確認して同じバッチを再実行してください。
+
+Keep the launcher running while using the app. Downloading the ZIP alone or double-clicking `index.html` does not start the local API connection. X stays off until you select it; entering a token does not start a search. / 利用中は起動した画面を閉じないでください。ZIPのダウンロードだけ、または `index.html` の直接表示ではX接続は動きません。Xは初期オフで、キー入力だけでは検索しません。
+
+Alternatively, with a compatible Node.js installed, open a terminal in the extracted folder (also available on macOS/Linux): / 手動起動では対応するNode.jsをインストールし、展開先のフォルダーで実行します（macOS/Linuxもこの方法で起動できます）。
 
 First install dependencies: / 初回は依存関係をインストールします。
 
 ```powershell
-npm install
+npm ci
 ```
 
 Start the dev server: / 開発サーバーを起動します。

@@ -6,7 +6,7 @@ import { CATEGORIES } from '../src/lib/categories.js';
 import { buildReport } from '../src/lib/reportEngine.js';
 import { fromJson, toJson, toMarkdown } from '../src/lib/exporters.js';
 import { PUBLIC_OBSERVATIONS } from './helpers/publicObservations.mjs';
-import { createXState, renderXPanel } from '../src/lib/xPanel.js';
+import { createXState, renderXPanel, canUseLocalApi } from '../src/lib/xPanel.js';
 
 const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const fixture = () => structuredClone(buildReport({ categoryId: 'story-manga', observations: PUBLIC_OBSERVATIONS }));
@@ -16,7 +16,8 @@ function harness(report = fixture()) {
   const app = { innerHTML: '' };
   const state = { report, settings: {}, planSamples: {}, analysisStartConfirmed: true, x: createXState() };
   const context = vm.createContext({
-    app, state, CATEGORIES, fromJson, renderXPanel, APP_VERSION: 'test', URL,
+    app, state, CATEGORIES, fromJson, renderXPanel, canUseLocalApi, APP_VERSION: 'test', URL,
+    document: { querySelector: () => null },
     getProviderStatus: () => ({ mode: 'gemini', provider: { connected: true, label: 'test' } }),
     fetch: () => { throw new Error('Network forbidden in import test'); },
   });
@@ -31,6 +32,46 @@ function harness(report = fixture()) {
     },
   };
 }
+
+test('unsubmitted X token survives unrelated render without entering report or HTML attributes', () => {
+  const h = harness();
+  h.state.x.mode = 'both';
+  h.context.location = new URL('http://127.0.0.1:5180/');
+  const draft = 'fixture-only-unsubmitted-token';
+  let input = { value: draft };
+  let html = '';
+  h.context.document = { querySelector: selector => selector === '#x-token' ? input : null };
+  Object.defineProperty(h.app, 'innerHTML', {
+    get: () => html,
+    set: value => { html = value; input = value.includes('id="x-token"') ? { value: '' } : null; },
+  });
+  vm.runInContext('render()', h.context);
+  assert.equal(input.value, draft);
+  assert.equal(h.state.x.token, '');
+  assert.doesNotMatch(html, new RegExp(draft));
+  assert.doesNotMatch(toJson(h.state.report), new RegExp(draft));
+  h.state.x.token = 'fixture-only-committed-token';
+  vm.runInContext('render()', h.context);
+  assert.equal(input, null, 'committed token must still render a blank disabled placeholder');
+  assert.doesNotMatch(html, /fixture-only-/);
+});
+
+test('AI setup precedes optional local X setup; public mode has only the local-use guide', () => {
+  const h = harness();
+  h.state.apiPanelOpen = true;
+  h.state.analysisStartConfirmed = false;
+  h.context.location = new URL('http://127.0.0.1:5180/');
+  vm.runInContext('render()', h.context);
+  const ai = h.app.innerHTML.indexOf('aria-label="AI設定"');
+  const x = h.app.innerHTML.indexOf('class="panel x-panel"');
+  const start = h.app.innerHTML.indexOf('id="provider-start"');
+  assert.ok(ai >= 0 && x > ai && start > x);
+  h.context.location = new URL('https://furuyan1234.github.io/viral-radar/');
+  vm.runInContext('render()', h.context);
+  assert.doesNotMatch(h.app.innerHTML, /x-source-mode|class="panel x-panel"|id="x-token"/);
+  assert.match(h.app.innerHTML, /このデモではX連携は利用できません/);
+  assert.match(h.app.innerHTML, /id="provider-start"/);
+});
 
 test('imported labels render as text, including HTML and attribute payloads', async () => {
   const report = fixture();
