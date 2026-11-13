@@ -4,29 +4,29 @@
 export const NANO_BANANA_FALLBACK_SNAPSHOT = {
   "sourceApp": "nano-banana-pro",
   "syncScope": "all-providers",
-  "sourceVersion": "7.2.6",
-  "syncedAt": "2026-11-03T08:51:21.004Z",
-  "sourceFingerprint": "fa3617a76316f3e8842106dbdcaab34707c2585110fe1e4ae4f5acf99d71cfe3",
+  "sourceVersion": "7.4.9",
+  "syncedAt": "2026-11-12T22:09:24.415Z",
+  "sourceFingerprint": "67b5d53b6178acc9ceb38066e42b98f73920bf8c23727cede0beea484b327a36",
   "sourceFiles": [
     {
       "path": "nano-banana-pro/package.json",
-      "bytes": 1648,
-      "sha256": "725e5dddda1976a3909d1a653ac058e68e61bae3046f438b7a107d1ed38c458d"
+      "bytes": 1704,
+      "sha256": "6d9e0fc132eee909acea306c2f18855e527a47576db4a5e76e7357766580ab36"
     },
     {
       "path": "nano-banana-pro/src/lib/fallback-chain-history.js",
-      "bytes": 17753,
-      "sha256": "ecc6a3529babd20dd188da346856c6a007deabd6766ded795ea920e9dcb96497"
+      "bytes": 17632,
+      "sha256": "b1eee40421b13afa9dd53782d3dd38ca9af1098572a3a596bfdc67ab241b0f9c"
     },
     {
       "path": "nano-banana-pro/src/lib/gemini-model-routes.js",
       "bytes": 856,
-      "sha256": "0bec4c1fe455e058611c7df4eec9f57e3a48341d5b0a4ff76c4983846963d146"
+      "sha256": "9a0e94d58a85bccafe0e1608f595a5a70d2bc5169c9e695680297c133fefb7f8"
     },
     {
       "path": "nano-banana-pro/src/config/openai-scenario-models.json",
       "bytes": 3301,
-      "sha256": "4f781a3218656d57e78ed10279628ac587bed873cf293ed503e297eda7e7744e"
+      "sha256": "23fb75ebcf62d443bd4356b2daf9b88576c00ec74c2ce7974b328ddf04ce4736"
     }
   ],
   "chains": {
@@ -59,7 +59,7 @@ export const NANO_BANANA_FALLBACK_SNAPSHOT = {
     "openaiText": {
       "provider": "openai",
       "sourceFile": "nano-banana-pro/src/config/openai-scenario-models.json",
-      "priceSnapshotDate": "2026-11-03",
+      "priceSnapshotDate": "2026-11-04",
       "priceSnapshotSource": "OpenAI official model pricing",
       "models": [
         {

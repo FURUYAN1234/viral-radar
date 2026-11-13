@@ -1,3 +1,4 @@
+import { CATEGORIES } from './categories.js';
 const SECRET_PATTERNS = [/sk-proj-[A-Za-z0-9_-]+/g, /AIza[0-9A-Za-z_-]+/g];
 
 export function toMarkdown(report) {
@@ -105,6 +106,8 @@ export function toMarkdown(report) {
       `形式: ${plan.formatLabel}`,
       `読者への約束: ${plan.audiencePromise}`,
       '',
+      ...(plan.sourceSynthesis ? ['#### 複合分析から物語への反映', plan.sourceSynthesis.creativeTransfer, ...plan.sourceSynthesis.evidence.map(item => `- ${item.source}: ${item.title} ${item.sourceUrl}`)] : []),
+      ...(plan.sampleText ? ['#### 参考本文・台本',plan.sampleText] : []),
       '#### 案の要点',
       `- 主人公: ${plan.creatorBrief.protagonist}`,
       `- 舞台: ${plan.creatorBrief.setting}`,
@@ -172,6 +175,7 @@ function validateReportShape(report) {
   if (!report.category?.id || !report.category?.label) {
     throw new Error('カテゴリ情報がないため読み込めません。');
   }
+  if (!CATEGORIES.some(category => category.id === report.category.id)) throw new Error('対応していない制作カテゴリです。漫画・動画・小説のレポートを選んでください。');
   for (const key of [
     'trendClusters',
     'evidenceCards',
@@ -223,6 +227,11 @@ function validateReportShape(report) {
   requireList(report.categoryFitCards, 'categoryFitCards', (card, path) => requireTextFields(card, path, ['title', 'whyThisMedium', 'creatorMove', 'example', 'evidenceAnchor']));
   requireList(report.categoryReasons, 'categoryReasons', (reason, path) => requireTextFields(reason, path, ['title', 'detail', 'example']));
   requireList(report.creativePlans, 'creativePlans', (plan, path) => {
+    if (plan.sampleText != null) requireText(plan.sampleText, `${path}.sampleText`);
+    if (plan.sourceSynthesis != null) {
+      requireTextFields(plan.sourceSynthesis, `${path}.sourceSynthesis`, ['creativeTransfer']);
+      requireList(plan.sourceSynthesis.evidence, `${path}.sourceSynthesis.evidence`, (item, itemPath) => requireTextFields(item, itemPath, ['source', 'title', 'sourceUrl']));
+    }
     requireTextFields(plan, path, ['id', 'formatLabel', 'audiencePromise', 'exampleDetail', 'opening', 'aiDraftPrompt']);
     for (const key of ['titleCandidates', 'reasonToWin', 'outline']) requireList(plan[key], `${path}.${key}`, requireText);
     if (plan.titleCandidates.length === 0) invalidReport(`${path}.titleCandidates`);

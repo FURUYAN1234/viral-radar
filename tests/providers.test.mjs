@@ -9,7 +9,26 @@ import {
   runPlanDesignGeneration,
   runProviderAnalysis,
   runDraftSample,
+  draftValidationIssues,
+  validateDraftSampleText,
 } from '../src/lib/providers.js';
+
+test('draft rejection keeps the full candidate and specific reason for a free recheck', async()=>{
+ const text='確認用の本文です。「それは確かめよう」と真白は言った。'.repeat(30)+'旅客営業規則第百二十条を根拠にした。';
+ assert.match(draftValidationIssues(text).join(' / '),/公的根拠/);
+ await assert.rejects(runDraftSample({provider:'openai',apiKey:'sk-test-only',draftPrompt:'使用タイトル: 確認稿',fetchImpl:async()=>Response.json({output_text:text})}),error=>{
+  assert.match(error.message,/公的根拠/);assert.ok(error.rejectedText.length>600);assert.ok(error.rejectedText.endsWith('旅客営業規則第百二十条を根拠にした。'));return true;
+ });
+ const clean=text.replace('旅客営業規則第百二十条を根拠にした。','');
+ assert.ok(validateDraftSampleText(clean,'使用タイトル: 確認稿').text.length>600);
+});
+
+test('protagonist descriptions after the name are not mistaken for additional names',()=>{
+ const prompt='主人公: 地域の木工講習で認定審査を担当する宮坂修、47歳。本業の工房でも理不尽な要求を受けるが、長年続けたことを誇りにしている。\n舞台: 架空の民間木工講座の最終試験日。共用作業台と工具棚のある実習室。\n最初の事件: 受講者の一人が、指導員から頼まれた展示台の補修で試験開始に遅れる。';
+ const story='宮坂修は木工講座の実習室で時計を見た。受講者は展示台の補修を終えていない。「手伝いを頼んだのは誰ですか」宮坂は工具棚の前で足を止めた。'.repeat(5);
+ assert.deepEqual(draftValidationIssues(story,prompt),[]);
+ assert.ok(draftValidationIssues(story.replaceAll('宮坂修','別人の佐藤'),prompt).some(issue=>issue.includes('主人公')));
+});
 
 const USABLE_STORY_SAMPLE = [
   '夜の通知音で、真白は目を覚ました。「また評価の日か」と彼女はつぶやく。',
@@ -935,7 +954,7 @@ test('runDraftSample rejects outline-only drafts that are not usable reference p
           },
         }),
       }),
-    /本文として使える具体的な場面や台詞が不足しています/,
+    /本文検査で不合格/,
   );
 });
 
@@ -990,7 +1009,7 @@ test('runDraftSample rejects unsupported official claims and private-life profil
             },
           }),
         }),
-      /本文として使える具体的な場面や台詞が不足しています/,
+      /本文検査で不合格/,
     );
   }
 });
@@ -1026,7 +1045,7 @@ test('runDraftSample rejects drafts that drift away from the selected plan core'
           },
         }),
       }),
-    /本文として使える具体的な場面や台詞が不足しています/,
+    /本文検査で不合格/,
   );
 });
 
@@ -1209,7 +1228,7 @@ test('runDraftSample rejects prompt field labels leaking into the finished body'
           },
         }),
       }),
-    /本文として使える具体的な場面や台詞が不足しています/,
+    /本文検査で不合格/,
   );
 });
 
@@ -1235,7 +1254,7 @@ test('runDraftSample does not blame keys or quota for draft quality rejection', 
       }),
     (error) => {
       assert.match(error.message, /参考文章生成に失敗しました/);
-      assert.match(error.message, /本文として使える具体的な場面や台詞が不足しています/);
+      assert.match(error.message, /本文検査で不合格/);
       assert.doesNotMatch(error.message, /キー、クォータ/);
       return true;
     },
@@ -1501,7 +1520,7 @@ test('runProviderAnalysis rejects incomplete evidence cards instead of leaving v
   );
 });
 
-test('runProviderAnalysis falls back when a model omits visible evidence-card readings', async () => {
+test('runProviderAnalysis corrects missing evidence-card readings once on the same model', async () => {
   let calls = 0;
   const result = await runProviderAnalysis({
     provider: 'openai',
@@ -1555,7 +1574,7 @@ test('runProviderAnalysis falls back when a model omits visible evidence-card re
     },
   });
 
-  assert.equal(result.used_model, 'gpt-6.1-terra');
+  assert.equal(result.used_model, 'gpt-6.1-sol');
   assert.equal(result.evidenceCards.length, 2);
   assert.equal(result.fallback_chain[0].status, 'failed');
 });

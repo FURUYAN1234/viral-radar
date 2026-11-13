@@ -6,6 +6,7 @@ import { CATEGORIES } from '../src/lib/categories.js';
 import { buildReport } from '../src/lib/reportEngine.js';
 import { fromJson, toJson, toMarkdown } from '../src/lib/exporters.js';
 import { PUBLIC_OBSERVATIONS } from './helpers/publicObservations.mjs';
+import { createXState, renderXPanel } from '../src/lib/xPanel.js';
 
 const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const fixture = () => structuredClone(buildReport({ categoryId: 'story-manga', observations: PUBLIC_OBSERVATIONS }));
@@ -13,9 +14,9 @@ const fixture = () => structuredClone(buildReport({ categoryId: 'story-manga', o
 // Execute the real import handler and renderer without a browser or network.
 function harness(report = fixture()) {
   const app = { innerHTML: '' };
-  const state = { report, settings: {}, planSamples: {}, analysisStartConfirmed: true };
+  const state = { report, settings: {}, planSamples: {}, analysisStartConfirmed: true, x: createXState() };
   const context = vm.createContext({
-    app, state, CATEGORIES, fromJson, APP_VERSION: 'test', URL,
+    app, state, CATEGORIES, fromJson, renderXPanel, APP_VERSION: 'test', URL,
     getProviderStatus: () => ({ mode: 'gemini', provider: { connected: true, label: 'test' } }),
     fetch: () => { throw new Error('Network forbidden in import test'); },
   });

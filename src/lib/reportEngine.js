@@ -1,5 +1,6 @@
 import { CATEGORIES, getCategoryById } from './categories.js';
 import { scoreCluster } from './scoring.js';
+import { formatXMetrics, xEvidenceScore } from './xSearch.js';
 
 const AI_PENDING_MESSAGE = '未生成';
 const AI_PROMPT_ONLY_MESSAGE = 'AIで新規生成してください。ここでは取得根拠だけを渡します。';
@@ -31,11 +32,16 @@ function selectObservationsForCategory(categoryId, observations) {
     strictMatches.length >= 2
       ? strictMatches
       : observations.filter((observation) => observation.tags.some((tag) => cluster.tags.includes(tag)));
-  return (matches.length > 0 ? matches : observations).slice(0, 5);
+  const pool = matches.length > 0 ? matches : observations;
+  const xPosts = pool.filter(item => item.sourceType === 'x-api').sort((a, b) => xEvidenceScore(b) - xEvidenceScore(a));
+  const other = pool.filter(item => item.sourceType !== 'x-api').sort((a,b)=>(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0));
+  if (!xPosts.length) return other.slice(0, 5);
+  const selected = other.length ? [other[0],xPosts[0],other[1],xPosts[1],other[2]].filter(Boolean) : xPosts.slice(0,5);
+  return [...selected, ...pool.filter(item => !selected.includes(item))].slice(0, 5);
 }
 
 function isAcquiredObservation(observation) {
-  return observation?.sourceType === 'public-web-rss';
+  return observation?.sourceType === 'public-web-rss' || observation?.sourceType === 'x-api';
 }
 
 function reportProviderMode(mode) {
@@ -167,11 +173,13 @@ function buildEvidenceCards(cluster) {
     claim: topicExcerpt(observation),
     sourceUrls: [observation.sourceUrl],
     source: evidenceSourceForCategory(observation, cluster.categoryId),
-    metricsSummary: summarizeMetrics(observation.metrics),
+    sourceType: observation.sourceType,
+    metricsSummary: summarizeMetrics(observation.metrics, observation.sourceType),
     timeWindow: observation.observedAt,
+    publishedAt: observation.publishedAt,
     whyItMatters: AI_PENDING_MESSAGE,
     ...interpretObservation(observation, cluster.categoryId),
-    limitations: observation.sourceType === 'public-web-rss' ? '公開RSS/検索フィード由来です。制作前にリンク先を確認してください。' : '',
+    limitations: observation.sourceType === 'x-api' ? 'Xの検索範囲内の実測値です。反応数は賛同や将来の拡散を保証しません。未取得の指標は補完していません。' : '公開RSS/検索フィード由来です。制作前にリンク先を確認してください。',
   }));
 }
 
@@ -212,7 +220,8 @@ function summarizeObservationForDisplay(observation) {
 }
 
 
-function summarizeMetrics(metrics = {}) {
+function summarizeMetrics(metrics = {}, sourceType = '') {
+  if (sourceType === 'x-api') return formatXMetrics(metrics);
   const parts = [];
   if (metrics.views) parts.push(`再生 ${metrics.views.toLocaleString('ja-JP')}`);
   if (metrics.likes) parts.push(`高評価 ${metrics.likes.toLocaleString('ja-JP')}`);
@@ -223,7 +232,7 @@ function summarizeMetrics(metrics = {}) {
   if (metrics.sourceWeight) parts.push(`取得元重み ${metrics.sourceWeight}`);
   if (metrics.coOccurrenceScore) parts.push(`共起 ${metrics.coOccurrenceScore}`);
   if (metrics.categoryMatchScore) parts.push(`検索角度一致 ${metrics.categoryMatchScore}`);
-  if (metrics.hatenaHotEntryScore) parts.push(`はてな反応 ${metrics.hatenaHotEntryScore}`);
+  if (metrics.hatenaHotEntryScore) parts.push(`はてな掲載指標 ${metrics.hatenaHotEntryScore}`);
   if (metrics.sourceDiversity) parts.push(`取得元数 ${metrics.sourceDiversity}`);
   return parts.join(' / ') || '公開RSS取得';
 }
@@ -274,6 +283,7 @@ export function buildPlanDraftPrompt(plan, categoryId, cluster = {}) {
     `使用タイトル: ${primaryTitle}`,
     '取得根拠:',
     ...evidencePromptLines(plan.evidenceAnchor),
+    ...(plan.sourceSynthesis ? ['複合分析からの創作判断:', plan.sourceSynthesis.creativeTransfer, ...plan.sourceSynthesis.evidence.map(item => `- ${item.source}: ${item.title} / ${item.sourceUrl}`)] : []),
     '案の要点:',
     `- 主人公: ${brief.protagonist ?? ''}`,
     `- 舞台: ${brief.setting ?? ''}`,
@@ -575,7 +585,7 @@ function buildEvidenceAnchorDigest(observation, categoryId, terms = [], index = 
     title: compactEvidenceText(observation?.title ?? observation?.snippet ?? `取得根拠 ${index + 1}`, 80),
     query: safeQueryForPlan(observation?.queryUsed ?? observation?.query),
     terms: terms.length ? terms : evidenceTermsForObservation(observation).slice(0, 5),
-    metricsSummary: summarizeMetrics(observation?.metrics),
+    metricsSummary: summarizeMetrics(observation?.metrics, observation?.sourceType),
   };
 }
 
@@ -734,10 +744,11 @@ export function buildReport({
       score: cluster.confidenceScore,
       explanation:
         selectedObservations.length > 0
-          ? '公開Web/RSSの取得結果を表示しています。'
+          ? '公開Web/RSS・Xのうち実際に取得した根拠を表示しています。'
           : '公開Web/RSSの取得結果がまだありません。',
     },
     limitations: [
+      ...(selectedObservations.some(item => item.sourceType === 'x-api') ? ['Xは指定検索語・期間・件数に限った標本です。全体の人気や賛同率ではありません。Xの参考順位は反応数・投稿の経過時間・取得できた場合のフォロワー規模から選定しています。'] : []),
       '公開Web/RSSの取得結果は制作前に人間が出典確認してください。',
       '実在の人物・企業・作品を架空ストーリーの主役や告発対象にしない前提で、AI生成時に変換してください。',
     ],

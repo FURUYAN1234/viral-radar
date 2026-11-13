@@ -45,7 +45,7 @@ function documentXml(report) {
   const lines = [
     paragraph(`${categoryLabel} 制作案確認資料`, 'Title'),
     paragraph(
-      '公開Web/RSSの取得結果、制作案、確認項目をまとめた資料です。',
+      '公開Web/RSS・Xの取得根拠、制作案、確認項目をまとめた資料です。',
       'Subtitle',
     ),
     table([
@@ -116,7 +116,7 @@ function documentXml(report) {
       ]),
     ]),
     heading1('5. 制作案の詳細'),
-    ...(primaryPlan ? editorPlanParagraphs(primaryPlan) : [paragraph('制作案がありません。')]),
+    ...(plans.length ? plans.flatMap(editorPlanParagraphs) : [paragraph('制作案がありません。')]),
     heading1('6. 媒体別の制作判断'),
     table([
       ['項目', '状態', '備考'],
@@ -206,6 +206,8 @@ function editorPlanParagraphs(plan) {
       ['AI感情フック', plan.emotionalHook],
       ['AI差別化', plan.differentiation],
     ]),
+    ...(plan.sourceSynthesis ? [heading3('複合分析から物語への反映'), paragraph(plan.sourceSynthesis.creativeTransfer), ...plan.sourceSynthesis.evidence.map(item => paragraph(`${item.source}: ${item.title} ${item.sourceUrl}`))] : []),
+    ...(plan.sampleText ? [heading3('参考本文・台本'),paragraph(plan.sampleText)] : []),
     heading3('物語の骨格'),
     table([
       ['要素', '内容'],

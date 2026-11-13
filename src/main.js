@@ -1,3 +1,4 @@
+import { newEvidenceOnly, rememberCreativeReport } from './lib/searchHistory.js';
 import './styles.css';
 import { CATEGORIES } from './lib/categories.js';
 import { copyTextToClipboard } from './lib/clipboard.js';
@@ -13,16 +14,18 @@ import {
   normalizeOpenAIModelId,
 } from './lib/openaiModels.js';
 import { buildPlanDraftPrompt, buildReport } from './lib/reportEngine.js';
-import { getProviderStatus, runDraftSample, runPlanDesignGeneration, runProviderAnalysis } from './lib/providers.js';
+import { getProviderStatus, runDraftSample, runPlanDesignGeneration, runProviderAnalysis, validateDraftSampleText } from './lib/providers.js';
 import { buildTrendSearchUrl, searchTrendObservations } from './lib/publicTrendSearch.js';
 import { loadSettingsFromStorage } from './lib/settings.js';
+import { createXState, renderXPanel } from './lib/xPanel.js';
+import { xSearchOptions, applyXHistory } from './lib/xSearch.js';
 
 const STORAGE_KEY = 'viral-radar-settings-v1';
 const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -30,7 +33,8 @@ let apiInputUserTouched = false;
 const initialSettings = loadSettings();
 const initialProviderStatus = getProviderStatus(initialSettings);
 
-const state = {
+const state = import.meta.hot?.data.runtimeState ?? {
+  x: createXState(),
   openAiModelId: DEFAULT_OPENAI_MODEL_ID,
   openAiModelConfirmed: true,
   analysisStartConfirmed: false,
@@ -40,11 +44,12 @@ const state = {
     adoptedByPath: {},
   },
   selectedCategoryId: 'story-manga',
-  timeWindow: '7d',
+  timeWindow: '24h',
   audience: 'general',
   searchSeed: 0,
   variantSeed: 0,
   observations: null,
+  historyByCategory: {},
   analysisSessionId: 0,
   providerRunSignature: null,
   providerSummary: null,
@@ -61,9 +66,20 @@ const state = {
   report: null,
 };
 
-state.observations = [];
-state.report = createReport();
-bootstrapApp();
+if (import.meta.hot?.data.runtimeState) {
+  render();
+} else {
+  state.observations = [];
+  state.report = createReport();
+  bootstrapApp();
+}
+if (import.meta.hot) {
+  import.meta.hot.accept();
+  import.meta.hot.dispose(data => {
+    if (actionMessageTimer) clearTimeout(actionMessageTimer);
+    data.runtimeState = state;
+  });
+}
 
 function bootstrapApp() {
   const providerStatus = currentProviderStatus();
@@ -116,7 +132,7 @@ function isApiWorking() {
 }
 
 function isUiWorking() {
-  return isApiWorking() || state.searchBusy;
+  return isApiWorking() || state.searchBusy || state.x.busy;
 }
 
 function isApiReady() {
@@ -156,20 +172,20 @@ function wait(ms) {
 }
 
 function createReport() {
-  return buildReport({
+  return { ...buildReport({
     categoryId: state.selectedCategoryId,
     timeWindow: state.timeWindow,
     audience: state.audience,
     observations: state.observations ?? [],
     providerMode: getReportProviderMode(currentProviderStatus().mode),
     variantSeed: state.variantSeed,
-  });
+  }), previousPlans: state.historyByCategory[state.selectedCategoryId]?.plans ?? [] };
 }
 
 function resetAnalysisSessionForApiChange() {
   state.analysisSessionId += 1;
-  state.searchSeed += 1;
-  state.variantSeed = state.searchSeed;
+  state.searchSeed = 0;
+  state.variantSeed = 0;
   state.providerRunSignature = null;
   state.providerSummary = null;
   state.planSamples = {};
@@ -239,19 +255,18 @@ function render() {
             <h1>物語バズメーカー</h1>
             <span class="version-badge" aria-label="アプリバージョン">v${APP_VERSION}</span>
           </div>
-          <p class="lead">取得根拠、制作案、本文生成用プロンプトをカテゴリ別にまとめます。</p>
+          <p class="lead">世間の動きと反応を分析し、漫画・物語の着想に。</p>
         </div>
         <div class="header-api-block">
           <div class="status-strip" aria-label="API接続状態">
-            <span class="${providerStatus.provider.connected ? 'ok' : ''}">${escapeHtml(providerLabel)}</span>
-            <span>対象: 漫画・動画・小説</span>
+            <span class="${providerStatus.provider.connected ? 'ok' : ''}">生成AI: ${escapeHtml(providerLabel)}</span>
+            <span>${state.x.mode === 'rss' ? 'Xは使わない' : 'Xを使う'}</span>
             ${
               !showApiPanel
                 ? `<button class="api-settings-button" id="api-settings" type="button" ${disabledAttr(uiWorking)}>${providerStatus.provider.connected ? 'APIキーを変更' : 'AI設定'}</button>`
                 : ''
             }
           </div>
-          ${showApiPanel ? renderApiConnectPanel(draftStatus, uiWorking) : ''}
         </div>
         <div class="header-progress-slot">
           ${
@@ -264,10 +279,17 @@ function render() {
         </div>
       </header>
 
-      <section class="settings-row ${isLocked ? 'is-disabled' : ''}" aria-label="分析条件" ${isLocked ? 'aria-disabled="true"' : ''}>
+      <section class="category-band" aria-label="カテゴリ選択">
+        ${CATEGORIES.map((category) => `
+          <button class="category-button ${category.id === state.selectedCategoryId ? 'active' : ''}" type="button" data-category-id="${category.id}" title="${escapeAttr(category.description)}" aria-pressed="${category.id === state.selectedCategoryId}" ${disabledAttr(uiWorking)}>
+            <strong>${category.label}</strong>
+          </button>
+        `).join('')}
+      </section>
+      <section class="settings-row" aria-label="分析条件">
         <label class="field-card">
-          <span>分析期間</span>
-          <select id="time-window" ${disabled}>
+          <span>公開Web/RSSの期間</span>
+          <select id="time-window" ${disabledAttr(uiWorking)}>
             ${option('24h', '直近24時間', state.timeWindow)}
             ${option('7d', '直近7日', state.timeWindow)}
             ${option('30d', '直近30日', state.timeWindow)}
@@ -275,7 +297,7 @@ function render() {
         </label>
         <label class="field-card">
           <span>想定読者</span>
-          <select id="audience" ${disabled}>
+          <select id="audience" ${disabledAttr(uiWorking)}>
             ${option('general', '一般向け', state.audience)}
             ${option('working-adults', '社会人向け', state.audience)}
             ${option('youth', '若年層向け', state.audience)}
@@ -285,14 +307,8 @@ function render() {
         </label>
       </section>
 
-      <section class="category-band ${isLocked ? 'is-disabled' : ''}" aria-label="カテゴリ選択" ${isLocked ? 'aria-disabled="true"' : ''}>
-        ${CATEGORIES.map((category) => `
-          <button class="category-button ${category.id === state.selectedCategoryId ? 'active' : ''}" type="button" data-category-id="${category.id}" ${disabled}>
-            <strong>${category.label}</strong>
-            <span>${category.description}</span>
-          </button>
-        `).join('')}
-      </section>
+      ${renderXPanel(state.x, { local: shouldUseLocalTrendApi(), busy: uiWorking, categoryId: state.selectedCategoryId, searchSeed:state.searchSeed })}
+      ${showApiPanel ? renderApiConnectPanel(draftStatus, uiWorking) : ''}
 
       <section class="action-row ${isLocked ? 'is-disabled' : ''}" aria-label="操作" ${isLocked ? 'aria-disabled="true"' : ''}>
         <button class="secondary-action" id="run-provider" type="button" ${disabled}>AI分析サマリーを更新</button>
@@ -307,8 +323,24 @@ function render() {
         !isApiReady()
           ? ''
           : `<div class="${isLocked ? 'is-disabled' : ''}" ${isLocked ? 'aria-disabled="true"' : ''}>
-      ${renderInsightDashboard(report)}
+      ${renderResearchReceipt(report)}
       ${state.providerSummary && !uiWorking ? renderProviderSummary(state.providerSummary, dataTimestamp) : ''}
+      <section class="plan-section" aria-label="${escapeAttr(planState.label)}">
+        <div class="plan-toolbar">
+          <div class="section-heading">
+            ${renderDataLabel(planState.label, dataTimestamp)}
+            <h2>${escapeHtml(planState.heading)}</h2>
+            ${planState.description ? `<p>${escapeHtml(planState.description)}</p>` : ''}
+          </div>
+          <button class="secondary-action plan-refresh" id="suggest-more" type="button" ${disabled}>再検索して別根拠を出す</button>
+        </div>
+        <div class="plan-grid">
+          ${report.creativePlans.map(renderCreativePlan).join('')}
+        </div>
+      </section>
+      <details class="research-details panel"><summary>分析根拠・取得指標・制作メモを確認</summary>
+      ${renderInsightDashboard(report)}
+
 
       <section class="report-layout" aria-live="polite">
         <aside class="panel summary-panel">
@@ -334,7 +366,7 @@ function render() {
         <section class="analysis-column">
           <div class="panel">
             ${renderDataLabel('AI読み取り', dataTimestamp)}
-            <h2>取得データの読み取り</h2>
+            <h2>情報源ごとの読み取りと創作への応用</h2>
             <div class="evidence-list">
               ${report.evidenceCards.map(renderEvidenceCard).join('')}
             </div>
@@ -356,20 +388,9 @@ function render() {
       </section>
 
       ${renderBeginnerGuide(report, dataTimestamp)}
+      </details>
 
-      <section class="plan-section" aria-label="${escapeAttr(planState.label)}">
-        <div class="plan-toolbar">
-          <div class="section-heading">
-            ${renderDataLabel(planState.label, dataTimestamp)}
-            <h2>${escapeHtml(planState.heading)}</h2>
-            ${planState.description ? `<p>${escapeHtml(planState.description)}</p>` : ''}
-          </div>
-          <button class="secondary-action plan-refresh" id="suggest-more" type="button" ${disabled}>再検索して別根拠を出す</button>
-        </div>
-        <div class="plan-grid">
-          ${report.creativePlans.map(renderCreativePlan).join('')}
-        </div>
-      </section>
+
       </div>
       `
       }
@@ -384,20 +405,13 @@ function renderApiStartGate(providerStatus) {
   if (providerStatus.provider.connected && !state.analysisStartConfirmed) {
     return `
       <div class="api-start-gate" aria-live="polite">
-        ${renderDataLabel('開始確認待機')}
-        <h2>準備ができました。ボタンを押すまで検索・分析は開始しません。</h2>
-        <p>${providerStatus.mode === 'openai' ? '選択したOpenAIモデルで' : 'Geminiで'}公開Web/RSS検索とAPI分析を開始します。</p>
-        <button class="primary-action" id="provider-start" type="button" ${disabledAttr(isUiWorking())}>検索・分析を開始</button>
+        <p>取得元：${state.x.mode === 'rss' ? '公開Web/RSS（Xは使わない）' : '公開Web/RSS ＋ X（X API料金が別途発生）'}。生成AIが根拠を照合し、漫画・物語の企画を作ります。</p>
+        <button class="primary-action" id="provider-start" type="button" ${disabledAttr(isUiWorking())}>情報収集・分析・企画作成を開始</button>
       </div>
     `;
   }
   return `
-    <div class="api-start-gate" aria-live="polite">
-      ${renderDataLabel('開始待機')}
-      <h2>APIキーを接続後、「検索・分析を開始」ボタンで公開Web/RSS取得を開始します。</h2>
-      <p>OpenAIはGPT-6.1 Solが初期選択されます。開始ボタンを押すまで取得と分析は実行しません。</p>
-      <p>キーはページ内のメモリだけで保持し、レポートやDOCX/JSONには含めません。</p>
-    </div>
+    <p class="query-note">キーを接続すると開始できます。入力だけでは実行しません。キーはメモリのみで保持し、保存ファイルには含めません。</p>
   `;
 }
 
@@ -417,11 +431,11 @@ function renderOpenAiModelControl(providerStatus, uiWorking) {
           ).join('')}
         </select>
       </label>
-      <div class="openai-model-details">
+      <details class="openai-model-details"><summary>モデルの料金・説明</summary>
         <strong>${escapeHtml(selectedModel.description)}</strong>
         <span class="openai-model-price">参考単価: ${escapeHtml(formatOpenAIModelPrice(selectedModel))}（${escapeHtml(selectedModel.priceSnapshotDate || OPENAI_MODEL_PRICE_SNAPSHOT_DATE)}時点）</span>
         <small class="openai-model-caveat">${escapeHtml(selectedModel.comparisonNote)}</small>
-      </div>
+      </details>
     </div>
   `;
 }
@@ -447,20 +461,19 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
     <section class="api-connect-panel" aria-label="AI設定">
       <div class="api-connect-copy">
         <p class="panel-label api-panel-meta">
-          <span>${isConnected ? 'AI設定' : '最初に設定'}</span>
-          <span class="version-badge compact" aria-label="アプリバージョン">v${APP_VERSION}</span>
+          <span>生成AI・企画と本文の作成に必要</span>
         </p>
-        <h2>${isConnected ? '接続とモデル' : 'AIを接続'}</h2>
+        <h2>${isConnected ? '生成AIの設定' : '生成AIを接続'}</h2>
         <p>${
           isConnected
-            ? `現在の接続: ${escapeHtml(currentProviderLabel)}。別のキーを使う場合だけ、新しいキーをこの欄に入力して接続してください。`
-            : 'APIキーを接続し、OpenAIの場合はモデルを選んでから検索・分析を開始します。'
+            ? `${escapeHtml(currentProviderLabel)}を使用。X APIとは別の料金です。`
+            : 'OpenAI／Geminiのどちらかを使用。X APIはデータ取得専用で、文章は生成しません。'
         }</p>
         ${state.apiGateMessage ? `<p class="gate-warning">${escapeHtml(state.apiGateMessage)}</p>` : ''}
       </div>
       ${editingKey ? `
       <form class="api-connect-form" id="api-connect-form" autocomplete="off">
-        <label for="api-key">APIキー</label>
+        <label for="api-key">生成AIのAPIキー（OpenAI / Gemini）</label>
         <div class="api-connect-row">
           <input id="api-key" name="viral-radar-runtime-api-key" type="password" value="${escapeAttr(draftKey)}" placeholder="OpenAI または Gemini のAPIキー" autocomplete="new-password" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" ${inputDisabled} />
           <button class="primary-action compact" id="connect-api" type="submit" ${connectDisabled}>${state.apiSaving ? '接続中' : '接続'}</button>
@@ -472,10 +485,10 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
             : ''
         }
       </form>
-      ` : `<div class="api-connect-form" aria-label="API接続済み">
-        <label for="connected-api-key">APIキー（接続済み）</label>
-        <input id="connected-api-key" type="password" value="" placeholder="••••••••" disabled autocomplete="off" />
-        <small class="ok">${escapeHtml(currentProviderLabel)} 接続済み</small>
+      ` : `<div class="api-connected-summary" aria-label="API接続済み">
+        <label class="visually-hidden" for="connected-api-key">APIキー（接続済み）</label>
+        <input id="connected-api-key" type="password" value="" placeholder="••••••••" disabled autocomplete="off" class="visually-hidden" />
+        <span class="ok">${escapeHtml(currentProviderLabel)} 接続済み</span>
         <button class="secondary-action compact" id="api-settings" type="button" ${inputDisabled}>APIキーを変更</button>
       </div>`}
       ${renderOpenAiModelControl(currentStatus, uiWorking)}
@@ -485,21 +498,24 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
 }
 
 function bindEvents(isLocked = false, showApiPanel = false) {
+  bindXControls();
   bindApiControls(showApiPanel);
   bindHeaderControls();
-  if (isLocked) return;
-
   document.querySelectorAll('[data-category-id]').forEach((button) => {
     button.addEventListener('click', () => {
-      const nextCategoryId = button.dataset.categoryId;
-      const isSameCategory = nextCategoryId === state.selectedCategoryId;
-      state.selectedCategoryId = nextCategoryId;
-      state.searchSeed = isSameCategory ? state.searchSeed + 1 : 0;
-      state.variantSeed = state.searchSeed;
-      state.providerRunSignature = null;
-      refreshTrendObservations({ runProvider: true });
+      selectCategory(button.dataset.categoryId);
     });
   });
+  for (const [id, field] of [['#time-window','timeWindow'],['#audience','audience']]) {
+    document.querySelector(id)?.addEventListener('change', event => {
+      if (isUiWorking()) return;
+      state[field] = event.target.value;
+      state.searchSeed = 0; state.variantSeed = 0;
+      if (isApiReady()) refreshTrendObservations({ runProvider: true });
+      else { state.report = createReport(); render(); }
+    });
+  }
+  if (isLocked) return;
   document.querySelector('#suggest-more').addEventListener('click', suggestMore);
   document.querySelector('#run-provider').addEventListener('click', runProviderDeepening);
   document.querySelector('#copy-markdown').addEventListener('click', copyMarkdown);
@@ -518,18 +534,20 @@ function bindEvents(isLocked = false, showApiPanel = false) {
   document.querySelectorAll('[data-copy-sample-id]').forEach((button) => {
     button.addEventListener('click', () => copyPlanSample(button.dataset.copySampleId));
   });
-  document.querySelector('#time-window').addEventListener('change', (event) => {
-    state.timeWindow = event.target.value;
-    state.searchSeed = 0;
-    state.variantSeed = 0;
-    refreshTrendObservations({ runProvider: true });
+  document.querySelectorAll('[data-recheck-sample-id]').forEach(button => {
+    button.addEventListener('click', () => recheckPlanSample(button.dataset.recheckSampleId));
   });
-  document.querySelector('#audience').addEventListener('change', (event) => {
-    state.audience = event.target.value;
-    state.searchSeed = 0;
-    state.variantSeed = 0;
-    refreshTrendObservations({ runProvider: true });
-  });
+}
+
+function selectCategory(nextCategoryId) {
+  if (isUiWorking()) return;
+  const isSameCategory = nextCategoryId === state.selectedCategoryId;
+  state.selectedCategoryId = nextCategoryId;
+  state.searchSeed = isSameCategory ? state.searchSeed + 1 : 0;
+  state.variantSeed = state.searchSeed;
+  state.providerRunSignature = null;
+  if (isApiReady()) refreshTrendObservations({ runProvider: true });
+  else { state.report = createReport(); render(); }
 }
 
 function bindHeaderControls() {
@@ -554,7 +572,7 @@ function handleOpenAiModelChange(event) {
   showActionMessage({
     summary: `OpenAIモデルを${selectedModel.label}に変更しました。`,
     risk_note: isFirstSelection
-      ? 'モデル選択を確認しました。「検索・分析を開始」ボタンを押すまで実行しません。'
+      ? 'モデル選択を確認しました。「情報収集・分析・企画作成を開始」ボタンを押すまで実行しません。'
       : '次のAPI分析・設計・参考文章生成から選択モデルを使います。',
     next_actions: [],
   });
@@ -568,7 +586,7 @@ function handleProviderStart() {
   state.apiGateMessage = '';
   clearActionMessage();
   showActionMessage({
-    summary: '検索・分析を開始します。',
+    summary: '情報収集・分析・企画作成を開始します。',
     risk_note: '選択済みのAPI設定を使います。',
     next_actions: [],
   });
@@ -646,16 +664,16 @@ async function connectApiKey() {
     state.apiPanelOpen = false;
     state.apiGateMessage =
       providerStatus.mode === 'openai'
-        ? 'GPT-6.1 Solを初期選択しています。変更する場合はモデルを選び、「検索・分析を開始」ボタンを押してください。'
-        : '「検索・分析を開始」ボタンを押すまで検索・分析は開始しません。';
+        ? 'GPT-6.1 Solを選択済み。開始ボタンを押すまで実行しません。'
+        : '開始ボタンを押すまで実行しません。';
     resetAnalysisSessionForApiChange();
   } finally {
     state.apiSaving = false;
     showActionMessage({
       summary:
         providerStatus.mode === 'openai'
-          ? 'OpenAIキーを接続しました。選択モデルを確認して「検索・分析を開始」ボタンを押してください。'
-          : 'Geminiキーを接続しました。「検索・分析を開始」ボタンを押してください。',
+          ? 'OpenAIキーを接続しました。選択モデルを確認して「情報収集・分析・企画作成を開始」ボタンを押してください。'
+          : 'Geminiキーを接続しました。「情報収集・分析・企画作成を開始」ボタンを押してください。',
     });
     render();
   }
@@ -681,7 +699,7 @@ function rebuildReport({ advanceSearch = false } = {}) {
   render();
 }
 
-async function fetchTrendObservations() {
+async function fetchRssObservations() {
   const searchParams = {
     categoryId: state.selectedCategoryId,
     timeWindow: state.timeWindow,
@@ -703,6 +721,80 @@ async function fetchTrendObservations() {
   return payload.observations;
 }
 
+function currentXOptions() {
+  return xSearchOptions({ ...state.x, categoryId: state.selectedCategoryId, searchSeed:state.searchSeed });
+}
+
+async function fetchXObservations({ force = false } = {}) {
+  if (state.x.mode === 'rss') throw new Error('Xを使わない設定です。利用する場合は取得元を切り替えてください。');
+  if (!shouldUseLocalTrendApi()) throw new Error('X検索はローカル版で利用できます。');
+  if (!state.x.token) throw new Error('XのBearer Tokenを専用欄で設定してください。');
+  const options = currentXOptions();
+  const signature = JSON.stringify(options);
+  if (!force && state.x.signature === signature && state.x.result && Date.now() - Date.parse(state.x.result.observedAt) < 300_000) return state.x.result.observations;
+  state.x.error = ''; state.x.result = null;
+  let response;
+  try {
+    response = await fetch('/api/x-search', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.x.token}` },
+      body: JSON.stringify(options), signal: AbortSignal.timeout(30_000),
+    });
+  } catch { throw new Error('ローカルのX検索に接続できないか、タイムアウトしました。'); }
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) {
+    if (response.status === 401 || response.status === 403) state.x.verified = false;
+    throw new Error(result.error || `X検索エラー（HTTP ${response.status}）`);
+  }
+  if (!Array.isArray(result.observations)) throw new Error('X検索の応答を読み取れませんでした。');
+  result.observations = applyXHistory(result.observations, state.x.history);
+  state.x.result = result; state.x.signature = signature; state.x.verified = true;
+  return result.observations;
+}
+
+async function fetchTrendObservations() {
+  if (state.x.mode === 'rss') {
+    const fresh = newEvidenceOnly(await fetchRssObservations(), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys);
+    if (!fresh.length) throw new Error('指定期間内に未使用の公開Web根拠がありません。以前の題材を新しい結果として再利用しません。');
+    return fresh;
+  }
+  if (state.x.mode !== 'both') throw new Error('X単独の分析は利用できません。公開Webと合わせて分析してください。');
+  let xPosts;
+  try { xPosts = newEvidenceOnly(await fetchXObservations(), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys); }
+  catch (error) { state.x.error = error.message; throw error; }
+  if (!xPosts.length) throw new Error('Xの補助情報が0件のため複合分析を開始できません。検索条件を変更するか、Xを使わない設定を選んでください。');
+  const rss = newEvidenceOnly(await fetchRssObservations(), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys);
+  if (!rss.length) throw new Error('指定期間内に未使用の公開Web根拠がありません。X単独の企画には切り替えません。');
+  return [...rss, ...xPosts];
+}
+
+function bindXControls() {
+  const x = state.x;
+  const bind = (selector, event, action) => document.querySelector(selector)?.addEventListener(event, action);
+  bind('#x-token-form', 'submit', event => {
+    event.preventDefault();
+    if (isUiWorking()) return;
+    const input = document.querySelector('#x-token');
+    const token = input?.value.trim().replace(/^Bearer\s+/i, '') || '';
+    if (!token || /\s/.test(token) || token.length > 4096) { x.error = 'Bearer Tokenを空白なしで入力してください。'; render(); return; }
+    input.value = '';
+    x.token = token; x.editing = false; x.verified = false; x.error = ''; x.result = null; x.signature = ''; x.history.clear();
+    render();
+  });
+  bind('#x-token-edit', 'click', () => { x.editing = true; render(); document.querySelector('#x-token')?.focus(); });
+  bind('#x-token-cancel', 'click', () => { x.editing = false; render(); });
+  bind('#x-token-clear', 'click', () => { state.x = createXState(); render(); });
+  document.querySelectorAll('[name="x-source-mode"]').forEach(input => input.addEventListener('change', event => {
+    if (isUiWorking()) return;
+    x.mode = event.target.value; x.error = ''; render();
+  }));
+  for (const [selector, key, type] of [['#x-query','query'],['#x-period','period'],['#x-sort','sortOrder'],['#x-limit','maxResults','number'],['#x-exclude-replies','excludeReplies','boolean'],['#x-authors','includeAuthors','boolean']]) {
+    bind(selector, 'change', event => {
+      x[key] = type === 'boolean' ? event.target.checked : type === 'number' ? Number(event.target.value) : event.target.value;
+      x.result = null; x.signature = ''; x.error = ''; render();
+    });
+  }
+}
+
 function isStaticPagesRuntime() {
   return globalThis.location?.hostname?.endsWith('github.io') ?? false;
 }
@@ -713,6 +805,7 @@ function shouldUseLocalTrendApi() {
 }
 
 async function refreshTrendObservations({ runProvider = false, announce = false } = {}) {
+  rememberCreativeReport(state.historyByCategory, state.report);
   if (isUiWorking()) return;
   state.searchBusy = true;
   state.providerSummary = null;
@@ -736,7 +829,7 @@ async function refreshTrendObservations({ runProvider = false, announce = false 
     state.observations = [];
     state.report = createReport();
     showActionMessage({
-      summary: '公開Web検索に失敗しました。',
+      summary: '取得に失敗しました。',
       risk_note: error instanceof Error ? error.message : '取得できませんでした。',
     });
   } finally {
@@ -750,6 +843,8 @@ async function refreshTrendObservations({ runProvider = false, announce = false 
 }
 
 function suggestMore() {
+  if (isUiWorking()) return;
+  state.x.signature = '';
   state.searchSeed += 1;
   state.variantSeed = state.searchSeed;
   refreshTrendObservations({ runProvider: true, announce: true });
@@ -813,6 +908,7 @@ async function generatePlanSample(planId) {
     if (!sampleText) {
       throw new Error('参考文章として表示できる本文が返りませんでした。もう一度生成してください。');
     }
+    plan.sampleText = sampleText;
     state.planSamples = {
       ...state.planSamples,
       [planId]: {
@@ -826,12 +922,28 @@ async function generatePlanSample(planId) {
       [planId]: {
         status: 'error',
         text: error?.message ?? '参考文章生成に失敗しました。',
+        rejectedText: error?.rejectedText ?? '',
       },
     };
   } finally {
     state.draftBusy = false;
     render();
   }
+}
+
+function recheckPlanSample(planId) {
+  if (isUiWorking()) return;
+  const plan = state.report.creativePlans.find(item => item.id === planId);
+  const rejectedText = state.planSamples[planId]?.rejectedText;
+  if (!plan || !rejectedText) return;
+  try {
+    const result = validateDraftSampleText(rejectedText, plan.aiDraftPrompt);
+    plan.sampleText = result.text;
+    state.planSamples[planId] = { status: 'done', text: result.text };
+  } catch (error) {
+    state.planSamples[planId] = { status: 'error', text: error.message, rejectedText };
+  }
+  render();
 }
 
 async function copyPlanSample(planId) {
@@ -900,11 +1012,11 @@ function applyLoadedReport(loadedReport) {
   state.selectedCategoryId = loadedReport.category.id;
   state.timeWindow = loadedReport.timeWindow ?? state.timeWindow;
   state.audience = loadedReport.audience ?? state.audience;
-  state.searchSeed = 0;
-  state.variantSeed = 0;
   state.observations = loadedReport.trendClusters?.[0]?.observations ?? [];
+  state.searchSeed = Math.max(0, ...state.observations.map(item => Number(item.searchRound) || 0));
+  state.variantSeed = state.searchSeed;
   state.providerRunSignature = null;
-  state.planSamples = {};
+  state.planSamples = Object.fromEntries(loadedReport.creativePlans.filter(plan=>plan.sampleText).map(plan=>[plan.id,{status:'done',text:plan.sampleText}]));
   state.report = loadedReport;
 }
 
@@ -1093,8 +1205,7 @@ function resultHasProviderAuthError(result) {
 }
 
 function isProviderAuthError(error) {
-  const message = String(error?.message ?? error ?? '');
-  return /HTTP\s*401|Incorrect API key|invalid_api_key|API key provided|認証|拒否/.test(message);
+  return error?.category === 'authentication';
 }
 
 function handleProviderAuthFailure(providerStatus) {
@@ -1109,7 +1220,7 @@ function handleProviderAuthFailure(providerStatus) {
   clearActionMessage();
   showActionMessage({
     summary: 'APIキーが認証されませんでした。',
-    risk_note: `${providerStatus.provider.name}からHTTP 401が返りました。途中レポートは表示せず、入力画面に戻します。`,
+    risk_note: `${providerStatus.provider.name}が認証情報を受理しませんでした。入力画面から接続し直してください。`,
     next_actions: ['API設定欄に有効なキーを入力して、接続し直してください。'],
   });
   render();
@@ -1250,6 +1361,7 @@ function applyProviderPlanDesigns(design, providerStatus) {
       return {
         ...plan,
         ...providerPlanVisibleFields(plan, generated),
+        sourceSynthesis: generated.sourceSynthesis,
         craftNotes: generated.craftNotes,
         storyArchitecture: generated.storyArchitecture,
         aiDesign: {
@@ -1386,11 +1498,12 @@ function stripProviderPrefix(value) {
 }
 
 function renderAnalysisBusyBanner(report, providerStatus) {
-  const label = state.searchBusy ? '公開Web検索中' : state.apiSaving ? 'API接続中' : state.draftBusy ? 'API稼働中' : 'API分析中';
+  const label = state.x.busy ? 'X検索中' : state.searchBusy ? '公開データ取得中' : state.apiSaving ? 'API接続中' : state.draftBusy ? 'API稼働中' : 'API分析中';
   const detail = state.apiSaving
     ? 'APIキーを確認しています'
+    : state.x.busy ? 'Xの公開投稿を取得しています'
     : state.searchBusy
-      ? `${report.category.label}の公開RSSを取得しています`
+      ? `${report.category.label}の${state.x.mode === 'rss' ? '公開RSS' : '公開RSSとX投稿'}を取得しています`
       : state.draftBusy
         ? 'AIで参考文章を生成しています'
         : `AIで${report.category.label}を分析しています`;
@@ -1402,6 +1515,17 @@ function renderAnalysisBusyBanner(report, providerStatus) {
       <span>${escapeHtml(detail)}</span>
     </div>
   `;
+}
+
+function renderResearchReceipt(report) {
+  const observations = report.trendClusters?.[0]?.observations ?? [];
+  if (!observations.length) return '';
+  const published = observations.map(item => Date.parse(item.publishedAt)).filter(Number.isFinite);
+  const range = published.length ? `${formatDataTimestamp(new Date(Math.min(...published)))} 〜 ${formatDataTimestamp(new Date(Math.max(...published)))}` : '日時不明';
+  const web = observations.filter(item => item.sourceType === 'public-web-rss').length;
+  const x = observations.filter(item => item.sourceType === 'x-api').length;
+  const round = Math.max(0, ...observations.map(item => Number(item.searchRound) || 0)) + 1;
+  return `<p class="research-receipt">今回の根拠：公開Web ${web}件${x ? ` ＋ X ${x}件` : ''} ／ 出典日時（RSS配信／X投稿） ${escapeHtml(range)} ／ 取得 ${escapeHtml(latestObservationTimestamp(report))} ／ 検索${round}回目</p>`;
 }
 
 function renderInsightDashboard(report) {
@@ -1425,7 +1549,7 @@ function renderInsightDashboard(report) {
     <section class="insight-dashboard" aria-label="取得状況">
       <div class="dashboard-lead">
         ${renderDataLabel('取得状況', dataTimestamp)}
-        <h2>${escapeHtml(report.category.label)}の取得状況</h2>
+        <h2>企画に使った情報の内訳</h2>
         <p>${escapeHtml(decisionNarrative(report, decisionScores))}</p>
       </div>
       <div class="opportunity-meter" role="img" aria-label="総合狙い目 ${opportunityScore}点">
@@ -1671,7 +1795,7 @@ function renderEvidenceCard(card) {
         </div>
       </dl>
       <small>
-        ${escapeHtml(card.source)} / ${escapeHtml(card.metricsSummary)}
+        ${escapeHtml(card.source)} / ${card.sourceType === 'x-api' ? '投稿日時' : 'RSS配信日時'} ${escapeHtml(card.publishedAt ? formatDataTimestamp(new Date(card.publishedAt)) : '日時不明')} / 取得 ${escapeHtml(card.timeWindow ? formatDataTimestamp(new Date(card.timeWindow)) : '日時不明')}<br/>${escapeHtml(card.metricsSummary)}
         ${sourceUrl ? `<a class="evidence-link" href="${escapeAttr(sourceUrl)}" target="_blank" rel="noreferrer">取得元の記事を開く</a>` : ''}
       </small>
     </article>
@@ -1735,6 +1859,7 @@ function renderCreativePlan(plan, index) {
       </div>
       <p class="promise">${escapeHtml(plan.audiencePromise)}</p>
 
+      ${renderSourceSynthesis(plan.sourceSynthesis)}
       <div class="brief-panel">
         <h4>${escapeHtml(planBriefHeading(plan))}</h4>
         <dl>
@@ -1776,6 +1901,11 @@ function renderCreativePlan(plan, index) {
       ${renderPlanSample(plan)}
     </article>
   `;
+}
+
+function renderSourceSynthesis(synthesis) {
+  if (!synthesis) return '';
+  return `<div class="source-synthesis"><h4>複合分析 → 物語への反映</h4><p>${escapeHtml(synthesis.creativeTransfer)}</p><ul>${synthesis.evidence.map(item => `<li>${escapeHtml(item.source)}：${escapeHtml(item.title)}</li>`).join('')}</ul></div>`;
 }
 
 function planBriefHeading(plan) {
@@ -1916,6 +2046,7 @@ function renderPlanSample(plan) {
         </div>
       </div>
       <div class="${className}">${formatMultilineText(text)}</div>
+      ${sample?.status === 'error' && sample.rejectedText ? `<details class="rejected-sample"><summary>不採用の本文を確認</summary><div class="sample-output">${formatMultilineText(sample.rejectedText)}</div><button type="button" class="secondary-action compact" data-recheck-sample-id="${escapeAttr(plan.id)}">この本文を再検査（API使用なし）</button></details>` : ''}
     </div>
   `;
 }

@@ -140,13 +140,17 @@ export function buildTrendSearchUrl({ categoryId, timeWindow, audience, searchSe
 
 export async function searchTrendObservations({
   categoryId = 'story-manga',
-  timeWindow = '7d',
+  timeWindow = '24h',
   audience = 'general',
   searchSeed = 0,
   fetchImpl = fetch,
+  now = Date.now(),
 } = {}) {
+  const hours = { '24h':24, '7d':168, '30d':720 }[timeWindow];
+  if (!hours) throw new Error('取得期間が不正です。');
+  const cutoff = now - hours * 3_600_000;
   const sources = trendSourcesFor(categoryId, searchSeed);
-  const results = await Promise.allSettled(sources.map((source) => fetchTrendSource(source, fetchImpl)));
+  const results = await Promise.allSettled(sources.map((source) => fetchTrendSource(source, fetchImpl, cutoff, now)));
   const succeeded = results.filter((result) => result.status === 'fulfilled').flatMap((result) => result.value);
   const pool = enrichTrendMetrics(buildCategoryRelevantPool(succeeded));
   const observations = selectDiverseTrendItems(pool, searchSeed)
@@ -243,9 +247,10 @@ function trendSourcesFor(categoryId, seed = 0) {
   ];
 }
 
-async function fetchTrendSource(source, fetchImpl) {
+async function fetchTrendSource(source, fetchImpl, cutoff, now) {
   const xml = await fetchTextWithCorsFallback(source.url, fetchImpl);
   return parseRssItems(xml)
+    .filter(item => { const published = Date.parse(item.pubDate); return Number.isFinite(published) && published >= cutoff && published <= now; })
     .slice(0, source.limit)
     .map((item, index) => ({
       ...item,
@@ -264,7 +269,7 @@ async function fetchTextWithCorsFallback(url, fetchImpl) {
   for (const createUrl of PUBLIC_CORS_FETCHERS) {
     const requestUrl = createUrl(url);
     try {
-      const response = await fetchImpl(requestUrl, { cache: 'no-store' });
+      const response = await fetchImpl(requestUrl, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
       if (!text || !/<(rss|feed|item|entry)\b/i.test(text)) {
@@ -289,7 +294,7 @@ function parseRssItems(xml) {
     title: decodeXml(readXmlTag(block, 'title')),
     link: decodeXml(readLink(block)),
     source: decodeXml(readXmlTag(block, 'source')),
-    pubDate: decodeXml(readXmlTag(block, 'pubDate') || readXmlTag(block, 'published') || readXmlTag(block, 'updated')),
+    pubDate: decodeXml(readXmlTag(block, 'pubDate') || readXmlTag(block, 'published') || readXmlTag(block, 'updated') || readXmlTag(block, 'dc:date')),
     description: stripHtml(decodeXml(readXmlTag(block, 'description') || readXmlTag(block, 'summary'))),
   }));
 }
@@ -306,7 +311,7 @@ function readLink(block) {
   return href?.[1] ?? '';
 }
 
-function decodeXml(value) {
+export function decodeXml(value) {
   const once = decodeXmlOnce(value);
   return /&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos|nbsp);/.test(once) ? decodeXmlOnce(once) : once;
 }
@@ -339,7 +344,7 @@ function stripHtml(value) {
     .trim();
 }
 
-function buildCategoryRelevantPool(items, minimum = 6) {
+export function buildCategoryRelevantPool(items, minimum = 6) {
   const scoped = [];
   const material = [];
   const filler = [];
@@ -359,7 +364,7 @@ function buildCategoryRelevantPool(items, minimum = 6) {
   return [...primary, ...filler];
 }
 
-function enrichTrendMetrics(items) {
+export function enrichTrendMetrics(items) {
   const sourceDiversity = new Set(items.map((item) => item.sourceLabel || item.source || 'public Web/RSS')).size;
   return items.map((item) => {
     const coOccurrenceScore = coOccurrenceScoreForItem(item, items);
@@ -381,7 +386,7 @@ function enrichTrendMetrics(items) {
   });
 }
 
-function itemMatchesStoryMaterial(item) {
+export function itemMatchesStoryMaterial(item) {
   const text = `${item.title ?? ''} ${item.description ?? ''}`.toLowerCase();
   if (isEntertainmentWorkArticle(text)) return false;
   return STORY_MATERIAL_TERMS.some((term) => term && text.includes(term.toLowerCase()));
@@ -431,7 +436,7 @@ function rankTrendItems(items) {
   const ranked = [];
   for (const item of items) {
     const key = normalizeTrendKey(item.title || item.link);
-    if (!key || seen.has(key)) continue;
+    if (!key || [...seen].some(prior => prior === key || (Math.min(prior.length,key.length) >= 20 && (prior.startsWith(key) || key.startsWith(prior))))) continue;
     seen.add(key);
     ranked.push(item);
   }
@@ -441,6 +446,7 @@ function rankTrendItems(items) {
 function normalizeTrendKey(value) {
   return String(value ?? '')
     .toLowerCase()
+    .replace(/\s+-\s+[^\n]+$/, '')
     .replace(/[^\p{Letter}\p{Number}]+/gu, '')
     .slice(0, 80);
 }
@@ -486,7 +492,7 @@ function recencyScore(pubDate) {
 
 function toTrendObservation(item, { audience, categoryId, index, searchSeed, timeWindow }) {
   const tags = tagsForTrendObservation(categoryId, item.title);
-  const publishedAt = Number.isNaN(Date.parse(item.pubDate)) ? new Date().toISOString() : new Date(item.pubDate).toISOString();
+  const publishedAt = Number.isFinite(Date.parse(item.pubDate)) ? new Date(item.pubDate).toISOString() : '';
   const sourceLabel = item.sourceLabel || item.source || 'public Web/RSS';
   return {
     id: `${categoryId}-web-${searchSeed}-${index}`,

@@ -34,6 +34,7 @@ test('searchTrendObservations fails closed when no real RSS source can be fetche
 
   await assert.rejects(
     searchTrendObservations({
+    now: Date.parse('2026-06-25T06:00:00Z'),
       categoryId: 'story-manga',
       timeWindow: '7d',
       audience: 'general',
@@ -67,6 +68,7 @@ test('searchTrendObservations converts fetched RSS into linked observations', as
     });
 
   const payload = await searchTrendObservations({
+    now: Date.parse('2026-06-25T06:00:00Z'),
     categoryId: 'story-manga',
     timeWindow: '7d',
     audience: 'general',
@@ -111,6 +113,7 @@ test('searchTrendObservations can use a later browser-safe public proxy fallback
   };
 
   const payload = await searchTrendObservations({
+    now: Date.parse('2026-06-25T06:00:00Z'),
     categoryId: 'story-manga',
     timeWindow: '7d',
     audience: 'general',

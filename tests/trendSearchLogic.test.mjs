@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeXml, itemMatchesCategory, buildCategoryRelevantPool, enrichTrendMetrics } from '../vite.config.js';
+import { decodeXml, itemMatchesStoryMaterial as itemMatchesCategory, buildCategoryRelevantPool, enrichTrendMetrics } from '../src/lib/publicTrendSearch.js';
 
 test('decodeXml decodes numeric and hex XML entities so RSS titles are not mojibake', () => {
   // はてな等のRSSは漢字・カナを16進実体参照で返すため、生の &#x...; が残ると文字化けに見える。
@@ -41,7 +41,7 @@ test('buildCategoryRelevantPool prioritizes angle-scoped and societal-material i
     { title: '台風7号が沖縄に接近' },
     { title: '日経平均株価が反発' },
   ];
-  const pool = buildCategoryRelevantPool(items, 'story-manga');
+  const pool = buildCategoryRelevantPool(items);
   const titles = pool.map((item) => item.title);
   assert.ok(titles.includes('言えなかった本音が共感を呼ぶ'));
   assert.ok(!titles.includes('台風7号が沖縄に接近'));
@@ -57,7 +57,7 @@ test('buildCategoryRelevantPool falls back to filler only when material is too f
     { title: '台風7号が沖縄に接近' },
     { title: '日経平均株価が反発' },
   ];
-  const pool = buildCategoryRelevantPool(items, 'story-manga');
+  const pool = buildCategoryRelevantPool(items);
   // 素材が1件 < minimum(6) なので、空にせず補助ニュースを末尾に加える。
   assert.equal(pool.length, 3);
   assert.equal(pool[0].title, '言えなかった本音が共感を呼ぶ');

@@ -1,9 +1,12 @@
+import { xEvidenceScore } from './xSearch.js';
+
 function normalized(value, max = 100) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
 }
 
 export function scoreObservation(observation) {
+  if (observation.sourceType === 'x-api') return xEvidenceScore(observation);
   const metrics = observation.metrics ?? {};
   const viewScore = normalized(metrics.views ?? 0, 1_500_000);
   const shareScore = normalized(metrics.shares ?? 0, 15_000);
