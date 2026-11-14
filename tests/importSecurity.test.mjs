@@ -1,3 +1,4 @@
+import {getOpenAIModelOption,OPENAI_MODEL_OPTIONS,OPENAI_MODEL_PRICE_SNAPSHOT_DATE,formatOpenAIModelPrice,DEFAULT_OPENAI_MODEL_ID} from '../src/lib/openaiModels.js';
 import { createAiOperationManager } from '../src/lib/aiOperation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,17 +16,18 @@ const fixture = () => structuredClone(buildReport({ categoryId: 'story-manga', o
 // Execute the real import handler and renderer without a browser or network.
 function harness(report = fixture()) {
   const app = { innerHTML: '' };
-  const state = { report, settings: {}, planSamples: {}, analysisStartConfirmed: true, x: createXState() };
+  const connection={connected:true,mode:'gemini'},bodyClasses=new Set();
+  const state = { report, settings: {}, planSamples: {}, openAiModelId:DEFAULT_OPENAI_MODEL_ID, analysisStartConfirmed: true, x: createXState() };
   const context = vm.createContext({ aiOperations: createAiOperationManager(),
-    app, state, CATEGORIES, fromJson, renderXPanel, canUseLocalApi, APP_VERSION: 'test', URL,
-    document: { querySelector: () => null },
-    getProviderStatus: () => ({ mode: 'gemini', provider: { connected: true, label: 'test' } }),
+    app, state, CATEGORIES, fromJson, renderXPanel, canUseLocalApi, APP_VERSION: 'test', URL, getOpenAIModelOption,OPENAI_MODEL_OPTIONS,OPENAI_MODEL_PRICE_SNAPSHOT_DATE,formatOpenAIModelPrice, API_INPUT_AUTOFILL_CLEAR_MS:0,window:{requestAnimationFrame:callback=>callback(),setTimeout:()=>0},
+    document: { querySelector: () => null,body:{classList:{toggle:(name,enabled)=>enabled?bodyClasses.add(name):bodyClasses.delete(name)}} },
+    getProviderStatus: () => ({ mode: connection.mode, provider: { connected: connection.connected, label: 'test' } }),
     fetch: () => { throw new Error('Network forbidden in import test'); },
   });
   vm.runInContext(main.slice(main.indexOf('function bootstrapApp()')), context);
   vm.runInContext('bindEvents = () => {}; clearActionMessage = () => {};', context);
   return {
-    state, app, context,
+    state, app, context, connection, bodyClasses,
     async import(reportToLoad) {
       context.event = { target: { files: [{ text: async () => JSON.stringify(reportToLoad) }], value: 'fixture.json' } };
       await vm.runInContext('importJson(event)', context);
@@ -142,11 +144,25 @@ test('ordinary and AI-enriched reports retain export/import content', async () =
   await h.import(report);
   assert.ok(h.app.innerHTML.includes('guide'));
 });
-test('startup API gate hides emergency stop; workspace idle/stopped disable it and thought enables it',()=>{
- const h=harness();h.state.analysisStartConfirmed=false;vm.runInContext('render()',h.context);
- const button=()=>h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];
- assert.match(button(),/\bhidden\b/);
- h.state.analysisStartConfirmed=true;vm.runInContext('render()',h.context);assert.doesNotMatch(button(),/\bhidden\b/);assert.match(button(),/\bdisabled\b/);
- vm.runInContext('var operation=aiOperations.begin();state.providerBusy=true;render()',h.context);assert.doesNotMatch(button(),/\bdisabled\b|\bhidden\b/);
- vm.runInContext('aiOperations.stop();operation.finish();state.providerBusy=false;render()',h.context);assert.match(button(),/\bdisabled\b/);assert.doesNotMatch(button(),/\bhidden\b/);
+test('API connection shows inactive stop before explicit start, without unlocking analysis, for both providers',()=>{
+ for(const mode of ['openai','gemini']){
+  const h=harness();h.connection.mode=mode;h.connection.connected=false;h.state.openAiModelConfirmed=true;h.state.analysisStartConfirmed=false;
+  const render=()=>vm.runInContext('render()',h.context),button=()=>h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];
+  render();assert.match(button(),/\bhidden\b/);assert.equal(h.bodyClasses.has('ai-workspace-ready'),false);
+  h.connection.connected=true;render();assert.doesNotMatch(button(),/\bhidden\b/);assert.match(button(),/\bdisabled\b/);assert.equal(h.bodyClasses.has('ai-workspace-ready'),true);
+  assert.match(h.app.innerHTML,/<main class="app-shell locked-shell/);assert.match(h.app.innerHTML,/class="api-start-panel"/);assert.equal(h.state.analysisStartConfirmed,false);
+  if(mode==='openai'){h.state.openAiModelConfirmed=false;render();assert.doesNotMatch(button(),/\bhidden\b/);h.state.openAiModelConfirmed=true;}
+  h.state.analysisStartConfirmed=true;render();assert.doesNotMatch(button(),/\bhidden\b/);assert.match(button(),/\bdisabled\b/);assert.doesNotMatch(h.app.innerHTML,/<main class="app-shell locked-shell/);
+  vm.runInContext('var operation=aiOperations.begin();state.providerBusy=true;render()',h.context);assert.doesNotMatch(button(),/\bdisabled\b|\bhidden\b/);assert.match(h.app.innerHTML,/<main class="app-shell locked-shell/);
+  vm.runInContext('aiOperations.stop();operation.finish();state.providerBusy=false;render()',h.context);assert.match(button(),/\bdisabled\b/);assert.doesNotMatch(button(),/\bhidden\b/);
+  vm.runInContext('operation=aiOperations.begin();state.providerBusy=true;render();operation.finish();state.providerBusy=false;render()',h.context);assert.match(button(),/\bdisabled\b/);assert.doesNotMatch(button(),/\bhidden\b/);
+  h.connection.connected=false;render();assert.match(button(),/\bhidden\b/);assert.equal(h.bodyClasses.has('ai-workspace-ready'),false);
+ }
+});
+test('active AI work remains stoppable above a lost connection gate and hides only after settling',()=>{
+ const h=harness();h.connection.connected=false;h.state.analysisStartConfirmed=false;
+ vm.runInContext('var operation=aiOperations.begin();state.providerBusy=true;render()',h.context);
+ let button=h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];assert.doesNotMatch(button,/\bhidden\b|\bdisabled\b/);assert.equal(h.bodyClasses.has('ai-workspace-ready'),true);
+ assert.ok(h.app.innerHTML.indexOf('id="stop-ai"')<h.app.innerHTML.indexOf('<main class="app-shell'));
+ vm.runInContext('aiOperations.stop();operation.finish();state.providerBusy=false;render()',h.context);button=h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];assert.match(button,/\bhidden\b/);assert.match(button,/\bdisabled\b/);
 });

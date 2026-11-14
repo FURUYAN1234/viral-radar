@@ -249,7 +249,7 @@ function render() {
   const disabled = disabledAttr(isLocked);
   const planState = planSectionState(report);
 
-  const workspaceReady = isApiReady() || aiOperations.state().active;
+  const workspaceReady = providerStatus.provider.connected || aiOperations.state().active;
   document.body?.classList?.toggle?.('ai-workspace-ready', workspaceReady);
   app.innerHTML = `
     <button id="stop-ai" class="ai-emergency-stop" type="button" ${workspaceReady ? '' : 'hidden'} ${disabledAttr(!aiOperations.state().active)}>⏹ ${aiOperations.state().stopped ? 'AI通信を中断済み' : 'AI通信を強制切断'}</button>

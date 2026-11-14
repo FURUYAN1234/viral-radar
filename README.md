@@ -766,4 +766,4 @@ It does not call the other apps at runtime. Each app works independently. / た�
 
 Model descriptions and prices wrap below the selector without widening the header; GPT-6 Luna is included in the layout checks. / モデル説明・料金は選択欄の下で折り返し、ヘッダーを横へ押し広げません。GPT-6 Lunaを含めて配置を確認しています。
 
-Emergency stop is hidden on the initial API setup/start screen, with no reserved stop space. After starting the workspace it stays at the upper right (20px top / 12px right), above the reserved header area. It remains reachable if settings are open during active work. / 初期のAPI設定・未起動画面では緊急停止と専用余白を表示しません。起動後の作業画面では上20px・右12pxの右上に固定し、ヘッダーと重ならない余白を確保します。作業中に設定を開いても停止操作へ届きます。
+Emergency stop is hidden until a provider key is connected, with no reserved stop space. Once connected, it stays visible even before the explicit analysis start, disabled while idle, at the upper right (20px top / 12px right), above the reserved header area. It remains reachable if settings are open during active work. / APIキー未接続では緊急停止と専用余白を表示しません。キー接続後は分析開始前も待機中の非活性状態で表示し、上20px・右12pxの右上に固定し、ヘッダーと重ならない余白を確保します。作業中に設定を開いても停止操作へ届きます。
