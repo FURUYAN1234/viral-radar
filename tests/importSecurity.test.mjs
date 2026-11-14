@@ -1,3 +1,4 @@
+import { createAiOperationManager } from '../src/lib/aiOperation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ const fixture = () => structuredClone(buildReport({ categoryId: 'story-manga', o
 function harness(report = fixture()) {
   const app = { innerHTML: '' };
   const state = { report, settings: {}, planSamples: {}, analysisStartConfirmed: true, x: createXState() };
-  const context = vm.createContext({
+  const context = vm.createContext({ aiOperations: createAiOperationManager(),
     app, state, CATEGORIES, fromJson, renderXPanel, canUseLocalApi, APP_VERSION: 'test', URL,
     document: { querySelector: () => null },
     getProviderStatus: () => ({ mode: 'gemini', provider: { connected: true, label: 'test' } }),
@@ -140,4 +141,12 @@ test('ordinary and AI-enriched reports retain export/import content', async () =
   const h = harness();
   await h.import(report);
   assert.ok(h.app.innerHTML.includes('guide'));
+});
+test('startup API gate hides emergency stop; workspace idle/stopped disable it and thought enables it',()=>{
+ const h=harness();h.state.analysisStartConfirmed=false;vm.runInContext('render()',h.context);
+ const button=()=>h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];
+ assert.match(button(),/\bhidden\b/);
+ h.state.analysisStartConfirmed=true;vm.runInContext('render()',h.context);assert.doesNotMatch(button(),/\bhidden\b/);assert.match(button(),/\bdisabled\b/);
+ vm.runInContext('var operation=aiOperations.begin();state.providerBusy=true;render()',h.context);assert.doesNotMatch(button(),/\bdisabled\b|\bhidden\b/);
+ vm.runInContext('aiOperations.stop();operation.finish();state.providerBusy=false;render()',h.context);assert.match(button(),/\bdisabled\b/);assert.doesNotMatch(button(),/\bhidden\b/);
 });

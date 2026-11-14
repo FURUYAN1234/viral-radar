@@ -1,3 +1,4 @@
+import { abortable } from './aiOperation.js';
 import { assertDifferentPlans } from './searchHistory.js';
 import { NANO_BANANA_FALLBACK_SNAPSHOT } from './nanoBananaFallbackSnapshot.js';
 import { DEFAULT_OPENAI_MODEL_ID, getOpenAIModelRoute, normalizeOpenAIModelId } from './openaiModels.js';
@@ -296,6 +297,7 @@ export async function runProviderAnalysis({
   onModelRoute,
   fetchImpl = fetch,
   proxyBase = '',
+  signal,
 }) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
@@ -308,6 +310,7 @@ export async function runProviderAnalysis({
     onModelRoute,
     fetchImpl,
     proxyBase,
+    signal,
     failureMessage: `${provider}の詳細分析に失敗しました。`,
     createRequest: (model) => createProviderAnalysisRequest({ provider, report, model }),
     parsePayload: (payload) => parseProviderPayload(provider, payload, report),
@@ -322,6 +325,7 @@ export async function runPlanDesignGeneration({
   onModelRoute,
   fetchImpl = fetch,
   proxyBase = '',
+  signal,
 }) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
@@ -334,6 +338,7 @@ export async function runPlanDesignGeneration({
     onModelRoute,
     fetchImpl,
     proxyBase,
+    signal,
     failureMessage: `${provider}の設計メモ生成に失敗しました。`,
     createRequest: (model) => createPlanDesignRequest({ provider, report, model }),
     parsePayload: (payload) => parsePlanDesignPayload(provider, payload, report),
@@ -348,6 +353,7 @@ export async function runDraftSample({
   onModelRoute,
   fetchImpl = fetch,
   proxyBase = '',
+  signal,
 }) {
   if (!apiKey || apiKey.length < 12) {
     throw new Error(`${provider}のAPIキーが未設定です。`);
@@ -363,6 +369,7 @@ export async function runDraftSample({
     onModelRoute,
     fetchImpl,
     proxyBase,
+    signal,
     failureMessage: `${provider}の参考文章生成に失敗しました。`,
     createRequest: (model) => createDraftSampleRequest({ provider, draftPrompt, model }),
     parsePayload: (payload) => parseDraftSamplePayload(provider, payload, prepareDraftPromptForSample(draftPrompt)),
@@ -423,6 +430,7 @@ async function runProviderFallback({
   onModelRoute,
   fetchImpl,
   proxyBase = '',
+  signal,
   failureMessage,
   createRequest,
   parsePayload,
@@ -437,6 +445,7 @@ async function runProviderFallback({
   // Availability failures may try at most three models. Invalid content gets
   // one explicit correction on the same model, then stops with its real error.
   for (let attempt = 0; attempt < 3 && modelIndex < models.length; attempt += 1) {
+    signal?.throwIfAborted();
     const model = models[modelIndex];
     onModelRoute?.({ phase: 'trying', modelId: model });
     try {
@@ -447,7 +456,8 @@ async function runProviderFallback({
         else request.input += repair;
       }
       const body = JSON.stringify(request);
-      const payload = await callProviderModel({ provider, apiKey, model, body, fetchImpl, proxyBase });
+      const payload = await callProviderModel({ provider, apiKey, model, body, fetchImpl, proxyBase, signal });
+      signal?.throwIfAborted();
       previousPayload = payload;
       let parsed;
       try { parsed = parsePayload(payload); }
@@ -459,6 +469,7 @@ async function runProviderFallback({
         fallback_chain: [...attempts, { model, status: 'success' }],
       };
     } catch (error) {
+      signal?.throwIfAborted();
       const reason = sanitizeProviderError(error);
       if (error?.rejectedText) rejectedText = sanitizeProviderError(error.rejectedText, Infinity);
       attempts.push({ model, status: 'failed', reason });
@@ -497,10 +508,12 @@ function isProviderConnectivityReason(reason = '') {
   );
 }
 
-async function callProviderModel({ provider, apiKey, model, body, fetchImpl, proxyBase = '' }) {
-  const signal = AbortSignal.timeout(240_000);
+async function callProviderModel({ provider, apiKey, model, body, fetchImpl, proxyBase = '', signal: externalSignal }) {
+  externalSignal?.throwIfAborted();
+  const signal = externalSignal ? AbortSignal.any([externalSignal, AbortSignal.timeout(240_000)]) : AbortSignal.timeout(240_000);
+  const request = (...args) => abortable(fetchImpl(...args), signal);
   const response = proxyBase
-    ? await fetchImpl(proxyBase, {
+    ? await request(proxyBase, {
         method: 'POST',
         signal,
         headers: { 'Content-Type': 'application/json' },
@@ -508,13 +521,13 @@ async function callProviderModel({ provider, apiKey, model, body, fetchImpl, pro
         body: JSON.stringify({ provider, model, apiKey, body: JSON.parse(body) }),
       })
     : provider === 'gemini'
-      ? await fetchImpl(`${GEMINI_MODEL_ENDPOINT_BASE}/${encodeURIComponent(model)}:generateContent`, {
+      ? await request(`${GEMINI_MODEL_ENDPOINT_BASE}/${encodeURIComponent(model)}:generateContent`, {
           method: 'POST',
           signal,
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body,
         })
-      : await fetchImpl(OPENAI_ENDPOINT, {
+      : await request(OPENAI_ENDPOINT, {
           method: 'POST',
           signal,
           headers: {
@@ -527,7 +540,8 @@ async function callProviderModel({ provider, apiKey, model, body, fetchImpl, pro
   if (!response.ok) {
     let message = '';
     try {
-      const payload = await response.json();
+      const payload = await abortable(response.json(), signal);
+  signal.throwIfAborted();
       message = payload.error?.message ?? payload.message ?? '';
     } catch {
       message = '';
@@ -537,7 +551,7 @@ async function callProviderModel({ provider, apiKey, model, body, fetchImpl, pro
     throw error;
   }
 
-  return response.json();
+  return abortable(response.json(), signal);
 }
 
 function prepareDraftPromptForSample(draftPrompt) {

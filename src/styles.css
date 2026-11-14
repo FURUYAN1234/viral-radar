@@ -1620,3 +1620,17 @@ textarea {
 .manual-help { font-size:11px; opacity:.75; margin:7px 0 0; }
 
 @media (max-width: 360px) { .manual-links { width:100%; flex-direction:column; align-items:stretch; } .manual-links a { width:100%; justify-content:center; } }
+
+/* Reserve a top band so the fixed stop never covers the header or model controls. */
+:root { --ai-stop-space:76px; }
+body.ai-workspace-ready { padding-top:var(--ai-stop-space); }
+body.ai-workspace-ready::before { content:""; position:fixed; top:0; left:0; right:0; height:var(--ai-stop-space); z-index:10000; pointer-events:none; background:#eef2ef; border-bottom:1px solid #b5c3bb; }
+.ai-emergency-stop { min-height:44px; position:fixed; top:max(20px, env(safe-area-inset-top)); right:max(12px, env(safe-area-inset-right)); z-index:10001; max-width:calc(100vw - 24px); box-sizing:border-box; white-space:normal; overflow-wrap:anywhere; line-height:1.4; background:#b91c1c; color:#fff; border:2px solid #fca5a5; border-radius:10px; padding:12px 18px; font-weight:800; cursor:pointer; }
+.ai-emergency-stop:hover:not(:disabled) { background:#dc2626; }
+.ai-emergency-stop:disabled { background:#4b5563; border-color:#6b7280; color:#d1d5db; cursor:not-allowed; opacity:.65; }
+.brand-block, .header-api-block, .status-strip, .api-connect-panel, .openai-model-card { min-width:0; max-width:100%; }
+.status-strip span, .openai-model-details, .openai-model-details span, .openai-model-caveat { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.openai-model-details { font-size:12px; line-height:1.5; }
+.openai-model-control select { box-sizing:border-box; width:100%; max-width:100%; min-width:0; text-overflow:ellipsis; }
+
+.ai-emergency-stop[hidden] { display:none !important; }

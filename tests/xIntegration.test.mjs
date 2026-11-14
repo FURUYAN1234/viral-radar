@@ -1,3 +1,4 @@
+import { createAiOperationManager } from '../src/lib/aiOperation.js';
 import { newEvidenceOnly } from '../src/lib/searchHistory.js';
 import { createPlanDesignRequest, runPlanDesignGeneration } from '../src/lib/providers.js';
 import { readFileSync } from 'node:fs';
@@ -37,7 +38,7 @@ test('mixed source selection retains both RSS and X even when RSS fills first fi
 const fixtureSource = readFileSync(new URL('./providers.test.mjs', import.meta.url), 'utf8');
 const start = fixtureSource.indexOf('function completeProviderPlan(');
 const end = fixtureSource.indexOf("\ntest(", start);
-const context = vm.createContext({});
+const context = vm.createContext({ aiOperations: createAiOperationManager(),});
 vm.runInContext(fixtureSource.slice(start, end), context);
 const completePlan = (id) => context.completeProviderPlan(id);
 const mixedReport = () => buildReport({categoryId:'story-manga', observations:[observation,...PUBLIC_OBSERVATIONS]});
@@ -85,7 +86,7 @@ test('network failures stop after three candidates and timeouts are not retried'
 
 test('imported reports retain their source search round and accurate date labels',()=>{
  const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
- const ctx=vm.createContext({state:{searchSeed:0,timeWindow:'24h',audience:'general'},loaded:{category:{id:'story-manga'},trendClusters:[{observations:[{sourceType:'public-web-rss',searchRound:2,publishedAt:'2026-11-12T23:00:00Z'}]}],creativePlans:[]},formatDataTimestamp:value=>String(value),escapeHtml:value=>String(value),latestObservationTimestamp:()=>''});
+ const ctx=vm.createContext({ aiOperations: createAiOperationManager(),state:{searchSeed:0,timeWindow:'24h',audience:'general'},loaded:{category:{id:'story-manga'},trendClusters:[{observations:[{sourceType:'public-web-rss',searchRound:2,publishedAt:'2026-11-12T23:00:00Z'}]}],creativePlans:[]},formatDataTimestamp:value=>String(value),escapeHtml:value=>String(value),latestObservationTimestamp:()=>''});
  vm.runInContext(main.slice(main.indexOf('function applyLoadedReport('),main.indexOf('async function saveExportFile(')),ctx);
  vm.runInContext(main.slice(main.indexOf('function renderResearchReceipt('),main.indexOf('function renderInsightDashboard(')),ctx);
  vm.runInContext('applyLoadedReport(loaded)',ctx);assert.equal(ctx.state.searchSeed,2);
@@ -103,7 +104,7 @@ test('obsolete X-post report imports cannot resurface as a creative category',()
 
 test('X alone and empty supplemental evidence cannot pass the combined route',async()=>{
  const main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');const a=main.indexOf('async function fetchTrendObservations(');const b=main.indexOf('function bindXControls(',a);
- const ctx=vm.createContext({newEvidenceOnly,state:{x:{mode:'both'},historyByCategory:{},selectedCategoryId:'story-manga'},fetchXObservations:async()=>[],fetchRssObservations:async()=>PUBLIC_OBSERVATIONS});vm.runInContext(main.slice(a,b),ctx);
+ const ctx=vm.createContext({ aiOperations: createAiOperationManager(),newEvidenceOnly,state:{x:{mode:'both'},historyByCategory:{},selectedCategoryId:'story-manga'},fetchXObservations:async()=>[],fetchRssObservations:async()=>PUBLIC_OBSERVATIONS});vm.runInContext(main.slice(a,b),ctx);
  await assert.rejects(vm.runInContext('fetchTrendObservations()',ctx),/0件/);ctx.state.x.mode='x';await assert.rejects(vm.runInContext('fetchTrendObservations()',ctx),/X単独/);ctx.state.x.mode='rss';assert.equal((await vm.runInContext('fetchTrendObservations()',ctx)).length,PUBLIC_OBSERVATIONS.length);
 });
 

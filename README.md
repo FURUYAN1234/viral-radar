@@ -8,7 +8,13 @@ Read the Japanese A4 guides from the app header; each opens in a separate tab an
 
 # Monogatari Buzz Maker / 物語バズメーカー
 
-**v1.4.2**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.2.md)
+### Stop AI communication / AI通信の強制切断
+
+The red **Stop AI communication** button stays at the upper right and is enabled while AI work is running, including waiting for reasoning and receiving a response. It cancels the active requests and prevents subsequent fallback, automatic corrections and late result adoption. It is disabled when idle or already stopped. Your inputs, keys and previously accepted results remain available; start again with the normal generation button. Provider billing already incurred is separate. / 画面右上の赤い「AI通信を強制切断」は、思考待ち・応答受信中を含むAI処理中だけ押せます。実行中の通信を中断し、後続のモデル切替・自動修正と遅延結果の採用を止めます。待機中・中断済みは非活性です。入力・キー・採用済みの結果は保持し、通常の生成ボタンで再実行できます。既に発生したAPI利用料金は別です。
+
+
+
+**v1.4.3**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.3.md)
 
 | Feature / 機能 | GitHub Pages / 公開Web版 | Download and run locally / ダウンロードしてローカル起動 |
 | --- | --- | --- |
@@ -35,7 +41,7 @@ Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https:/
 [Local launch instructions / ローカル起動手順](#local-setup) · X and AI API usage are billed separately by each provider. / X APIと生成AIの利用料金は各事業者へ別途かかります。
 
 
-![Version](https://img.shields.io/badge/version-1.4.2-0f766e)
+![Version](https://img.shields.io/badge/version-1.4.3-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -757,3 +763,7 @@ It does not call the other apps at runtime. Each app works independently. / た�
 | Local Port / ローカルポート | `5180` |
 | Public URL / 公開URL | [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/) |
 | License / ライセンス | [FURU アプリ利用条件](LICENSE) |
+
+Model descriptions and prices wrap below the selector without widening the header; GPT-6 Luna is included in the layout checks. / モデル説明・料金は選択欄の下で折り返し、ヘッダーを横へ押し広げません。GPT-6 Lunaを含めて配置を確認しています。
+
+Emergency stop is hidden on the initial API setup/start screen, with no reserved stop space. After starting the workspace it stays at the upper right (20px top / 12px right), above the reserved header area. It remains reachable if settings are open during active work. / 初期のAPI設定・未起動画面では緊急停止と専用余白を表示しません。起動後の作業画面では上20px・右12pxの右上に固定し、ヘッダーと重ならない余白を確保します。作業中に設定を開いても停止操作へ届きます。

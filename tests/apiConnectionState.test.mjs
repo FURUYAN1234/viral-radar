@@ -1,3 +1,4 @@
+import { createAiOperationManager } from '../src/lib/aiOperation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,7 +9,7 @@ const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 function extract(name){ const start=source.search(new RegExp(`^(?:async )?function ${name}\\(`,'m'));assert.ok(start>=0);const next=source.slice(start+1).search(/\n(?:async )?function /);return source.slice(start,next<0?undefined:start+1+next); }
 function harness(){
  let calls=0;
- const context=vm.createContext({...models,createXState,canUseLocalApi,location:new URL('https://furuyan1234.github.io/viral-radar/'),initialSettings:{apiKey:''},initialProviderStatus:{provider:{connected:false}},APP_VERSION:'1.4.1',API_SAVE_BUSY_MS:300,
+ const context=vm.createContext({ aiOperations: createAiOperationManager(),...models,createXState,canUseLocalApi,location:new URL('https://furuyan1234.github.io/viral-radar/'),initialSettings:{apiKey:''},initialProviderStatus:{provider:{connected:false}},APP_VERSION:'1.4.1',API_SAVE_BUSY_MS:300,
  createReport:()=>({}),render:()=>{},clearActionMessage:()=>{},showActionMessage:()=>{},forgetPersistedSettings:()=>{},wait:async()=>{},focusApiInputSoon:()=>{},resetAnalysisSessionForApiChange:()=>{},isUiWorking:()=>false,escapeHtml:String,escapeAttr:String,disabledAttr:v=>v?'disabled':'',renderDataLabel:()=>'',normalizeEnteredApiKey:v=>String(v).trim(),refreshTrendObservations:()=>{calls++;},fetch:()=>{calls++;throw new Error('unexpected API');}});
  const start=source.indexOf('const state = ');assert.ok(start>=0);const end=source.indexOf('\n};',start)+3;
  vm.runInContext(source.slice(start,end).replace('import.meta.hot?.data.runtimeState','undefined')+'\nlet apiInputUserTouched=false;',context);

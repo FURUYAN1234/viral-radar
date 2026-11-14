@@ -1,3 +1,4 @@
+import { createAiOperationManager } from './lib/aiOperation.js';
 import { newEvidenceOnly, rememberCreativeReport } from './lib/searchHistory.js';
 import './styles.css';
 import { CATEGORIES } from './lib/categories.js';
@@ -25,11 +26,12 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
 let apiInputUserTouched = false;
+const aiOperations = createAiOperationManager();
 const initialSettings = loadSettings();
 const initialProviderStatus = getProviderStatus(initialSettings);
 
@@ -247,7 +249,10 @@ function render() {
   const disabled = disabledAttr(isLocked);
   const planState = planSectionState(report);
 
+  const workspaceReady = isApiReady() || aiOperations.state().active;
+  document.body?.classList?.toggle?.('ai-workspace-ready', workspaceReady);
   app.innerHTML = `
+    <button id="stop-ai" class="ai-emergency-stop" type="button" ${workspaceReady ? '' : 'hidden'} ${disabledAttr(!aiOperations.state().active)}>⏹ ${aiOperations.state().stopped ? 'AI通信を中断済み' : 'AI通信を強制切断'}</button>
     <main class="app-shell ${isLocked ? 'locked-shell' : ''} ${uiWorking ? 'busy-shell' : ''}">
       <header class="topbar">
         <div class="brand-block">
@@ -502,6 +507,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
 }
 
 function bindEvents(isLocked = false, showApiPanel = false) {
+  document.querySelector('#stop-ai')?.addEventListener('click', () => { aiOperations.stop(); render(); });
   bindXControls();
   bindApiControls(showApiPanel);
   bindHeaderControls();
@@ -887,6 +893,8 @@ async function generatePlanSample(planId) {
     return;
   }
 
+  const previousSamples = state.planSamples;
+  const operation = aiOperations.begin();
   state.planSamples = {
     ...state.planSamples,
     [planId]: {
@@ -903,11 +911,13 @@ async function generatePlanSample(planId) {
       provider: providerStatus.mode,
       apiKey: providerStatus.apiKey,
       draftPrompt: plan.aiDraftPrompt,
+      signal: operation.signal,
       proxyBase: PROVIDER_PROXY,
       selectedModelId: state.openAiModelId,
       onModelRoute:
-        providerStatus.mode === 'openai' ? (event) => handleOpenAiModelRoute('draft', event) : undefined,
+        providerStatus.mode === 'openai' ? (event) => { operation.check(); handleOpenAiModelRoute('draft', event); } : undefined,
     });
+    operation.check();
     const sampleText = result.text?.trim();
     if (!sampleText) {
       throw new Error('参考文章として表示できる本文が返りませんでした。もう一度生成してください。');
@@ -921,6 +931,10 @@ async function generatePlanSample(planId) {
       },
     };
   } catch (error) {
+    if (operation.signal.aborted) {
+      if (operation.isCurrent()) state.planSamples = previousSamples;
+      return;
+    }
     state.planSamples = {
       ...state.planSamples,
       [planId]: {
@@ -930,8 +944,7 @@ async function generatePlanSample(planId) {
       },
     };
   } finally {
-    state.draftBusy = false;
-    render();
+    if (operation.isCurrent()) { state.draftBusy = false; operation.finish(); render(); }
   }
 }
 
@@ -1155,6 +1168,8 @@ async function runProviderDeepening() {
     return;
   }
 
+  const operation = aiOperations.begin();
+  const previousSummary = state.providerSummary;
   const runSignature = currentProviderRunSignature(providerStatus);
   state.providerRunSignature = runSignature;
   state.providerSummary = {
@@ -1168,9 +1183,11 @@ async function runProviderDeepening() {
 
   try {
     const [summaryResult, designResult] = await Promise.allSettled([
-      runOneProvider(providerStatus.mode, providerStatus.apiKey),
-      runOnePlanDesign(providerStatus.mode, providerStatus.apiKey),
+      runOneProvider(providerStatus.mode, providerStatus.apiKey, operation),
+      runOnePlanDesign(providerStatus.mode, providerStatus.apiKey, operation),
     ]);
+    if (operation.signal.aborted) { if (operation.isCurrent()) state.providerSummary = previousSummary; return; }
+    operation.check();
     if (state.providerRunSignature !== runSignature) return;
     if ([summaryResult, designResult].some(resultHasProviderAuthError)) {
       state.providerBusy = false;
@@ -1198,6 +1215,8 @@ async function runProviderDeepening() {
       combineProviderStatuses(reportAnalysisStatus, designStatus),
     );
   } finally {
+    if (!operation.isCurrent()) return;
+    operation.finish();
     if (state.providerRunSignature !== runSignature) return;
     state.providerBusy = false;
     render();
@@ -1230,28 +1249,30 @@ function handleProviderAuthFailure(providerStatus) {
   render();
 }
 
-async function runOneProvider(provider, apiKey) {
+async function runOneProvider(provider, apiKey, operation) {
   const summary = await runProviderAnalysis({
     provider,
+    signal: operation.signal,
     apiKey,
     report: state.report,
     proxyBase: PROVIDER_PROXY,
     selectedModelId: state.openAiModelId,
     onModelRoute:
-      provider === 'openai' ? (event) => handleOpenAiModelRoute('analysis', event) : undefined,
+      provider === 'openai' ? (event) => { operation.check(); handleOpenAiModelRoute('analysis', event); } : undefined,
   });
   return { provider, summary };
 }
 
-async function runOnePlanDesign(provider, apiKey) {
+async function runOnePlanDesign(provider, apiKey, operation) {
   const design = await runPlanDesignGeneration({
     provider,
+    signal: operation.signal,
     apiKey,
     report: state.report,
     proxyBase: PROVIDER_PROXY,
     selectedModelId: state.openAiModelId,
     onModelRoute:
-      provider === 'openai' ? (event) => handleOpenAiModelRoute('planDesign', event) : undefined,
+      provider === 'openai' ? (event) => { operation.check(); handleOpenAiModelRoute('planDesign', event); } : undefined,
   });
   return { provider, design };
 }

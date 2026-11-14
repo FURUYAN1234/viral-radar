@@ -80,12 +80,15 @@ function providerProxyPlugin() {
   };
 }
 
-function registerProviderProxyRoute(middlewares) {
+export function registerProviderProxyRoute(middlewares) {
   middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith('/api/provider-generate')) {
       next();
       return;
     }
+    const controller = new AbortController();
+    const stop = () => { if (!response.writableEnded) controller.abort(); };
+    request.once('aborted', stop); response.once('close', stop);
     try {
       if (request.method !== 'POST') {
         sendJson(response, 405, { ok: false, error: '許可されていないメソッドです。' });
@@ -105,26 +108,30 @@ function registerProviderProxyRoute(middlewares) {
         provider === 'gemini'
           ? await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
               method: 'POST',
+              signal: controller.signal,
               headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
               body: JSON.stringify(body),
             })
           : await fetch('https://api.openai.com/v1/responses', {
               method: 'POST',
+              signal: controller.signal,
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
               body: JSON.stringify(body),
             });
 
       const text = await upstream.text();
+      controller.signal.throwIfAborted();
       // プロバイダのステータスとJSONをそのまま返す（クライアント側の callProviderModel が解釈する）。
       response.statusCode = upstream.status;
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
       response.end(text || '{}');
     } catch (error) {
+      if (controller.signal.aborted || response.destroyed) return;
       sendJson(response, 502, {
         ok: false,
         error: { message: error instanceof Error ? error.message : 'プロバイダ中継に失敗しました。' },
       });
-    }
+    } finally { request.removeListener('aborted', stop); response.removeListener('close', stop); }
   });
 }
 
