@@ -1,5 +1,9 @@
 [![Manual / 操作マニュアル PDF](https://img.shields.io/badge/PDF-Manual%20%2F%20操作マニュアル-087c86)](https://furuyan1234.github.io/viral-radar/downloads/viral-radar-manual.pdf) [![API setup / API設定 PDF](https://img.shields.io/badge/PDF-API%20setup%20%2F%20API設定-087c86)](https://furuyan1234.github.io/viral-radar/downloads/viral-radar-api-guide.pdf)
 
+[![Read the application manual PDF / 操作マニュアルPDFを読む](docs/assets/manual-pdf-banner.png)](https://furuyan1234.github.io/viral-radar/downloads/viral-radar-manual.pdf)
+
+Operation guide / 操作ガイド: Open the PDF to review the application workflow and controls. / PDFで制作の流れと操作方法を確認できます。
+
 Read the Japanese A4 guides from the app header; each opens in a separate tab and can be saved from the PDF viewer. / アプリ上部から日本語A4の操作・API設定ガイドを別タブで開き、PDFビューアーで保存できます。
 
 # Monogatari Buzz Maker / 物語バズメーカー
