@@ -24,6 +24,12 @@ GitHub Pages cannot run the server-side connection needed for X. No shared autho
 
 Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https://furuyan1234.github.io/viral-radar/)
 
+[![Download local app: Web + AI, with optional X API / ローカルアプリをダウンロード：公開Web＋生成AIにX API連携を追加](docs/assets/local-download-banner.png)](https://github.com/FURUYAN1234/viral-radar/archive/refs/heads/main.zip)
+
+**Local download / ローカル版のダウンロード:** Extract the ZIP and double-click `start_monogatari_buzz_maker.bat` on Windows. In addition to public Web research and AI story planning, the local app can add X API evidence with your own Bearer Token. / WindowsではZIPを展開して `start_monogatari_buzz_maker.bat` をダブルクリックします。公開Web＋生成AIによる企画作成に加え、自分のBearer TokenでX APIの情報を追加できます。
+
+[Local launch instructions / ローカル起動手順](#local-setup) · X and AI API usage are billed separately by each provider. / X APIと生成AIの利用料金は各事業者へ別途かかります。
+
 
 ![Version](https://img.shields.io/badge/version-1.4.2-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
