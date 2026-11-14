@@ -25,7 +25,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -257,6 +257,7 @@ function render() {
             <span class="version-badge" aria-label="アプリバージョン">v${APP_VERSION}</span>
           </div>
           <p class="lead">世間の動きと反応を分析し、漫画・物語の着想に。</p>
+          <nav class="manual-links" aria-label="PDFガイド"><a href="./downloads/viral-radar-manual.pdf" target="_blank" rel="noopener noreferrer">操作マニュアル（PDF）</a><a href="./downloads/viral-radar-api-guide.pdf" target="_blank" rel="noopener noreferrer">API設定ガイド（PDF）</a></nav><p class="manual-help">別タブで開き、PDFビューアーから保存できます。</p>
         </div>
         <div class="header-api-block">
           <div class="status-strip" aria-label="API接続状態">
