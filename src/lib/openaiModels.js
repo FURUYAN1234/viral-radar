@@ -1,7 +1,7 @@
 import { NANO_BANANA_FALLBACK_SNAPSHOT } from './nanoBananaFallbackSnapshot.js';
 
 export function resolveDefaultOpenAIModelId() {
-  return 'gpt-6.1-sol';
+  return 'gpt-6-luna';
 }
 
 export const DEFAULT_OPENAI_MODEL_ID = resolveDefaultOpenAIModelId();
@@ -9,8 +9,8 @@ export const DEFAULT_OPENAI_MODEL_ID = resolveDefaultOpenAIModelId();
 const VIRAL_RADAR_MODEL_COPY = Object.freeze({
   'gpt-6.1-sol': Object.freeze({
     priceSnapshotDate: '2026-09-30',
-    description: '新しいSolで企画の構成と料金のバランスを重視',
-    comparisonNote: '開発版・公開版の既定候補です。根拠整理と漫画・動画・小説の企画設計に使い、題材ごとの生成結果を確認してください。',
+    description: '企画の構成と料金のバランスを重視',
+    comparisonNote: '根拠整理と漫画・動画・小説の企画設計に使えます。',
   }),
   'gpt-6.1-terra': Object.freeze({
     priceSnapshotDate: '2026-10-27',
@@ -70,16 +70,21 @@ const VIRAL_RADAR_COMPATIBILITY_MODELS = Object.freeze([
 ]);
 
 const nanoModels = NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models;
+const [astra62, sol62] = [
+  { id: 'gpt-6.2-astra', label: 'GPT-6.2 Astra', group: 'GPT-6.2', description: '複雑な指示や多段の判断を重視', inputPriceUsdPerM: 8, outputPriceUsdPerM: 40, comparisonNote: '旧GPT-6 Astraより通常の入力・出力単価が20%低いモデルです。', priceSnapshotDate: '2026-11-18' },
+  { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', group: 'GPT-6.2', description: '複数の条件がある処理と料金のバランス', inputPriceUsdPerM: 2, outputPriceUsdPerM: 10, comparisonNote: '通常の入力・出力単価はGPT-6.1 Solと同じです。', priceSnapshotDate: '2026-11-18' },
+];
 const modelChain = [
-  ...nanoModels,
+  astra62,
+  ...nanoModels.flatMap((model) => model.id === 'gpt-6.1-sol' ? [sol62, model] : [model]),
   ...VIRAL_RADAR_COMPATIBILITY_MODELS.filter((model) => !nanoModels.some((source) => source.id === model.id)),
 ];
 
 export const OPENAI_MODEL_OPTIONS = Object.freeze(
   modelChain.map((model, index) => {
     const productCopy = VIRAL_RADAR_MODEL_COPY[model.id] || {
-      description: '用途と料金を確認して選択',
-      comparisonNote: '物語バズメーカーでの生成結果を確認して利用してください。',
+      description: model.description ?? '用途と料金を確認して選択',
+      comparisonNote: model.comparisonNote ?? '物語バズメーカーでの生成結果を確認して利用してください。',
     };
     return Object.freeze({
       ...model,

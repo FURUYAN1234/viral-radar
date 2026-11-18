@@ -13,10 +13,16 @@ import {
 } from '../src/lib/openaiModels.js';
 import { NANO_BANANA_FALLBACK_SNAPSHOT } from '../src/lib/nanoBananaFallbackSnapshot.js';
 
-test('OpenAI model catalog defaults to 6.1 Sol and keeps the synced display metadata', () => {
-  assert.equal(DEFAULT_OPENAI_MODEL_ID, 'gpt-6.1-sol');
-  assert.equal(OPENAI_MODEL_OPTIONS[0].id, 'gpt-6-astra');
-  assert.equal(OPENAI_MODEL_OPTIONS[0].label, 'GPT-6 Astra');
+test('OpenAI model catalog defaults to Luna and keeps the synced display metadata', () => {
+  assert.equal(DEFAULT_OPENAI_MODEL_ID, 'gpt-6-luna');
+  assert.equal(OPENAI_MODEL_OPTIONS[0].id, 'gpt-6.2-astra');
+  assert.equal(OPENAI_MODEL_OPTIONS[0].label, 'GPT-6.2 Astra');
+  const astra62 = getOpenAIModelOption('gpt-6.2-astra');
+  assert.match(astra62.description, /多段の判断/);
+  assert.match(astra62.comparisonNote, /20%低い/);
+  const sol62 = getOpenAIModelOption('gpt-6.2-sol');
+  assert.match(sol62.description, /料金のバランス/);
+  assert.match(sol62.comparisonNote, /GPT-6\.1 Solと同じ/);
   assert.equal(OPENAI_MODEL_PRICE_SNAPSHOT_DATE, NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate);
   assert.equal(getOpenAIModelOption('gpt-6.1-sol').priceSnapshotDate, '2026-09-30');
   const terra = getOpenAIModelOption('gpt-6.1-terra');
@@ -36,9 +42,9 @@ test('OpenAI model catalog defaults to 6.1 Sol and keeps the synced display meta
   );
 });
 
-test('development and production default to 6.1 Sol', () => {
-  assert.equal(resolveDefaultOpenAIModelId(true), 'gpt-6.1-sol');
-  assert.equal(resolveDefaultOpenAIModelId(false), 'gpt-6.1-sol');
+test('development and production default to Luna', () => {
+  assert.equal(resolveDefaultOpenAIModelId(true), 'gpt-6-luna');
+  assert.equal(resolveDefaultOpenAIModelId(false), 'gpt-6-luna');
 });
 
 test('model routing metadata is synced without importing Nano Banana product copy', () => {
@@ -56,8 +62,8 @@ test('model routing metadata is synced without importing Nano Banana product cop
 });
 
 test('OpenAI model route starts at the selected model and only moves downward', () => {
-  assert.deepEqual(getOpenAIModelRoute('gpt-6-astra').slice(0, 4), ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol']);
-  assert.deepEqual(getOpenAIModelRoute().slice(0, 3), ['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol']);
+  assert.deepEqual(getOpenAIModelRoute('gpt-6-astra').slice(0, 4), ['gpt-6-astra', 'gpt-6.2-sol', 'gpt-6.1-sol', 'gpt-6.1-terra']);
+  assert.deepEqual(getOpenAIModelRoute().slice(0, 3), ['gpt-6-luna', 'gpt-5.6-luna', 'gpt-4.1']);
   assert.equal(getOpenAIModelRoute('gpt-6.1-terra').includes('gpt-6.1-sol'), false);
   assert.equal(getOpenAIModelRoute().includes('gpt-6-astra'), false);
   assert.equal(getOpenAIModelRoute('gpt-6-sol').includes('gpt-6.1-sol'), false);
@@ -71,7 +77,7 @@ test('OpenAI model route starts at the selected model and only moves downward', 
   ]);
 });
 
-test('unknown OpenAI model ids normalize to the 6.1 Sol default', () => {
-  assert.equal(normalizeOpenAIModelId('unknown-model'), 'gpt-6.1-sol');
-  assert.equal(getOpenAIModelOption('unknown-model').id, 'gpt-6.1-sol');
+test('unknown OpenAI model ids normalize to the Luna default', () => {
+  assert.equal(normalizeOpenAIModelId('unknown-model'), 'gpt-6-luna');
+  assert.equal(getOpenAIModelOption('unknown-model').id, 'gpt-6-luna');
 });

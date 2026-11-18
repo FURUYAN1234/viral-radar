@@ -17,9 +17,9 @@ function harness(){
  for(const name of ['isProviderConfigured','isApiReady','bootstrapApp','renderOpenAiModelControl','renderApiStartGate','renderApiConnectPanel','openApiSettings','closeApiSettings','connectApiKey','selectCategory','fetchXObservations','suggestMore','isProviderAuthError','shouldUseLocalTrendApi']) vm.runInContext(extract(name),context);
  return {context,get state(){return vm.runInContext('state',context);},get calls(){return calls;}};
 }
-test('Sol actually selected on startup without automatic API',()=>{
- const h=harness();vm.runInContext('bootstrapApp()',h.context);assert.equal(h.state.openAiModelId,'gpt-6.1-sol');assert.equal(h.state.openAiModelConfirmed,true);assert.equal(h.state.analysisStartConfirmed,false);assert.equal(h.calls,0);
- const html=vm.runInContext("renderOpenAiModelControl({mode:'openai'},false)",h.context);assert.match(html,/value="gpt-6.1-sol" selected/);assert.doesNotMatch(html,/value=""/);
+test('Luna actually selected on startup without automatic API',()=>{
+ const h=harness();vm.runInContext('bootstrapApp()',h.context);assert.equal(h.state.openAiModelId,'gpt-6-luna');assert.equal(h.state.openAiModelConfirmed,true);assert.equal(h.state.analysisStartConfirmed,false);assert.equal(h.calls,0);
+ const html=vm.runInContext("renderOpenAiModelControl({mode:'openai'},false)",h.context);assert.match(html,/value="gpt-6-luna" selected/);assert.doesNotMatch(html,/value=""/);
 });
 test('public runtime blocks X before any request even if its in-memory mode is changed', async()=>{
  const h=harness(); h.state.x.mode='both'; h.state.x.token='test-only-placeholder';

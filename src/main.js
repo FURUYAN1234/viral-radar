@@ -26,7 +26,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 const app = document.querySelector('#app');
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
@@ -674,7 +674,7 @@ async function connectApiKey() {
     state.apiPanelOpen = false;
     state.apiGateMessage =
       providerStatus.mode === 'openai'
-        ? 'GPT-6.1 Solを選択済み。開始ボタンを押すまで実行しません。'
+        ? `${getOpenAIModelOption(state.openAiModelId).label}を選択済み。開始ボタンを押すまで実行しません。`
         : '開始ボタンを押すまで実行しません。';
     resetAnalysisSessionForApiChange();
   } finally {

@@ -1,6 +1,6 @@
 {
   "name": "monogatari-buzz-maker",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "homepage": "https://FURUYAN1234.github.io/viral-radar",
   "description": "物語バズメーカー - 公開Web/RSSトレンドを漫画・動画・小説の制作案へ整理する創作支援ツール",
@@ -25,5 +25,8 @@
   "devDependencies": {
     "gh-pages": "6.3.0",
     "vite": "^6.4.4"
+  },
+  "overrides": {
+    "picomatch": "npm:@ryotsu/picomatch@4.0.7-a"
   }
 }

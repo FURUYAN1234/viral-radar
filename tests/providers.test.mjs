@@ -156,7 +156,7 @@ test('getProviderStatus detects provider from a single API key field', () => {
   assert.equal(geminiStatus.mode, 'gemini');
   assert.equal(getProviderStatus({ apiKey: '' }).mode, 'fixture');
   assert.equal(getProviderStatus({ apiKey: 'not-a-real-provider-key' }).mode, 'unknown');
-  assert.equal(openaiStatus.provider.label, 'OpenAI gpt-6.1-sol');
+  assert.equal(openaiStatus.provider.label, 'OpenAI gpt-6-luna');
   assert.equal(geminiStatus.provider.label, 'Gemini gemini-3.8-flash');
   assert.equal(openaiStatus.provider.label.includes('sk-'), false);
   assert.equal(geminiStatus.provider.label.includes('AIza'), false);
@@ -402,11 +402,6 @@ test('runPlanDesignGeneration drops typo-like provider notes instead of showing 
 test('provider model chains follow the Nano Banana Pro text fallback order', () => {
   assert.deepEqual(getProviderModelChain('gemini'), ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']);
   assert.deepEqual(getProviderModelChain('openai'), [
-    'gpt-6.1-sol',
-    'gpt-6.1-terra',
-    'gpt-6-sol',
-    'gpt-5.6-sol',
-    'gpt-5.6-terra',
     'gpt-6-luna',
     'gpt-5.6-luna',
     'gpt-4.1',
@@ -446,7 +441,7 @@ test('runProviderAnalysis uses Authorization header without exposing key in body
   assert.equal(result.summary, 'ok');
   assert.equal(captured.init.headers.Authorization, `Bearer ${OPENAI_SECRET_KEY}`);
   assert.equal(captured.init.body.includes(OPENAI_SECRET_KEY), false);
-  assert.equal(result.used_model, 'gpt-6.1-sol');
+  assert.equal(result.used_model, 'gpt-6-luna');
 });
 
 test('all OpenAI generation entry points start with the selected Luna model', async () => {
@@ -485,7 +480,7 @@ test('all OpenAI generation entry points start with the selected Luna model', as
   assert.equal(draft.used_model, 'gpt-6-luna');
 });
 
-test('all OpenAI generation entry points default to Sol 6.1 with compatible Responses payloads', async () => {
+test('all OpenAI generation entry points default to Luna with compatible Responses payloads', async () => {
   const requests = [];
   const respondingWith = (outputText) => async (url, init) => {
     assert.equal(url, 'https://api.openai.com/v1/responses');
@@ -499,9 +494,9 @@ test('all OpenAI generation entry points default to Sol 6.1 with compatible Resp
     report, fetchImpl: respondingWith(JSON.stringify({ plans: [completeProviderPlan()] })) });
   const draft = await runDraftSample({ provider: 'openai', apiKey: OPENAI_SECRET_KEY,
     draftPrompt: ['使用タイトル: 灰色の査定欄', '主人公: 真白'].join('\n'), fetchImpl: respondingWith(USABLE_STORY_SAMPLE) });
-  assert.deepEqual([analysis.used_model, design.used_model, draft.used_model], Array(3).fill('gpt-6.1-sol'));
+  assert.deepEqual([analysis.used_model, design.used_model, draft.used_model], Array(3).fill('gpt-6-luna'));
   for (const body of requests) {
-    assert.equal(body.model, 'gpt-6.1-sol');
+    assert.equal(body.model, 'gpt-6-luna');
     assert.equal(typeof body.input, 'string');
     assert.equal('temperature' in body, false);
     assert.equal('max_tokens' in body, false);
@@ -509,7 +504,7 @@ test('all OpenAI generation entry points default to Sol 6.1 with compatible Resp
   }
 });
 
-test('explicit Astra remains available and falls down to Sol 6.1', async () => {
+test('explicit Astra remains available and falls down to Sol 6.2', async () => {
   const attempted = [];
   const result = await runProviderAnalysis({
     provider: 'openai', apiKey: OPENAI_SECRET_KEY, selectedModelId: 'gpt-6-astra',
@@ -521,8 +516,8 @@ test('explicit Astra remains available and falls down to Sol 6.1', async () => {
         : { ok: true, async json() { return { output_text: '{"summary":"sol fallback"}' }; } };
     },
   });
-  assert.deepEqual(attempted, ['gpt-6-astra', 'gpt-6.1-sol']);
-  assert.equal(result.used_model, 'gpt-6.1-sol');
+  assert.deepEqual(attempted, ['gpt-6-astra', 'gpt-6.2-sol']);
+  assert.equal(result.used_model, 'gpt-6.2-sol');
 });
 
 test('OpenAI routing reports trying and adopted events for the selected model', async () => {
@@ -601,12 +596,12 @@ test('runProviderAnalysis falls back to the next Nano Banana Pro model on provid
     },
   });
 
-  assert.deepEqual(attemptedModels, ['gpt-6.1-sol', 'gpt-6.1-terra']);
+  assert.deepEqual(attemptedModels, ['gpt-6-luna', 'gpt-5.6-luna']);
   assert.equal(result.summary, 'fallback ok');
-  assert.equal(result.used_model, 'gpt-6.1-terra');
+  assert.equal(result.used_model, 'gpt-5.6-luna');
   assert.deepEqual(
     result.fallback_chain.map((attempt) => `${attempt.model}:${attempt.status}`),
-    ['gpt-6.1-sol:failed', 'gpt-6.1-terra:success'],
+    ['gpt-6-luna:failed', 'gpt-5.6-luna:success'],
   );
   assert.equal(JSON.stringify(result).includes(OPENAI_SECRET_KEY), false);
 });
@@ -796,7 +791,7 @@ test('runDraftSample routes through the local proxy when proxyBase is set (fixes
   assert.equal(captured.url, '/api/provider-generate');
   const proxyBody = JSON.parse(captured.init.body);
   assert.equal(proxyBody.provider, 'openai');
-  assert.equal(proxyBody.model, 'gpt-6.1-sol');
+  assert.equal(proxyBody.model, 'gpt-6-luna');
   assert.equal(proxyBody.apiKey, OPENAI_SECRET_KEY);
   assert.equal(typeof proxyBody.body, 'object');
   // Authorizationヘッダにキーを載せない（中継先がサーバー側で付与する）。
@@ -1574,7 +1569,7 @@ test('runProviderAnalysis corrects missing evidence-card readings once on the sa
     },
   });
 
-  assert.equal(result.used_model, 'gpt-6.1-sol');
+  assert.equal(result.used_model, 'gpt-6-luna');
   assert.equal(result.evidenceCards.length, 2);
   assert.equal(result.fallback_chain[0].status, 'failed');
 });

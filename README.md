@@ -1,5 +1,9 @@
 [![Manual / 操作マニュアル PDF](https://img.shields.io/badge/PDF-Manual%20%2F%20操作マニュアル-087c86)](https://furuyan1234.github.io/viral-radar/downloads/viral-radar-manual.pdf) [![API setup / API設定 PDF](https://img.shields.io/badge/PDF-API%20setup%20%2F%20API設定-087c86)](https://furuyan1234.github.io/viral-radar/downloads/viral-radar-api-guide.pdf)
 
+OpenAI research analysis and story planning now offers **GPT-6.2 Sol** and **GPT-6.2 Astra**. The initial selection is **GPT-6 Luna**. / OpenAIによる調査の分析・物語企画に **GPT-6.2 Sol** と **GPT-6.2 Astra** を追加しました。初期選択は **GPT-6 Luna** です。
+
+Standard input / output per million tokens: GPT-6 Luna $0.10 / $0.50, GPT-6.2 Sol $2 / $10, GPT-6.2 Astra $8 / $40 (November 18, 2026). / 100万トークン当たりの通常入力／出力単価はGPT-6 Luna $0.10／$0.50、GPT-6.2 Sol $2／$10、GPT-6.2 Astra $8／$40です（2026年11月18日確認）。
+
 [![Read the application manual PDF / 操作マニュアルPDFを読む](docs/assets/manual-pdf-banner.png)](https://furuyan1234.github.io/viral-radar/downloads/viral-radar-manual.pdf)
 
 Operation guide / 操作ガイド: Open the PDF to review the application workflow and controls. / PDFで制作の流れと操作方法を確認できます。
@@ -14,7 +18,7 @@ The red **Stop AI communication** button stays at the upper right and is enabled
 
 
 
-**v1.4.3**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.3.md)
+**v1.4.4**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.4.md)
 
 | Feature / 機能 | GitHub Pages / 公開Web版 | Download and run locally / ダウンロードしてローカル起動 |
 | --- | --- | --- |
@@ -41,7 +45,7 @@ Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https:/
 [Local launch instructions / ローカル起動手順](#local-setup) · X and AI API usage are billed separately by each provider. / X APIと生成AIの利用料金は各事業者へ別途かかります。
 
 
-![Version](https://img.shields.io/badge/version-1.4.3-0f766e)
+![Version](https://img.shields.io/badge/version-1.4.4-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -350,11 +354,11 @@ The app uses a single API-key input field. OpenAI and Gemini keys are detected f
 
 ### OpenAI Model Selection / OpenAIモデル選択
 
-Default: GPT-6.1 Sol / 既定: GPT-6.1 Sol
+Default: GPT-6 Luna / 既定: GPT-6 Luna
 
 The normal `check:nano-fallback` gate checks both Gemini and OpenAI against Nano. Run `npm run sync:nano-fallback` when either catalog changes. Explicit `--openai-only` remains available for a scoped manual update, but does not replace the normal gate. / 通常の `check:nano-fallback` はGeminiとOpenAIの両方をNanoと照合します。いずれかの候補が変わった場合は `npm run sync:nano-fallback` で同期します。明示的な `--openai-only` は限定更新用に残しますが、通常検査の代わりにはしません。
 
-API connection does not start retrieval or analysis for either provider. With OpenAI, the user must explicitly choose a model, including GPT-6.1 Sol, and then press the `情報収集・分析・企画作成を開始` button. With Gemini, the user presses the same button after connecting the key. GPT-6.1 Sol is recommended in both development and production. Astra remains selectable above Sol in the fallback order. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list. / どちらのAPIも、キーを接続しただけでは情報収集・分析・企画作成を開始しません。OpenAIはGPT-6.1 Solが初期選択され、必要なら別モデルに変更してから `情報収集・分析・企画作成を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。GPT-6.1 Solは開発版・公開版共通の既定モデルです。AstraはSolより上位の選択肢として残します。選択はページ内だけで保持され、再読み込みするとGPT-6.1 Solが初期選択されます。接続後はキー入力を閉じ、接続済みのマスク表示にします。「APIキーを変更」で新規入力を開き、キャンセルや形式不明の入力では現在の接続を維持します。実キーを入力欄へ復元しません。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
+API connection does not start retrieval or analysis for either provider. With OpenAI, the user can change the initial GPT-6 Luna selection and then press the `情報収集・分析・企画作成を開始` button. With Gemini, the user presses the same button after connecting the key. GPT-6.2 Sol and GPT-6.2 Astra are available for more involved analysis and planning. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list. / どちらのAPIも、キーを接続しただけでは情報収集・分析・企画作成を開始しません。OpenAIはGPT-6 Lunaが初期選択され、必要なら別モデルに変更してから `情報収集・分析・企画作成を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。より複雑な分析や企画にはGPT-6.2 SolとGPT-6.2 Astraを選べます。選択はページ内だけで保持され、再読み込みするとGPT-6 Lunaが初期選択されます。接続後はキー入力を閉じ、接続済みのマスク表示にします。「APIキーを変更」で新規入力を開き、キャンセルや形式不明の入力では現在の接続を維持します。実キーを入力欄へ復元しません。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
 
 API usage fees, terms, model restrictions, and rate limits follow each provider's contract. / API利用料、利用規約、モデル制限、レート制限は、各サービスの契約に従います。
 
@@ -697,7 +701,7 @@ It does not call the other apps at runtime. Each app works independently. / た�
 
 ### v1.2.7 (2026-10-01)
 
-* Added GPT-6.1 Sol as the default candidate in development and production. / 開発版と公開版の初期候補にGPT-6.1 Solを追加しました。
+* Added GPT-6 Luna as the default candidate in development and production. / 開発版と公開版の初期候補にGPT-6.1 Solを追加しました。
 * Synced the fallback catalog: Astra → 6.1 Sol → 6 Sol, retaining selected-model downward routing across analysis, plan design and drafts. / 開発版・公開版の実際の初期選択をGPT-6.1 Solへ統一。Astraと既存モデルの明示選択、API接続後の開始確認は維持します。
 
 ### v1.2.6 (2026-09-24)
