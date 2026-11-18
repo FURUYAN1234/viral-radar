@@ -9,7 +9,9 @@ const openaiOnly = process.argv.includes('--openai-only');
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(scriptDir, '..');
 const workspaceRoot = resolve(appRoot, '..');
-const nanoRoot = resolve(workspaceRoot, 'nano-banana-pro');
+const nanoRoot = process.env.NANO_BANANA_PRO_ROOT
+  ? resolve(process.env.NANO_BANANA_PRO_ROOT)
+  : resolve(workspaceRoot, 'nano-banana-pro');
 const snapshotPath = resolve(appRoot, 'src/lib/nanoBananaFallbackSnapshot.js');
 
 const sourcePaths = {
@@ -146,7 +148,7 @@ function toModelEntries(ids) {
 function sourceInfo(filePath) {
   const content = readFileSync(filePath, 'utf8');
   return {
-    path: relative(workspaceRoot, filePath).replaceAll('\\', '/'),
+    path: `nano-banana-pro/${relative(nanoRoot, filePath).replaceAll('\\', '/')}`,
     bytes: Buffer.byteLength(content, 'utf8'),
     sha256: hashText(content),
   };

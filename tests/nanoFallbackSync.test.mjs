@@ -1,12 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, copyFileSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const fixtureEnv = { ...process.env };
+delete fixtureEnv.NANO_BANANA_PRO_ROOT;
+const fixtureProcess = { encoding: 'utf8', env: fixtureEnv };
 
 test('downloaded app validates its bundled models without another app, while release checks stay strict', () => {
   const temporary = mkdtempSync(resolve(tmpdir(), 'viral-portable-check-'));
@@ -17,10 +20,10 @@ test('downloaded app validates its bundled models without another app, while rel
       copyFileSync(resolve(appRoot, file), target);
     }
     const script = resolve(temporary, 'app/scripts/sync-nano-fallback-chain.mjs');
-    const check = () => spawnSync(process.execPath, [script, '--check-bundled'], { encoding: 'utf8' });
+    const check = () => spawnSync(process.execPath, [script, '--check-bundled'], fixtureProcess);
     const valid = check();
     assert.equal(valid.status, 0, valid.stderr);
-    const releaseCheck = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
+    const releaseCheck = spawnSync(process.execPath, [script, '--check'], fixtureProcess);
     assert.notEqual(releaseCheck.status, 0, 'strict author-side upstream check must not skip missing sources');
     const file = resolve(temporary, 'app/src/lib/nanoBananaFallbackSnapshot.js');
     const original = readFileSync(file, 'utf8');
@@ -102,23 +105,28 @@ test('OpenAI-only synchronization preserves Gemini while ordinary synchronizatio
     writeFileSync(fixtureGeminiRoutes, "const GEMINI_TEXT_MODEL_IDS = ['gemini-test-route'];\n");
     const readSnapshot = () => JSON.parse(readFileSync(fixtureSnapshot, 'utf8').match(/= ([\s\S]*);\s*$/)[1]);
     const originalGemini = readSnapshot().chains.geminiText;
-    const scoped = spawnSync(process.execPath, [fixtureScript, '--openai-only'], { encoding: 'utf8' });
+    const scoped = spawnSync(process.execPath, [fixtureScript, '--openai-only'], fixtureProcess);
     assert.equal(scoped.status, 0, scoped.stderr);
     assert.deepEqual(readSnapshot().chains.geminiText, originalGemini);
     assert.equal(readSnapshot().syncScope, 'openai-only');
     assert.equal(readSnapshot().chains.openaiText.models[1].id, 'gpt-6.1-sol');
     assert.equal(readSnapshot().chains.openaiText.models[2].id, 'gpt-6.1-terra');
-    const stale = spawnSync(process.execPath, [fixtureScript, '--check'], { encoding: 'utf8' });
+    const stale = spawnSync(process.execPath, [fixtureScript, '--check'], fixtureProcess);
     assert.notEqual(stale.status, 0, 'normal upstream gate must reject a stale Gemini chain');
-    const full = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' });
+    const full = spawnSync(process.execPath, [fixtureScript], fixtureProcess);
     assert.equal(full.status, 0, full.stderr);
     assert.notDeepEqual(readSnapshot().chains.geminiText, originalGemini);
     assert.equal(readSnapshot().syncScope, 'all-providers');
     assert.equal(readSnapshot().chains.geminiText.models[0].id, 'gemini-test-route');
-    const current = spawnSync(process.execPath, [fixtureScript, '--check'], { encoding: 'utf8' });
+    const current = spawnSync(process.execPath, [fixtureScript, '--check'], fixtureProcess);
     assert.equal(current.status, 0, current.stderr);
+    const publishedSource = resolve(temporary, 'published-source');
+    renameSync(resolve(temporary, 'nano-banana-pro'), publishedSource);
+    const explicitSource = { ...fixtureProcess, env: { ...fixtureEnv, NANO_BANANA_PRO_ROOT: publishedSource } };
+    const pinned = spawnSync(process.execPath, [fixtureScript, '--check'], explicitSource);
+    assert.equal(pinned.status, 0, pinned.stderr);
     rmSync(fixtureSnapshot);
-    const missing = spawnSync(process.execPath, [fixtureScript, '--openai-only'], { encoding: 'utf8' });
+    const missing = spawnSync(process.execPath, [fixtureScript, '--openai-only'], explicitSource);
     assert.notEqual(missing.status, 0);
     assert.match(missing.stderr, /requires an existing fallback snapshot/);
   } finally {
