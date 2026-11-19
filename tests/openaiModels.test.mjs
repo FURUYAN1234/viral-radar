@@ -15,6 +15,7 @@ import { NANO_BANANA_FALLBACK_SNAPSHOT } from '../src/lib/nanoBananaFallbackSnap
 
 test('OpenAI model catalog defaults to Luna and keeps the synced display metadata', () => {
   assert.equal(DEFAULT_OPENAI_MODEL_ID, 'gpt-6-luna');
+  assert.equal(new Set(OPENAI_MODEL_OPTIONS.map((model) => model.id)).size, OPENAI_MODEL_OPTIONS.length);
   assert.equal(OPENAI_MODEL_OPTIONS[0].id, 'gpt-6.2-astra');
   assert.equal(OPENAI_MODEL_OPTIONS[0].label, 'GPT-6.2 Astra');
   const astra62 = getOpenAIModelOption('gpt-6.2-astra');

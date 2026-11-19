@@ -61,6 +61,8 @@ test('nano banana pro fallback snapshot is synced from source model arrays', asy
     NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models.map((model) => model.id),
     [
       'gpt-6-astra',
+      'gpt-6.2-astra',
+      'gpt-6.2-sol',
       'gpt-6.1-sol',
       'gpt-6.1-terra',
       'gpt-6-sol',
@@ -72,8 +74,8 @@ test('nano banana pro fallback snapshot is synced from source model arrays', asy
   );
   assert.match(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.priceSnapshotDate, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[0].label, 'GPT-6 Astra');
-  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[2].inputPriceUsdPerM, 1);
-  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models[6].inputPriceUsdPerM, 0.1);
+  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models.find(model => model.id === 'gpt-6.1-terra').inputPriceUsdPerM, 1);
+  assert.equal(NANO_BANANA_FALLBACK_SNAPSHOT.chains.openaiText.models.find(model => model.id === 'gpt-6-luna').inputPriceUsdPerM, 0.1);
   assert.match(NANO_BANANA_FALLBACK_SNAPSHOT.updateWorkflow, /check:nano-fallback/);
 });
 
@@ -109,8 +111,7 @@ test('OpenAI-only synchronization preserves Gemini while ordinary synchronizatio
     assert.equal(scoped.status, 0, scoped.stderr);
     assert.deepEqual(readSnapshot().chains.geminiText, originalGemini);
     assert.equal(readSnapshot().syncScope, 'openai-only');
-    assert.equal(readSnapshot().chains.openaiText.models[1].id, 'gpt-6.1-sol');
-    assert.equal(readSnapshot().chains.openaiText.models[2].id, 'gpt-6.1-terra');
+    assert.deepEqual(readSnapshot().chains.openaiText.models, bundled.chains.openaiText.models);
     const stale = spawnSync(process.execPath, [fixtureScript, '--check'], fixtureProcess);
     assert.notEqual(stale.status, 0, 'normal upstream gate must reject a stale Gemini chain');
     const full = spawnSync(process.execPath, [fixtureScript], fixtureProcess);
