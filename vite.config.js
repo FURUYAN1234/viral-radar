@@ -1,3 +1,4 @@
+import { furuMcpBuild } from './mcp/build.mjs';
 import { webSecurity } from './scripts/web-security.mjs';
 import { writeFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
@@ -11,7 +12,7 @@ const GITHUB_PAGES_BASE = '/viral-radar/';
 
 export default defineConfig({
   base: GITHUB_PAGES_BASE,
-  plugins: [webSecurity({ connectSources: ["https://api.openai.com","https://generativelanguage.googleapis.com","https://api.allorigins.win","https://api.codetabs.com","https://corsproxy.io","https://cors.isomorphic-git.org","https://news.google.com","https://www.bing.com","https://trends.google.co.jp","https://news.yahoo.co.jp","https://b.hatena.ne.jp"] }), nativeSaveDialogPlugin(), trendSearchPlugin(), providerProxyPlugin(), xApiPlugin()],
+  plugins: [furuMcpBuild("viral-radar", 45934), webSecurity({ connectSources: ["https://api.openai.com","https://generativelanguage.googleapis.com","https://api.allorigins.win","https://api.codetabs.com","https://corsproxy.io","https://cors.isomorphic-git.org","https://news.google.com","https://www.bing.com","https://trends.google.co.jp","https://news.yahoo.co.jp","https://b.hatena.ne.jp"] }), nativeSaveDialogPlugin(), trendSearchPlugin(), providerProxyPlugin(), xApiPlugin()],
   server: {
     host: '127.0.0.1',
     port: 5180,

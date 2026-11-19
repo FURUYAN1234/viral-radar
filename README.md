@@ -18,7 +18,7 @@ The red **Stop AI communication** button stays at the upper right and is enabled
 
 
 
-**v1.4.5**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.5.md)
+**v1.4.6**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.6.md)
 
 | Feature / 機能 | GitHub Pages / 公開Web版 | Download and run locally / ダウンロードしてローカル起動 |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https:/
 [Local launch instructions / ローカル起動手順](#local-setup) · X and AI API usage are billed separately by each provider. / X APIと生成AIの利用料金は各事業者へ別途かかります。
 
 
-![Version](https://img.shields.io/badge/version-1.4.5-0f766e)
+![Version](https://img.shields.io/badge/version-1.4.6-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -771,3 +771,21 @@ It does not call the other apps at runtime. Each app works independently. / た�
 Model descriptions and prices wrap below the selector without widening the header; GPT-6 Luna is included in the layout checks. / モデル説明・料金は選択欄の下で折り返し、ヘッダーを横へ押し広げません。GPT-6 Lunaを含めて配置を確認しています。
 
 Emergency stop is hidden until a provider key is connected, with no reserved stop space. Once connected, it stays visible even before the explicit analysis start, disabled while idle, at the upper right (20px top / 12px right), above the reserved header area. It remains reachable if settings are open during active work. / APIキー未接続では緊急停止と専用余白を表示しません。キー接続後は分析開始前も待機中の非活性状態で表示し、上20px・右12pxの右上に固定し、ヘッダーと重ならない余白を確保します。作業中に設定を開いても停止操作へ届きます。
+
+
+## Local MCP / ローカルMCP
+
+Windows users can start/stop the service, check for a release, and stage an update from `Launch-MCP.cmd`. Open the local app and click **MCP接続** to pair from the application itself. / Windowsでは `Launch-MCP.cmd` からMCPの起動・停止、更新確認・適用を行えます。起動した画面の **MCP接続** でも接続できます。更新候補は公開Releaseが指すコミットのソースから別フォルダへビルドし、成功後に切替先を記録します。作業中の画面は保存後に停止してください。
+
+The MCP server starts a build-verified copy on loopback port `45934`. Install the dependencies and build this application's source before configuring Codex. The API key is entered in the application's normal browser UI and is not passed to MCP. / MCPサーバーはビルドを照合し、ローカルの `45934` 番で対象アプリを起動します。このアプリのソースを展開して依存関係を入れ、ビルドしてからCodexに登録します。APIキーは通常のアプリ画面で入力します。
+
+```powershell
+npm ci
+npm --prefix mcp ci
+npm run build
+codex mcp add viral-radar -- node "C:\absolute\path\to\viral-radar\Launch-Codex-MCP.mjs"
+```
+
+Call `buzz_connection` and open its one-time URL in the same Codex chat's in-app browser. Wait for `MCP 接続済み`, then run `buzz_generate_brief` with a unique `requestId`. Read `buzz_job_get` until it returns a terminal state. Check the existing result before retrying an `unknown` job. / `buzz_connection` の一時URLを実行チャットの内蔵ブラウザーで開き、自動接続を確認します。ジョブは `buzz_job_get` で結果まで追跡してください。MCP接続をAI側で確立できない場合は、対象アプリの画面を示してユーザーに接続を依頼します。
+
+The job returns Markdown with source links and completed planning prompts. Give the selected prompt to Story Maker as the brief. / 根拠リンク付きのMarkdownと企画プロンプトを返します。採用案をStory Makerの補足指示へ渡せます。

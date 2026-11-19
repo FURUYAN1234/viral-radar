@@ -1,3 +1,4 @@
+import { connectFuruMcp, mcpAppError } from './mcp-connection.js';
 import { createAiOperationManager } from './lib/aiOperation.js';
 import { newEvidenceOnly, rememberCreativeReport } from './lib/searchHistory.js';
 import './styles.css';
@@ -26,8 +27,9 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.5';
+const APP_VERSION = '1.4.6';
 const app = document.querySelector('#app');
+let mcpCurrent;
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
 let apiInputUserTouched = false;
@@ -75,8 +77,44 @@ if (import.meta.hot?.data.runtimeState) {
   state.report = createReport();
   bootstrapApp();
 }
+const disconnectMcp = connectFuruMcp({
+  appId: 'viral-radar',
+  readiness: isApiReady,
+  async execute(operation, { category }) {
+    if (operation !== 'generate_brief') throw mcpAppError('OUTPUT_INVALID');
+    if (!isApiReady()) throw mcpAppError('API_REQUIRED');
+    if (isUiWorking()) throw mcpAppError('APP_BUSY');
+    if (category && !CATEGORIES.some(entry => entry.id === category)) throw mcpAppError('OUTPUT_INVALID');
+    const stop = new AbortController();
+    mcpCurrent = stop;
+    try {
+      if (category) await selectCategory(category, { runProvider: false, signal: stop.signal });
+      else await refreshTrendObservations({ signal: stop.signal });
+      stop.signal.throwIfAborted();
+      if (!hasLiveObservations()) throw mcpAppError('NO_LIVE_SOURCES');
+      const status = await runProviderDeepening();
+      stop.signal.throwIfAborted();
+      if (!status?.complete || !isApiReady()) throw mcpAppError('OUTPUT_INVALID');
+      const report = state.report;
+      return {
+        title: report.category.label,
+        reportMarkdown: toMarkdown(report),
+        planPrompts: report.creativePlans.filter(plan => plan.aiDesign?.status === 'done').map(plan => ({
+          id: plan.id,
+          title: plan.titleCandidates[0],
+          prompt: plan.aiDraftPrompt,
+        })),
+      };
+    } finally {
+      mcpCurrent = undefined;
+    }
+  },
+  stop: stopCurrentWork,
+});
+
 if (import.meta.hot) {
   import.meta.hot.accept();
+  import.meta.hot.dispose(disconnectMcp);
   import.meta.hot.dispose(data => {
     if (actionMessageTimer) clearTimeout(actionMessageTimer);
     data.runtimeState = state;
@@ -507,7 +545,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
 }
 
 function bindEvents(isLocked = false, showApiPanel = false) {
-  document.querySelector('#stop-ai')?.addEventListener('click', () => { aiOperations.stop(); render(); });
+  document.querySelector('#stop-ai')?.addEventListener('click', () => { stopCurrentWork(); });
   bindXControls();
   bindApiControls(showApiPanel);
   bindHeaderControls();
@@ -549,15 +587,16 @@ function bindEvents(isLocked = false, showApiPanel = false) {
   });
 }
 
-function selectCategory(nextCategoryId) {
+function selectCategory(nextCategoryId, { runProvider = true, signal } = {}) {
   if (isUiWorking()) return;
   const isSameCategory = nextCategoryId === state.selectedCategoryId;
   state.selectedCategoryId = nextCategoryId;
   state.searchSeed = isSameCategory ? state.searchSeed + 1 : 0;
   state.variantSeed = state.searchSeed;
   state.providerRunSignature = null;
-  if (isApiReady()) refreshTrendObservations({ runProvider: true });
-  else { state.report = createReport(); render(); }
+  if (isApiReady()) return refreshTrendObservations({ runProvider, signal });
+  state.report = createReport();
+  render();
 }
 
 function bindHeaderControls() {
@@ -709,7 +748,7 @@ function rebuildReport({ advanceSearch = false } = {}) {
   render();
 }
 
-async function fetchRssObservations() {
+async function fetchRssObservations(signal) {
   const searchParams = {
     categoryId: state.selectedCategoryId,
     timeWindow: state.timeWindow,
@@ -720,7 +759,7 @@ async function fetchRssObservations() {
     const payload = await searchTrendObservations(searchParams);
     return payload.observations;
   }
-  const response = await fetch(buildTrendSearchUrl(searchParams));
+  const response = await fetch(buildTrendSearchUrl(searchParams), { signal });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || '公開Web/RSS取得に失敗しました。');
@@ -735,7 +774,7 @@ function currentXOptions() {
   return xSearchOptions({ ...state.x, categoryId: state.selectedCategoryId, searchSeed:state.searchSeed });
 }
 
-async function fetchXObservations({ force = false } = {}) {
+async function fetchXObservations({ force = false, signal } = {}) {
   if (state.x.mode === 'rss') throw new Error('Xを使わない設定です。利用する場合は取得元を切り替えてください。');
   if (!shouldUseLocalTrendApi()) throw new Error('X検索はローカル版で利用できます。');
   if (!state.x.token) throw new Error('XのBearer Tokenを専用欄で設定してください。');
@@ -747,7 +786,7 @@ async function fetchXObservations({ force = false } = {}) {
   try {
     response = await fetch('/api/x-search', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.x.token}` },
-      body: JSON.stringify(options), signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify(options), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
     });
   } catch { throw new Error('ローカルのX検索に接続できないか、タイムアウトしました。'); }
   const result = await response.json().catch(() => ({}));
@@ -761,18 +800,18 @@ async function fetchXObservations({ force = false } = {}) {
   return result.observations;
 }
 
-async function fetchTrendObservations() {
+async function fetchTrendObservations(signal) {
   if (state.x.mode === 'rss') {
-    const fresh = newEvidenceOnly(await fetchRssObservations(), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys);
+    const fresh = newEvidenceOnly(await fetchRssObservations(signal), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys);
     if (!fresh.length) throw new Error('指定期間内に未使用の公開Web根拠がありません。以前の題材を新しい結果として再利用しません。');
     return fresh;
   }
   if (state.x.mode !== 'both') throw new Error('X単独の分析は利用できません。公開Webと合わせて分析してください。');
   let xPosts;
-  try { xPosts = newEvidenceOnly(await fetchXObservations(), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys); }
+  try { xPosts = newEvidenceOnly(await fetchXObservations({ signal }), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys); }
   catch (error) { state.x.error = error.message; throw error; }
   if (!xPosts.length) throw new Error('Xの補助情報が0件のため複合分析を開始できません。検索条件を変更するか、Xを使わない設定を選んでください。');
-  const rss = newEvidenceOnly(await fetchRssObservations(), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys);
+  const rss = newEvidenceOnly(await fetchRssObservations(signal), state.historyByCategory[state.selectedCategoryId]?.evidenceKeys);
   if (!rss.length) throw new Error('指定期間内に未使用の公開Web根拠がありません。X単独の企画には切り替えません。');
   return [...rss, ...xPosts];
 }
@@ -814,9 +853,10 @@ function shouldUseLocalTrendApi() {
   return canUseLocalApi(globalThis.location);
 }
 
-async function refreshTrendObservations({ runProvider = false, announce = false } = {}) {
+async function refreshTrendObservations({ runProvider = false, announce = false, signal } = {}) {
   rememberCreativeReport(state.historyByCategory, state.report);
   if (isUiWorking()) return;
+  const previous = signal && { observations: state.observations, providerSummary: state.providerSummary, planSamples: state.planSamples, report: state.report };
   state.searchBusy = true;
   state.providerSummary = null;
   state.planSamples = {};
@@ -827,7 +867,9 @@ async function refreshTrendObservations({ runProvider = false, announce = false 
 
   let didLoad = false;
   try {
-    state.observations = await fetchTrendObservations();
+    const observations = await fetchTrendObservations(signal);
+    signal?.throwIfAborted();
+    state.observations = observations;
     state.report = createReport();
     didLoad = true;
     if (announce) {
@@ -836,6 +878,10 @@ async function refreshTrendObservations({ runProvider = false, announce = false 
       });
     }
   } catch (error) {
+    if (signal?.aborted) {
+      Object.assign(state, previous);
+      return;
+    }
     state.observations = [];
     state.report = createReport();
     showActionMessage({
@@ -1214,6 +1260,7 @@ async function runProviderDeepening() {
       providerStatus,
       combineProviderStatuses(reportAnalysisStatus, designStatus),
     );
+    return { complete: summaryResult.status === 'fulfilled' && designStatus.applied > 0 };
   } finally {
     if (!operation.isCurrent()) return;
     operation.finish();
@@ -2170,4 +2217,10 @@ function escapeTextarea(value) {
 
 function formatMultilineText(value) {
   return escapeHtml(value).replace(/\n/g, '<br>');
+}
+
+function stopCurrentWork() {
+  mcpCurrent?.abort();
+  aiOperations.stop();
+  render();
 }
