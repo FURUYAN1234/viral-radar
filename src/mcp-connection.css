@@ -55,10 +55,6 @@
   visibility: hidden;
 }
 
-body:not(.furu-mcp-active) .furu-mcp-resources:has(.furu-mcp-connection) {
-  padding-inline-end: 136px;
-}
-
 body:has(.furu-mcp-resources) :is(nav.manual-links, a.api-link[href$="-manual.pdf"], a.api-link[href$="-api-guide.pdf"]) {
   display: none;
 }
