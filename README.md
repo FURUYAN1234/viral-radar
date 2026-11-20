@@ -59,6 +59,10 @@ Monogatari Buzz Maker is a creative planning app that turns topics retrieved fro
 
 It is not a simple buzzword list. It keeps retrieval evidence, derived metrics, creative plans, text-generation prompts, and editor-facing DOCX output in one workflow. / 単なる流行語リストではありません。取得根拠、算出指標、制作案、本文生成プロンプト、確認用DOCXまでを1つのワークフローで扱います。
 
+## Introduction video / 紹介動画
+
+[![Watch the Story Buzz Maker introduction / 物語バズメーカーの紹介動画を見る](https://i.ytimg.com/vi/j-0KfxvHNOc/hqdefault.jpg)](https://youtu.be/j-0KfxvHNOc)
+
 > **Important / 重要**
 > This app does not fill missing retrieval data with fictional examples, guessed values, or fixed samples. If public Web/RSS retrieval fails or returns no usable result, the app reports no result or retrieval failure. / 取得できないデータを架空例、推測値、固定サンプルで埋めません。公開Web/RSSで取得できない場合は、結果なし、または取得失敗と表示します。
 >
