@@ -689,6 +689,8 @@ It does not call the other apps at runtime. Each app works independently. / た�
 | Codex Usage / Codex 残量 | Windows usage overlay / Windows用の利用枠表示ツール | [GitHub / ソースコード](https://github.com/FURUYAN1234/codex-usage-overlay) |
 | Local Handoff MCP / ローカルの作業引き継ぎ | Resume work between Codex and Antigravity in the same project folder / 同じ作業フォルダーでCodexとAntigravityの作業を引き継ぐ | [GitHub](https://github.com/FURUYAN1234/local-handoff-mcp) · [Guide / 解説](https://note.com/happy_duck780/n/n806c7bc6de94) |
 
+- AI Tracer Nazori-kun / AIトレーサー なぞり君 · [Web app / 公開アプリ](https://furuyan1234.github.io/ai-tracer-nazori-kun/) · [GitHub](https://github.com/FURUYAN1234/ai-tracer-nazori-kun)
+
 ## Changelog / 更新履歴
 
 ### v1.2.10 (2026-10-27)
