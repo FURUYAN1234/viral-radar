@@ -800,3 +800,9 @@ codex mcp add viral-radar -- node "C:\absolute\path\to\viral-radar\Launch-Codex-
 Call `buzz_connection` and open its one-time URL in the same Codex chat's in-app browser. Wait for `MCP 接続済み`, then run `buzz_generate_brief` with a unique `requestId`. Read `buzz_job_get` until it returns a terminal state. Check the existing result before retrying an `unknown` job. / `buzz_connection` の一時URLを実行チャットの内蔵ブラウザーで開き、自動接続を確認します。ジョブは `buzz_job_get` で結果まで追跡してください。MCP接続をAI側で確立できない場合は、対象アプリの画面を示してユーザーに接続を依頼します。
 
 The job returns Markdown with source links and completed planning prompts. Give the selected prompt to Story Maker as the brief. / 根拠リンク付きのMarkdownと企画プロンプトを返します。採用案をStory Makerの補足指示へ渡せます。
+
+## CLIP Drop / 習作・ベータ版
+
+クリスタの .clip を SVG・PSD・PNG に変換するWindows用の習作です。 / An experimental Windows converter for Clip Studio Paint files.
+
+- [GitHub](https://github.com/FURUYAN1234/clip-drop) · [note](https://note.com/happy_duck780/n/n8a38199a75db)
