@@ -77,13 +77,26 @@ function Get-DependencyFingerprint([string]$AppRoot, [string]$NodePath) {
     return "$lockHash/$nodeIdentity"
 }
 
-function Test-Dependencies([string]$AppRoot, [string]$NodePath, [string]$Fingerprint) {
+function Test-Dependencies([string]$AppRoot, [string]$NodePath, [string]$NpmCli, [string]$Fingerprint) {
     $marker = Join-Path $AppRoot 'node_modules/.monogatari-install'
-    if (-not (Test-Path -LiteralPath $marker)) { return $false }
-    if ((Get-Content -LiteralPath $marker -Raw).Trim() -ne $Fingerprint) { return $false }
-    # Check actual dependencies as well as the marker, including the native esbuild binary.
     try {
         & $NodePath --input-type=module -e "await import('vite'); const e = await import('esbuild'); e.transformSync('let x=1');" 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { return $false }
+        if ((Test-Path -LiteralPath $marker) -and (Get-Content -LiteralPath $marker -Raw).Trim() -eq $Fingerprint) { return $true }
+
+        # The MCP launcher also installs these dependencies. Confirm its npm installation against this source lockfile.
+        $verifyLock = @'
+import {readFileSync} from 'node:fs';
+const wanted = JSON.parse(readFileSync('package-lock.json', 'utf8')).packages;
+const installed = JSON.parse(readFileSync('node_modules/.package-lock.json', 'utf8')).packages;
+if (!Object.keys(installed).length || Object.entries(installed).some(([name, pkg]) => {
+  const expected = wanted[name];
+  return !expected || expected.version !== pkg.version || expected.integrity !== pkg.integrity;
+})) process.exitCode = 1;
+'@
+        $verifyLock | & $NodePath --input-type=module 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { return $false }
+        & $NodePath $NpmCli ls --all --json 2>$null | Out-Null
         return $LASTEXITCODE -eq 0
     } catch { return $false }
 }
@@ -105,13 +118,13 @@ function Start-Monogatari([string]$AppRoot, [bool]$OpenBrowser) {
             $npmCli = Join-Path (Split-Path $nodePath) 'node_modules/npm/bin/npm-cli.js'
             $env:Path = (Split-Path $nodePath) + ';' + $env:Path
             $fingerprint = Get-DependencyFingerprint $AppRoot $nodePath
-            if (-not (Test-Dependencies $AppRoot $nodePath $fingerprint)) {
+            if (-not (Test-Dependencies $AppRoot $nodePath $npmCli $fingerprint)) {
                 Write-Host '[2/3] Installing app dependencies. An Internet connection is required on the first run.'
                 & $nodePath $npmCli ci --no-audit --no-fund
                 if ($LASTEXITCODE -ne 0) { throw 'Dependency setup failed. Check your Internet connection and disk space, then run the batch again.' }
-                Set-Content -LiteralPath (Join-Path $AppRoot 'node_modules/.monogatari-install') -Value $fingerprint -Encoding ASCII
-                if (-not (Test-Dependencies $AppRoot $nodePath $fingerprint)) { throw 'Installed dependencies could not start. Run the batch again to repair them.' }
+                if (-not (Test-Dependencies $AppRoot $nodePath $npmCli $fingerprint)) { throw 'Installed dependencies could not start. Run the batch again to repair them.' }
             }
+            Set-Content -LiteralPath (Join-Path $AppRoot 'node_modules/.monogatari-install') -Value $fingerprint -Encoding ASCII
             & $nodePath $npmCli run check:runtime
             if ($LASTEXITCODE -ne 0) { throw 'Bundled model settings are missing or invalid. Download and extract the complete source ZIP again.' }
         } finally { $setupLock.Dispose() }

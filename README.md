@@ -14,7 +14,7 @@ Read the Japanese A4 guides from the app header; each opens in a separate tab an
 
 [Illustrated guide / 個別解説](https://note.com/happy_duck780/n/ncc593101d77f)
 
-[Release notes / 更新内容](docs/releases/v1.4.9.md)
+[Release notes / 更新内容](docs/releases/v1.4.10.md)
 
 ### Stop AI communication / AI通信の強制切断
 
@@ -22,7 +22,7 @@ The red **Stop AI communication** button stays at the upper right and is enabled
 
 
 
-**v1.4.9**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.9.md)
+**v1.4.10**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.10.md)
 
 | Feature / 機能 | GitHub Pages / 公開Web版 | Download and run locally / ダウンロードしてローカル起動 |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https:/
 [Local launch instructions / ローカル起動手順](#local-setup) · X and AI API usage are billed separately by each provider. / X APIと生成AIの利用料金は各事業者へ別途かかります。
 
 
-![Version](https://img.shields.io/badge/version-1.4.9-0f766e)
+![Version](https://img.shields.io/badge/version-1.4.10-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -433,7 +433,7 @@ Until AI setup is completed, the main UI remains locked. Public Web/RSS retrieva
 ### Local Launch (Windows) / ローカルでの起動
 
 1. [Download the source ZIP](https://github.com/FURUYAN1234/viral-radar/archive/refs/heads/main.zip) and extract the entire folder. / ソースZIPをダウンロードし、フォルダー全体を展開します。
-2. Double-click `start_monogatari_buzz_maker.bat`. The first run prepares Node.js if needed, installs the required components, and opens the app. / 展開先の `start_monogatari_buzz_maker.bat` をダブルクリックします。初回は不足するNode.jsと必要な部品を自動で準備し、アプリ画面を開きます。
+2. Double-click `start_monogatari_buzz_maker.bat`. The first run prepares Node.js if needed, installs the required components, and opens the app in your default browser. It reuses matching dependencies installed by the MCP launcher. / 展開先の `start_monogatari_buzz_maker.bat` をダブルクリックします。必要なNode.jsなどを準備し、既定のブラウザーでアプリを開きます。MCPランチャーで導入済みの依存ファイルは同じ版なら再利用します。
 3. Connect your OpenAI/Gemini key first. Below it, select “Xを使う” and enter your X Bearer Token. / 先に生成AIキーを接続します。その下の「Xの追加接続」で「Xを使う」を選び、自分のBearer Tokenを設定します。APIキーの発行と入力は利用者本人が行います。
 
 Windows 10/11 (64-bit x64 or ARM64) and an Internet connection are required. No administrator access, manual Node.js installation, or other app is needed. If a compatible Node.js is already installed, it is reused; otherwise the launcher downloads the pinned official Node.js LTS ZIP, verifies its SHA-256, and places it in this app's `.runtime` folder. It does not change the system PATH. / Windows 10/11（64bit x64・ARM64）とインターネット接続が必要です。管理者権限・Node.jsの手動インストール・他アプリは不要です。利用可能なNode.jsがあれば再利用し、なければ公式の固定版LTSを取得してSHA-256を照合し、このアプリ内の `.runtime` に置きます。PC全体のPATH設定は変更しません。
