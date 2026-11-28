@@ -7,6 +7,7 @@ import { copyTextToClipboard } from './lib/clipboard.js';
 import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from './lib/docxExporter.js';
 import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
+import { saveBytesWithDialog } from './lib/reportFileSave.js';
 import {
   DEFAULT_OPENAI_MODEL_ID,
   OPENAI_MODEL_OPTIONS,
@@ -27,7 +28,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.11';
+const APP_VERSION = '1.4.12';
 const app = document.querySelector('#app');
 let mcpCurrent;
 let actionMessageTimer = null;
@@ -1099,6 +1100,7 @@ async function saveExportFile(kind) {
       fileName,
       mimeType,
       bytes,
+      nativeDialog: shouldUseLocalTrendApi(),
     });
     showActionMessage({
       summary:
@@ -1120,78 +1122,6 @@ async function saveExportFile(kind) {
   }
 
   render();
-}
-
-async function saveBytesWithDialog({ fileName, mimeType, bytes }) {
-  const blob = new Blob([bytes], { type: mimeType });
-  if ('showSaveFilePicker' in window) {
-    const extension = fileName.endsWith('.docx') ? '.docx' : '.json';
-    const handle = await window.showSaveFilePicker({
-      suggestedName: fileName,
-      types: [
-        {
-          description: extension === '.docx' ? 'Word文書' : 'JSONファイル',
-          accept: {
-            [mimeType.split(';')[0]]: [extension],
-          },
-        },
-      ],
-    });
-    const writable = await handle.createWritable();
-    await writable.write(blob);
-    await writable.close();
-    return { mode: 'picker', fileName };
-  }
-
-  try {
-    const result = await saveViaNativeDialog({
-      fileName,
-      mimeType,
-      contentBase64: bytesToBase64(bytes),
-    });
-    if (result.cancelled) throw new DOMException('Save cancelled', 'AbortError');
-    return { mode: 'native', fileName: result.fileName ?? fileName };
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error;
-  }
-
-  return saveWithBrowserDownload({ fileName, mimeType, bytes });
-}
-
-async function saveViaNativeDialog(payload) {
-  const response = await fetch('/api/save-file-dialog', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (response.status === 404) throw new Error('Native save dialog is not available.');
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error ?? `HTTP ${response.status}`);
-  }
-  return result;
-}
-
-function saveWithBrowserDownload({ fileName, mimeType, bytes }) {
-  const blob = new Blob([bytes], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-  return { mode: 'download', fileName };
-}
-
-function bytesToBase64(bytes) {
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    binary += String.fromCharCode(...bytes.slice(index, index + chunkSize));
-  }
-  return btoa(binary);
 }
 
 async function runProviderDeepening() {

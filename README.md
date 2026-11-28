@@ -14,7 +14,7 @@ Read the Japanese A4 guides from the app header; each opens in a separate tab an
 
 [Illustrated guide / 個別解説](https://note.com/happy_duck780/n/ncc593101d77f)
 
-[Release notes / 更新内容](docs/releases/v1.4.11.md)
+[Release notes / 更新内容](docs/releases/v1.4.12.md)
 
 ### Stop AI communication / AI通信の強制切断
 
@@ -22,7 +22,7 @@ The red **Stop AI communication** button stays at the upper right and is enabled
 
 
 
-**v1.4.11**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.11.md)
+**v1.4.12**: One source for GitHub Pages and local use. X is enabled only when running locally; public Web research and AI story planning work on both. / **GitHub Pagesとローカルで同じソースを使います。X連携はローカル起動時だけ利用できます。** 公開Webの背景情報と任意のXの反応を生成AIが照合し、漫画・動画・小説の企画へ反映します。[User guide / 利用ガイド](docs/x-api.md) · [Release notes / 変更内容](docs/releases/v1.4.12.md)
 
 | Feature / 機能 | GitHub Pages / 公開Web版 | Download and run locally / ダウンロードしてローカル起動 |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Demo URL / デモサイト: [https://furuyan1234.github.io/viral-radar/](https:/
 [Local launch instructions / ローカル起動手順](#local-setup) · X and AI API usage are billed separately by each provider. / X APIと生成AIの利用料金は各事業者へ別途かかります。
 
 
-![Version](https://img.shields.io/badge/version-1.4.11-0f766e)
+![Version](https://img.shields.io/badge/version-1.4.12-0f766e)
 ![Framework](https://img.shields.io/badge/framework-Vite-646cff)
 ![Runtime](https://img.shields.io/badge/runtime-browser%20%2B%20local%20Vite-111827)
 ![API](https://img.shields.io/badge/API-OpenAI%20%2F%20Gemini-2563eb)
@@ -608,7 +608,7 @@ The app output is reference information for creative planning. It is not profess
 
 ### Local Saving / ローカル保存
 
-For JSON and DOCX saving, the user chooses the save destination. / JSON/DOCX保存では、ユーザーが保存先を選びます。
+Choose the destination when saving JSON or DOCX. The picker initially suggests the Downloads folder and allows a different location. / JSON・DOCXの保存先を選べます。初回は「ダウンロード」フォルダーを表示し、希望する保存先に変更できます。
 
 The app does not silently save into a fixed folder under the app directory. / アプリ直下の固定フォルダへ勝手に保存しません。
 

@@ -161,6 +161,11 @@ function registerSaveDialogRoute(middlewares) {
         return;
       }
 
+      if (process.platform !== 'win32') {
+        sendJson(response, 501, { ok: false, error: 'Windowsの保存ダイアログを利用できません。' });
+        return;
+      }
+
       const payload = await readJsonBody(request);
       const fileName = sanitizeFileName(payload?.fileName);
       const contentBase64 = String(payload?.contentBase64 ?? '');
@@ -200,7 +205,8 @@ function askUserForSavePath(fileName) {
     `$dialog.DefaultExt = ${psQuote(extension)}`,
     '$dialog.AddExtension = $true',
     '$dialog.OverwritePrompt = $true',
-    "$dialog.InitialDirectory = [Environment]::GetFolderPath('MyDocuments')",
+    "$downloads = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads')",
+    "if ($downloads) { $dialog.InitialDirectory = $downloads.Self.Path } else { $dialog.InitialDirectory = [Environment]::GetFolderPath('MyDocuments') }",
     'if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::WriteLine($dialog.FileName) }',
   ].join('; ');
 
