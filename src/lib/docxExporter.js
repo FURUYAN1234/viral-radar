@@ -447,7 +447,8 @@ function escapeXml(value) {
 function normalizeDocxText(value) {
   return value
     .replace(/(\d{4})\/(\d{2})\/(\d{2})\s+(\d{1,2}):(\d{2})/g, '$1年$2月$3日 $4時$5分')
-    .replace(/(\d{1,2}):(\d{2})/g, '$1時$2分')
+    .replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)|(\d{1,2}):(\d{2})/g,
+      (_match, isoDate, hours, minutes) => isoDate ?? `${hours}時${minutes}分`)
     .replace(/: /g, '：')
     .replace(/ \/ /g, '・');
 }

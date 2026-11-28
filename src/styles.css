@@ -575,6 +575,26 @@ a.secondary-action {
   margin-bottom: 8px;
 }
 
+.report-save-options {
+  margin-bottom: 8px;
+}
+
+.report-save-options summary {
+  width: fit-content;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.report-save-options .action-row {
+  margin-top: 8px;
+}
+
+.report-download-note {
+  margin: 0 0 12px;
+  color: #46515f;
+  font-size: 13px;
+}
+
 .action-message {
   display: flex;
   flex-wrap: nowrap;

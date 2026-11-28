@@ -7,6 +7,8 @@ import vm from 'node:vm';
 import { CATEGORIES } from '../src/lib/categories.js';
 import { buildReport } from '../src/lib/reportEngine.js';
 import { fromJson, toJson, toMarkdown } from '../src/lib/exporters.js';
+import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from '../src/lib/docxExporter.js';
+import { exportTimestamp } from '../src/lib/fileNames.js';
 import { PUBLIC_OBSERVATIONS } from './helpers/publicObservations.mjs';
 import { createXState, renderXPanel, canUseLocalApi } from '../src/lib/xPanel.js';
 
@@ -19,13 +21,13 @@ function harness(report = fixture()) {
   const connection={connected:true,mode:'gemini'},bodyClasses=new Set();
   const state = { report, settings: {}, planSamples: {}, openAiModelId:DEFAULT_OPENAI_MODEL_ID, analysisStartConfirmed: true, x: createXState() };
   const context = vm.createContext({ aiOperations: createAiOperationManager(),
-    app, state, CATEGORIES, fromJson, renderXPanel, canUseLocalApi, APP_VERSION: 'test', URL, getOpenAIModelOption,OPENAI_MODEL_OPTIONS,OPENAI_MODEL_PRICE_SNAPSHOT_DATE,formatOpenAIModelPrice, API_INPUT_AUTOFILL_CLEAR_MS:0,window:{requestAnimationFrame:callback=>callback(),setTimeout:()=>0},
+    app, state, CATEGORIES, fromJson, toJson, DOCX_MIME, docxFileName, toDocxArrayBuffer, exportTimestamp, TextEncoder, renderXPanel, canUseLocalApi, APP_VERSION: 'test', URL, getOpenAIModelOption,OPENAI_MODEL_OPTIONS,OPENAI_MODEL_PRICE_SNAPSHOT_DATE,formatOpenAIModelPrice, API_INPUT_AUTOFILL_CLEAR_MS:0,window:{requestAnimationFrame:callback=>callback(),setTimeout:()=>0},
     document: { querySelector: () => null,body:{classList:{toggle:(name,enabled)=>enabled?bodyClasses.add(name):bodyClasses.delete(name)}} },
     getProviderStatus: () => ({ mode: connection.mode, provider: { connected: connection.connected, label: 'test' } }),
     fetch: () => { throw new Error('Network forbidden in import test'); },
   });
   vm.runInContext(main.slice(main.indexOf('function bootstrapApp()')), context);
-  vm.runInContext('bindEvents = () => {}; clearActionMessage = () => {};', context);
+  vm.runInContext('var reportImportVersion = 0; bindEvents = () => {}; clearActionMessage = () => { state.actionMessage = null; }; showActionMessage = message => { state.actionMessage = message; };', context);
   return {
     state, app, context, connection, bodyClasses,
     async import(reportToLoad) {
@@ -165,4 +167,73 @@ test('active AI work remains stoppable above a lost connection gate and hides on
  let button=h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];assert.doesNotMatch(button,/\bhidden\b|\bdisabled\b/);assert.equal(h.bodyClasses.has('ai-workspace-ready'),true);
  assert.ok(h.app.innerHTML.indexOf('id="stop-ai"')<h.app.innerHTML.indexOf('<main class="app-shell'));
  vm.runInContext('aiOperations.stop();operation.finish();state.providerBusy=false;render()',h.context);button=h.app.innerHTML.match(/<button id="stop-ai"[^>]*>/)[0];assert.match(button,/\bhidden\b/);assert.match(button,/\bdisabled\b/);
+});
+
+test('a saved report opens and exports without authorizing analysis or requesting a provider', async () => {
+  const h = harness();
+  h.connection.connected = false;
+  h.state.analysisStartConfirmed = false;
+  const downloads = [];
+  h.context.downloadReportFile = file => { downloads.push(file); return { mode: 'download' }; };
+  h.context.saveBytesWithDialog = () => assert.fail('Default save must not open a picker');
+  const button = id => h.app.innerHTML.match(new RegExp('<button[^>]+id="' + id + '"[^>]*>'))[0];
+  const render = () => vm.runInContext('render()', h.context);
+  const save = kind => vm.runInContext('saveExportFile(' + JSON.stringify(kind) + ')', h.context);
+
+  render();
+  assert.doesNotMatch(button('import-json'), /disabled/);
+  assert.match(button('download-json'), /disabled/);
+  assert.doesNotMatch(h.app.innerHTML, /class="plan-card"/);
+  await save('json');
+  assert.equal(downloads.length, 0);
+
+  const report = fixture();
+  report.creativePlans[0].titleCandidates[0] = '保存済みの企画';
+  await h.import(report);
+  assert.match(h.app.innerHTML, /保存済みの企画/);
+  assert.match(h.app.innerHTML, /根拠JSONを読み込みました/);
+  assert.doesNotMatch(button('download-json'), /disabled/);
+  assert.doesNotMatch(button('download-docx'), /disabled/);
+  assert.match(h.app.innerHTML, /保存先を選ぶ/);
+  assert.match(h.app.innerHTML, /ブラウザーのダウンロード設定/);
+  assert.match(button('run-provider'), /disabled/);
+  assert.match(button('suggest-more'), /disabled/);
+  assert.match(h.app.innerHTML, /<button[^>]+data-generate-plan-id[^>]+disabled/);
+  assert.equal(h.state.analysisStartConfirmed, false);
+  assert.equal(h.state.settings.apiKey, undefined);
+
+  await save('json');
+  await save('docx');
+  assert.equal(downloads.length, 2);
+  assert.deepEqual(fromJson(Buffer.from(downloads[0].bytes).toString('utf8')), report);
+  const docx = Buffer.from(downloads[1].bytes);
+  assert.equal(docx.subarray(0, 2).toString('utf8'), 'PK');
+  assert.ok(docx.toString('utf8').includes(report.creativePlans[0].titleCandidates[0]));
+});
+
+test('offline import failure is visible and retains the open report', async () => {
+  const h = harness();
+  h.connection.connected = false;
+  h.state.analysisStartConfirmed = false;
+  await h.import(fixture());
+  const open = h.state.report;
+  await h.import({ category: null });
+  assert.equal(h.state.report, open);
+  assert.match(h.app.innerHTML, /JSONを読み込めませんでした/);
+  assert.equal(h.state.analysisStartConfirmed, false);
+});
+
+test('JSON reading in progress cannot replace a report after a new analysis starts', async () => {
+  const h = harness();
+  h.connection.connected = false;
+  h.state.analysisStartConfirmed = false;
+  const original = h.state.report;
+  let finish;
+  const pending = new Promise(resolve => { finish = resolve; });
+  h.context.event = { target: { files: [{ text: () => pending }], value: 'fixture.json' } };
+  const read = vm.runInContext('importJson(event)', h.context);
+  h.state.searchBusy = true;
+  finish(JSON.stringify(fixture()));
+  await read;
+  assert.equal(h.state.report, original);
 });

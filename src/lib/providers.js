@@ -295,6 +295,7 @@ export async function runProviderAnalysis({
   report,
   selectedModelId,
   onModelRoute,
+  onAuthenticated,
   fetchImpl = fetch,
   proxyBase = '',
   signal,
@@ -308,6 +309,7 @@ export async function runProviderAnalysis({
     apiKey,
     selectedModelId,
     onModelRoute,
+    onAuthenticated,
     fetchImpl,
     proxyBase,
     signal,
@@ -323,6 +325,7 @@ export async function runPlanDesignGeneration({
   report,
   selectedModelId,
   onModelRoute,
+  onAuthenticated,
   fetchImpl = fetch,
   proxyBase = '',
   signal,
@@ -336,6 +339,7 @@ export async function runPlanDesignGeneration({
     apiKey,
     selectedModelId,
     onModelRoute,
+    onAuthenticated,
     fetchImpl,
     proxyBase,
     signal,
@@ -351,6 +355,7 @@ export async function runDraftSample({
   draftPrompt,
   selectedModelId,
   onModelRoute,
+  onAuthenticated,
   fetchImpl = fetch,
   proxyBase = '',
   signal,
@@ -367,6 +372,7 @@ export async function runDraftSample({
     apiKey,
     selectedModelId,
     onModelRoute,
+    onAuthenticated,
     fetchImpl,
     proxyBase,
     signal,
@@ -428,6 +434,7 @@ async function runProviderFallback({
   apiKey,
   selectedModelId,
   onModelRoute,
+  onAuthenticated,
   fetchImpl,
   proxyBase = '',
   signal,
@@ -458,6 +465,7 @@ async function runProviderFallback({
       const body = JSON.stringify(request);
       const payload = await callProviderModel({ provider, apiKey, model, body, fetchImpl, proxyBase, signal });
       signal?.throwIfAborted();
+      if (payload && typeof payload === 'object' && !payload.error) onAuthenticated?.();
       previousPayload = payload;
       let parsed;
       try { parsed = parsePayload(payload); }
@@ -539,15 +547,22 @@ async function callProviderModel({ provider, apiKey, model, body, fetchImpl, pro
 
   if (!response.ok) {
     let message = '';
+    let invalidKey = false;
     try {
       const payload = await abortable(response.json(), signal);
-  signal.throwIfAborted();
-      message = payload.error?.message ?? payload.message ?? '';
+      signal.throwIfAborted();
+      const providerError = payload.error;
+      message = providerError?.message ?? payload.message ?? '';
+      const details = Array.isArray(providerError?.details) ? providerError.details : [];
+      invalidKey = [providerError?.code, ...details.map(detail => detail?.reason)].some(code =>
+        /^(?:api_key_invalid|invalid_api_key|api_key_revoked)$/i.test(String(code)));
+      invalidKey ||= /API_KEY_INVALID|API key not valid|invalid_api_key/i.test(message);
     } catch {
       message = '';
     }
+    signal.throwIfAborted();
     const error = new Error(`HTTP ${response.status ?? 'error'} ${message}`.trim());
-    if (response.status === 401 || (response.status === 400 && /API_KEY_INVALID|API key not valid|invalid_api_key/i.test(message))) error.category = 'authentication';
+    if (response.status === 401 || ([400, 403].includes(response.status) && invalidKey)) error.category = 'authentication';
     throw error;
   }
 

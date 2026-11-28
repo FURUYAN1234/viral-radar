@@ -1,8 +1,16 @@
-export async function saveBytesWithDialog({ fileName, mimeType, bytes, nativeDialog }) {
+function requireSaveActivation() {
   if (window.navigator?.userActivation?.isActive === false) {
     throw new DOMException('保存ボタンから操作してください。', 'SecurityError');
   }
+}
 
+export function downloadReportFile({ fileName, mimeType, bytes }) {
+  requireSaveActivation();
+  return saveWithBrowserDownload({ fileName, blob: new Blob([bytes], { type: mimeType }) });
+}
+
+export async function saveBytesWithDialog({ fileName, mimeType, bytes, nativeDialog }) {
+  requireSaveActivation();
   const blob = new Blob([bytes], { type: mimeType });
 
   if (typeof window.showSaveFilePicker === 'function') {

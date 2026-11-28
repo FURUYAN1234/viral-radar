@@ -1689,3 +1689,43 @@ test('runPlanDesignGeneration parses provider prose for every visible plan field
   assert.equal(plan.storyArchitecture.status, 'done');
   assert.equal(plan.storyArchitecture.notes.length, 2);
 });
+
+test('only a successful response payload from the intended endpoint confirms the credential without an extra API probe', async () => {
+  const paths = [];
+  let confirmations = 0;
+  await runProviderAnalysis({
+    provider: 'openai',
+    apiKey: OPENAI_TEST_KEY,
+    report: { category: { label: 'Manga' }, evidenceCards: [] },
+    onAuthenticated: () => { confirmations += 1; },
+    fetchImpl: async (url, options) => {
+      paths.push([String(url), options.method]);
+      return Response.json({ output_text: '{"summary":"Provider response verified"}' });
+    },
+  });
+  assert.ok(paths.length >= 1);
+  assert.equal(confirmations, paths.length);
+  assert.ok(paths.every(([url, method]) => url.endsWith('/v1/responses') && method === 'POST'));
+});
+
+test('a typed key rejection requires reconfiguration, but an ordinary scope denial does not falsely verify or invalidate the key', async () => {
+  for (const typed of [true, false]) {
+    let requests = 0, confirmations = 0;
+    await assert.rejects(runProviderAnalysis({
+      provider: 'gemini',
+      apiKey: GEMINI_TEST_KEY,
+      report: providerDesignReport(),
+      onAuthenticated: () => { confirmations += 1; },
+      fetchImpl: async () => {
+        requests += 1;
+        return Response.json({
+          error: { message: 'Access denied', details: typed ? [{ reason: 'API_KEY_INVALID' }] : [{ reason: 'INSUFFICIENT_SCOPE' }] },
+        }, { status: 403 });
+      },
+    }), error => boolAuth(error) === typed);
+    assert.equal(confirmations, 0);
+    if (typed) assert.equal(requests, 1);
+  }
+
+  function boolAuth(error) { return error.category === 'authentication'; }
+});

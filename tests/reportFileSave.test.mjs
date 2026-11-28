@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { saveBytesWithDialog } from '../src/lib/reportFileSave.js';
+import * as reportFileSave from '../src/lib/reportFileSave.js';
+const { downloadReportFile, saveBytesWithDialog } = reportFileSave;
 
 const contents = '{"title":"風の物語"}';
 const input = {
@@ -160,4 +161,23 @@ test('a lost native response is an error even if the write may already have happ
   await assert.rejects(saveBytesWithDialog(input), error => error === failure);
   assert.equal(native.mock.callCount(), 1);
   assert.equal(link.click.mock.callCount(), 0);
+});
+
+test('the standard save uses the browser download without requesting a destination', t => {
+  const picker = t.mock.fn();
+  const { link, native } = useBrowser(t, { picker });
+  assert.deepEqual(downloadReportFile(input), { mode: 'download', fileName: input.fileName });
+  assert.equal(link.download, input.fileName);
+  assert.equal(link.click.mock.callCount(), 1);
+  assert.equal(picker.mock.callCount(), 0);
+  assert.equal(native.mock.callCount(), 0);
+});
+
+test('a denied or non-user-initiated standard download does not attempt a picker', t => {
+  const picker = t.mock.fn();
+  const { link, native } = useBrowser(t, { picker, activated: false });
+  assert.throws(() => downloadReportFile(input), { name: 'SecurityError' });
+  assert.equal(link.click.mock.callCount(), 0);
+  assert.equal(picker.mock.callCount(), 0);
+  assert.equal(native.mock.callCount(), 0);
 });

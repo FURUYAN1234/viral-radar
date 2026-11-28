@@ -14,7 +14,7 @@ function harness(){
  const start=source.indexOf('const state = ');assert.ok(start>=0);const end=source.indexOf('\n};',start)+3;
  vm.runInContext(source.slice(start,end).replace('import.meta.hot?.data.runtimeState','undefined')+'\nlet apiInputUserTouched=false;',context);
  vm.runInContext("function currentProviderStatus(settings=state.settings){return {mode:settings.apiKey?.startsWith('sk-')?'openai':'none',provider:{connected:settings.apiKey?.startsWith('sk-')||false,label:'OpenAI'}};}",context);
- for(const name of ['isProviderConfigured','isApiReady','bootstrapApp','renderOpenAiModelControl','renderApiStartGate','renderApiConnectPanel','openApiSettings','closeApiSettings','connectApiKey','selectCategory','fetchXObservations','suggestMore','isProviderAuthError','shouldUseLocalTrendApi']) vm.runInContext(extract(name),context);
+ for(const name of ['isProviderConfigured','isApiReady','providerKeyStatusLabel','confirmProviderAuthentication','handleProviderAuthFailure','runOneProvider','bootstrapApp','renderOpenAiModelControl','renderApiStartGate','renderApiConnectPanel','openApiSettings','closeApiSettings','connectApiKey','selectCategory','fetchXObservations','suggestMore','isProviderAuthError','shouldUseLocalTrendApi']) vm.runInContext(extract(name),context);
  return {context,get state(){return vm.runInContext('state',context);},get calls(){return calls;}};
 }
 test('Luna actually selected on startup without automatic API',()=>{
@@ -62,4 +62,34 @@ test('re-search keeps the connected key and ready state and invalidates the X ca
 test('content refusal and validation errors cannot erase authentication',()=>{
  const h=harness();for(const message of ['生成を拒否しました','認証を題材にした文章は不合格','HTTP 403 permission denied','HTTP 429 quota']) {h.context.testError=new Error(message);assert.equal(vm.runInContext('isProviderAuthError(testError)',h.context),false);}
  h.context.testError=Object.assign(new Error('HTTP 401'),{category:'authentication'});assert.equal(vm.runInContext('isProviderAuthError(testError)',h.context),true);
+});
+
+test('setting a key displays authentication pending until a successful provider operation', async () => {
+  const h = harness();
+  const messages = [];
+  h.context.showActionMessage = message => messages.push(message);
+  h.state.apiKeyDraft = 'sk-test-only-placeholder';
+  await vm.runInContext('connectApiKey()', h.context);
+  const panel = () => vm.runInContext("renderApiConnectPanel({mode:'none',provider:{connected:false}},false)", h.context);
+  assert.match(messages.at(-1).summary, /キーを設定しました/);
+  assert.match(panel(), /設定済み・認証未確認/);
+  assert.doesNotMatch(panel(), /接続済み|認証済み/);
+  assert.equal(h.state.analysisStartConfirmed, false);
+  assert.equal(h.calls, 0);
+
+  h.context.PROVIDER_PROXY = '';
+  h.context.runProviderAnalysis = async ({ onAuthenticated }) => {
+    onAuthenticated();
+    return { summary: 'verified' };
+  };
+  await vm.runInContext("runOneProvider('gemini', state.settings.apiKey, { check() {} })", h.context);
+  assert.match(panel(), /認証済み/);
+  assert.doesNotMatch(panel(), /認証未確認/);
+  h.state.x.mode = 'both';
+  vm.runInContext("handleProviderAuthFailure({provider:{name:'OpenAI'}})", h.context);
+  assert.equal(h.state.settings.apiKey, '');
+  assert.equal(h.state.providerAuthenticated, false);
+  assert.equal(h.state.analysisStartConfirmed, false);
+  assert.equal(h.state.apiPanelOpen, true);
+  assert.equal(h.state.x.mode, 'both');
 });

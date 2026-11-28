@@ -7,7 +7,7 @@ import { copyTextToClipboard } from './lib/clipboard.js';
 import { DOCX_MIME, docxFileName, toDocxArrayBuffer } from './lib/docxExporter.js';
 import { fromJson, toJson, toMarkdown } from './lib/exporters.js';
 import { exportTimestamp } from './lib/fileNames.js';
-import { saveBytesWithDialog } from './lib/reportFileSave.js';
+import { downloadReportFile, saveBytesWithDialog } from './lib/reportFileSave.js';
 import {
   DEFAULT_OPENAI_MODEL_ID,
   OPENAI_MODEL_OPTIONS,
@@ -33,6 +33,7 @@ const app = document.querySelector('#app');
 let mcpCurrent;
 let actionMessageTimer = null;
 let actionMessageVersion = 0;
+let reportImportVersion = 0;
 let apiInputUserTouched = false;
 const aiOperations = createAiOperationManager();
 const initialSettings = loadSettings();
@@ -43,6 +44,7 @@ const state = import.meta.hot?.data.runtimeState ?? {
   openAiModelId: DEFAULT_OPENAI_MODEL_ID,
   openAiModelConfirmed: true,
   analysisStartConfirmed: false,
+  providerAuthenticated: false,
   openAiModelRoute: {
     selected: DEFAULT_OPENAI_MODEL_ID,
     attemptedByPath: {},
@@ -69,6 +71,8 @@ const state = import.meta.hot?.data.runtimeState ?? {
   apiKeyDraft: '',
   apiPanelOpen: !initialProviderStatus.provider.connected,
   report: null,
+  reportFromFile: false,
+  fileDialogBusy: false,
 };
 
 if (import.meta.hot?.data.runtimeState) {
@@ -181,6 +185,14 @@ function isApiReady() {
   return isProviderConfigured(status) && state.analysisStartConfirmed;
 }
 
+function providerKeyStatusLabel() {
+  return state.providerAuthenticated ? '認証済み' : '設定済み・認証未確認';
+}
+
+function hasReadableReport() {
+  return Boolean(state.reportFromFile) || isApiReady();
+}
+
 function isProviderConfigured(status = currentProviderStatus()) {
   return status.provider.connected && (status.mode !== 'openai' || state.openAiModelConfirmed);
 }
@@ -229,9 +241,11 @@ function resetAnalysisSessionForApiChange() {
   state.variantSeed = 0;
   state.providerRunSignature = null;
   state.providerSummary = null;
-  state.planSamples = {};
   state.observations = [];
-  state.report = createReport();
+  if (!state.reportFromFile) {
+    state.planSamples = {};
+    state.report = createReport();
+  }
   resetOpenAiModelRoute();
 }
 
@@ -239,8 +253,10 @@ function resetAnalysisSessionForModelChange() {
   state.analysisSessionId += 1;
   state.providerRunSignature = null;
   state.providerSummary = null;
-  state.planSamples = {};
-  state.report = createReport();
+  if (!state.reportFromFile) {
+    state.planSamples = {};
+    state.report = createReport();
+  }
   resetOpenAiModelRoute();
   clearActionMessage();
 }
@@ -286,6 +302,8 @@ function render() {
   const selectedCategory = report.category;
   const dataTimestamp = latestObservationTimestamp(report);
   const disabled = disabledAttr(isLocked);
+  const reportAvailable = hasReadableReport();
+  const reportDisabled = disabledAttr(!reportAvailable || uiWorking || state.fileDialogBusy);
   const planState = planSectionState(report);
 
   const workspaceReady = providerStatus.provider.connected || aiOperations.state().active;
@@ -305,7 +323,7 @@ function render() {
         </div>
         <div class="header-api-block">
           <div class="status-strip" aria-label="API接続状態">
-            <span class="${providerStatus.provider.connected ? 'ok' : ''}">生成AI: ${escapeHtml(providerLabel)}</span>
+            <span class="${providerStatus.provider.connected && state.providerAuthenticated ? 'ok' : ''}">生成AI: ${escapeHtml(providerLabel)}${providerStatus.provider.connected ? ` ${providerKeyStatusLabel()}` : ''}</span>
             ${shouldUseLocalTrendApi() ? `<span>${state.x.mode === 'rss' ? 'Xは使わない' : 'Xを使う'}</span>` : ''}
             ${
               !showApiPanel
@@ -357,19 +375,29 @@ function render() {
       ${renderXPanel(state.x, { local: shouldUseLocalTrendApi(), busy: uiWorking, categoryId: state.selectedCategoryId, searchSeed:state.searchSeed })}
       ${!isApiReady() ? `<section class="api-start-panel">${renderApiStartGate(providerStatus)}</section>` : ''}
 
-      <section class="action-row ${isLocked ? 'is-disabled' : ''}" aria-label="操作" ${isLocked ? 'aria-disabled="true"' : ''}>
+      <section class="action-row" aria-label="操作">
         <button class="secondary-action" id="run-provider" type="button" ${disabled}>AI分析サマリーを更新</button>
-        <button class="secondary-action" id="copy-markdown" type="button" ${disabled}>レポートをコピー</button>
-        <button class="secondary-action" id="download-docx" type="button" ${disabled}>資料DOCX保存</button>
-        <button class="secondary-action" id="download-json" type="button" ${disabled}>JSON保存</button>
-        <button class="secondary-action" id="import-json" type="button" ${disabled}>JSON読み込み</button>
+        <button class="secondary-action" id="import-json" type="button" ${disabledAttr(uiWorking || state.fileDialogBusy)}>JSON読み込み</button>
         <input id="json-file-input" class="visually-hidden" type="file" accept="application/json,.json" />
+        <button class="secondary-action" id="copy-markdown" type="button" ${reportDisabled}>レポートをコピー</button>
+        <button class="secondary-action" id="download-docx" type="button" ${reportDisabled}>資料DOCX保存</button>
+        <button class="secondary-action" id="download-json" type="button" ${reportDisabled}>JSON保存</button>
       </section>
+      ${reportAvailable ? `
+        <details class="report-save-options">
+          <summary>保存先を選ぶ</summary>
+          <div class="action-row">
+            <button class="secondary-action" id="save-docx-as" type="button" ${reportDisabled}>資料DOCXの保存先を選ぶ</button>
+            <button class="secondary-action" id="save-json-as" type="button" ${reportDisabled}>JSONの保存先を選ぶ</button>
+          </div>
+        </details>
+        <p class="report-download-note">通常の保存先はブラウザーのダウンロード設定に従います。</p>
+      ` : ''}
 
       ${
-        !isApiReady()
+        !reportAvailable
           ? ''
-          : `<div class="${isLocked ? 'is-disabled' : ''}" ${isLocked ? 'aria-disabled="true"' : ''}>
+          : `<div class="${uiWorking ? 'is-disabled' : ''}" ${uiWorking ? 'aria-disabled="true"' : ''}>
       ${renderResearchReceipt(report)}
       ${state.providerSummary && !uiWorking ? renderProviderSummary(state.providerSummary, dataTimestamp) : ''}
       <section class="plan-section" aria-label="${escapeAttr(planState.label)}">
@@ -460,7 +488,7 @@ function renderApiStartGate(providerStatus) {
     `;
   }
   return `
-    <p class="query-note">キーを接続すると開始できます。入力だけでは実行しません。キーはメモリのみで保持し、保存ファイルには含めません。</p>
+    <p class="query-note">キーを設定すると開始できます。提供元の認証は利用開始時に確認します。キーはメモリのみで保持し、保存ファイルには含めません。</p>
   `;
 }
 
@@ -512,7 +540,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
         <p class="panel-label api-panel-meta">
           <span>生成AI・企画と本文の作成に必要</span>
         </p>
-        <h2>${isConnected ? '生成AIの設定' : '生成AIを接続'}</h2>
+        <h2>${isConnected ? '生成AIの設定' : '生成AIキーを設定'}</h2>
         <p>${
           isConnected
             ? `${escapeHtml(currentProviderLabel)}を使用。X APIとは別の料金です。`
@@ -525,7 +553,7 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
         <label for="api-key">生成AIのAPIキー（OpenAI / Gemini）</label>
         <div class="api-connect-row">
           <input id="api-key" name="viral-radar-runtime-api-key" type="password" value="${escapeAttr(draftKey)}" placeholder="OpenAI または Gemini のAPIキー" autocomplete="new-password" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" ${inputDisabled} />
-          <button class="primary-action compact" id="connect-api" type="submit" ${connectDisabled}>${state.apiSaving ? '接続中' : '接続'}</button>
+          <button class="primary-action compact" id="connect-api" type="submit" ${connectDisabled}>${state.apiSaving ? '設定中' : 'キーを設定'}</button>
         </div>
         <small class="${draftStatus.provider.connected ? 'ok' : ''}">${escapeHtml(draftProviderHint)}</small>
         ${
@@ -534,10 +562,10 @@ function renderApiConnectPanel(draftStatus, uiWorking) {
             : ''
         }
       </form>
-      ` : `<div class="api-connected-summary" aria-label="API接続済み">
-        <label class="visually-hidden" for="connected-api-key">APIキー（接続済み）</label>
+      ` : `<div class="api-connected-summary" aria-label="APIキーの状態">
+        <label class="visually-hidden" for="connected-api-key">APIキー（設定済み）</label>
         <input id="connected-api-key" type="password" value="" placeholder="••••••••" disabled autocomplete="off" class="visually-hidden" />
-        <span class="ok">${escapeHtml(currentProviderLabel)} 接続済み</span>
+        <span class="${state.providerAuthenticated ? 'ok' : ''}">${escapeHtml(currentProviderLabel)} ${providerKeyStatusLabel()}</span>
         <button class="secondary-action compact" id="api-settings" type="button" ${inputDisabled}>APIキーを変更</button>
       </div>`}
       ${renderOpenAiModelControl(currentStatus, uiWorking)}
@@ -561,24 +589,32 @@ function bindEvents(isLocked = false, showApiPanel = false) {
       state[field] = event.target.value;
       state.searchSeed = 0; state.variantSeed = 0;
       if (isApiReady()) refreshTrendObservations({ runProvider: true });
-      else { state.report = createReport(); render(); }
+      else {
+        if (!state.reportFromFile) state.report = createReport();
+        render();
+      }
     });
   }
-  if (isLocked) return;
-  document.querySelector('#suggest-more').addEventListener('click', suggestMore);
-  document.querySelector('#run-provider').addEventListener('click', runProviderDeepening);
-  document.querySelector('#copy-markdown').addEventListener('click', copyMarkdown);
-  document.querySelector('#download-docx').addEventListener('click', () => saveExportFile('docx'));
-  document.querySelector('#download-json').addEventListener('click', () => saveExportFile('json'));
   document.querySelector('#import-json').addEventListener('click', () => {
+    if (isUiWorking() || state.fileDialogBusy) return;
     document.querySelector('#json-file-input').click();
   });
   document.querySelector('#json-file-input').addEventListener('change', importJson);
+  if (!isLocked) {
+    document.querySelector('#suggest-more').addEventListener('click', suggestMore);
+    document.querySelector('#run-provider').addEventListener('click', runProviderDeepening);
+    document.querySelectorAll('[data-generate-plan-id]').forEach((button) => {
+      button.addEventListener('click', () => generatePlanSample(button.dataset.generatePlanId));
+    });
+  }
+  if (!hasReadableReport() || isUiWorking()) return;
+  document.querySelector('#copy-markdown').addEventListener('click', copyMarkdown);
+  document.querySelector('#download-docx').addEventListener('click', () => saveExportFile('docx'));
+  document.querySelector('#download-json').addEventListener('click', () => saveExportFile('json'));
+  document.querySelector('#save-docx-as').addEventListener('click', () => saveExportFile('docx', { chooseDestination: true }));
+  document.querySelector('#save-json-as').addEventListener('click', () => saveExportFile('json', { chooseDestination: true }));
   document.querySelectorAll('[data-copy-plan-id]').forEach((button) => {
     button.addEventListener('click', () => copyPlanPrompt(button.dataset.copyPlanId));
-  });
-  document.querySelectorAll('[data-generate-plan-id]').forEach((button) => {
-    button.addEventListener('click', () => generatePlanSample(button.dataset.generatePlanId));
   });
   document.querySelectorAll('[data-copy-sample-id]').forEach((button) => {
     button.addEventListener('click', () => copyPlanSample(button.dataset.copySampleId));
@@ -596,7 +632,7 @@ function selectCategory(nextCategoryId, { runProvider = true, signal } = {}) {
   state.variantSeed = state.searchSeed;
   state.providerRunSignature = null;
   if (isApiReady()) return refreshTrendObservations({ runProvider, signal });
-  state.report = createReport();
+  if (!state.reportFromFile) state.report = createReport();
   render();
 }
 
@@ -695,7 +731,7 @@ async function connectApiKey() {
   const cleanKey = normalizeEnteredApiKey(state.apiKeyDraft);
   const providerStatus = currentProviderStatus({ apiKey: cleanKey });
   if (!providerStatus.provider.connected) {
-    state.apiGateMessage = 'APIキーを確認できません。OpenAIまたはGeminiのキーを1つ入力してください。';
+    state.apiGateMessage = 'APIキーの形式を確認できません。OpenAIまたはGeminiのキーを1つ入力してください。';
     render();
     return;
   }
@@ -706,6 +742,7 @@ async function connectApiKey() {
   try {
     await wait(API_SAVE_BUSY_MS);
     state.settings.apiKey = cleanKey;
+    state.providerAuthenticated = false;
     state.openAiModelConfirmed = true;
     state.analysisStartConfirmed = false;
     forgetPersistedSettings();
@@ -720,10 +757,7 @@ async function connectApiKey() {
   } finally {
     state.apiSaving = false;
     showActionMessage({
-      summary:
-        providerStatus.mode === 'openai'
-          ? 'OpenAIキーを接続しました。選択モデルを確認して「情報収集・分析・企画作成を開始」ボタンを押してください。'
-          : 'Geminiキーを接続しました。「情報収集・分析・企画作成を開始」ボタンを押してください。',
+      summary: `${providerStatus.mode === 'openai' ? 'OpenAI' : 'Gemini'}キーを設定しました。認証は「情報収集・分析・企画作成を開始」の実行時に確認します。`,
     });
     render();
   }
@@ -857,7 +891,12 @@ function shouldUseLocalTrendApi() {
 async function refreshTrendObservations({ runProvider = false, announce = false, signal } = {}) {
   rememberCreativeReport(state.historyByCategory, state.report);
   if (isUiWorking()) return;
-  const previous = signal && { observations: state.observations, providerSummary: state.providerSummary, planSamples: state.planSamples, report: state.report };
+  const previous = signal && {
+    observations: state.observations, providerSummary: state.providerSummary, planSamples: state.planSamples,
+    report: state.report, reportFromFile: state.reportFromFile,
+  };
+  reportImportVersion += 1;
+  state.reportFromFile = false;
   state.searchBusy = true;
   state.providerSummary = null;
   state.planSamples = {};
@@ -908,6 +947,7 @@ function suggestMore() {
 }
 
 async function copyMarkdown() {
+  if (!hasReadableReport() || isUiWorking()) return;
   const result = await copyTextToClipboard(toMarkdown(state.report));
   showActionMessage(copyMessage(result, 'レポートをコピーしました。'));
   render();
@@ -961,6 +1001,7 @@ async function generatePlanSample(planId) {
       signal: operation.signal,
       proxyBase: PROVIDER_PROXY,
       selectedModelId: state.openAiModelId,
+      onAuthenticated: () => confirmProviderAuthentication(operation),
       onModelRoute:
         providerStatus.mode === 'openai' ? (event) => { operation.check(); handleOpenAiModelRoute('draft', event); } : undefined,
     });
@@ -980,6 +1021,11 @@ async function generatePlanSample(planId) {
   } catch (error) {
     if (operation.signal.aborted) {
       if (operation.isCurrent()) state.planSamples = previousSamples;
+      return;
+    }
+    if (isProviderAuthError(error)) {
+      state.draftBusy = false;
+      handleProviderAuthFailure(providerStatus);
       return;
     }
     state.planSamples = {
@@ -1050,23 +1096,23 @@ function disabledAttr(isDisabled) {
 async function importJson(event) {
   const file = event.target.files?.[0];
   event.target.value = '';
-  if (!file) return;
+  if (!file || isUiWorking() || state.fileDialogBusy) return;
+  const version = ++reportImportVersion;
+  const canApply = () => version === reportImportVersion && !isUiWorking();
 
   try {
-    applyLoadedReport(fromJson(await file.text()));
-    state.providerSummary = {
-      summary: '根拠JSONを読み込みました。',
-      risk_note: 'APIキーは読み込み対象ではありません。キーらしい文字列は赤字化しています。',
-      next_actions: ['必要ならAI分析サマリーを更新して、現在のキーで再レビューできます。'],
-    };
-    clearActionMessage();
+    const report = fromJson(await file.text());
+    if (!canApply()) return;
+    applyLoadedReport(report);
+    state.providerSummary = null;
+    showActionMessage({ summary: '根拠JSONを読み込みました。' });
   } catch (error) {
-    state.providerSummary = {
+    if (!canApply()) return;
+    showActionMessage({
       summary: 'JSONを読み込めませんでした。',
       risk_note: error instanceof Error ? error.message : 'ファイル形式を確認してください。',
       next_actions: ['物語バズメーカーで保存したJSONを選んでください。'],
-    };
-    clearActionMessage();
+    });
   }
 
   render();
@@ -1082,46 +1128,41 @@ function applyLoadedReport(loadedReport) {
   state.providerRunSignature = null;
   state.planSamples = Object.fromEntries(loadedReport.creativePlans.filter(plan=>plan.sampleText).map(plan=>[plan.id,{status:'done',text:plan.sampleText}]));
   state.report = loadedReport;
+  state.reportFromFile = true;
 }
 
-async function saveExportFile(kind) {
+async function saveExportFile(kind, { chooseDestination = false } = {}) {
+  if (!hasReadableReport() || isUiWorking() || state.fileDialogBusy) return;
   const isDocx = kind === 'docx';
-  const fileName = isDocx ? docxFileName(state.report) : jsonFileName(state.report);
-  const mimeType = isDocx ? DOCX_MIME : 'application/json;charset=utf-8';
-  const bytes = isDocx ? new Uint8Array(toDocxArrayBuffer(state.report)) : new TextEncoder().encode(toJson(state.report));
-
-  showActionMessage({
-      summary: `${isDocx ? '資料DOCX' : '根拠JSON'}を保存中です。`,
-  });
-  render();
-
+  const label = isDocx ? '資料DOCX' : '根拠JSON';
   try {
-    const result = await saveBytesWithDialog({
-      fileName,
-      mimeType,
-      bytes,
-      nativeDialog: shouldUseLocalTrendApi(),
-    });
+    const fileName = isDocx ? docxFileName(state.report) : jsonFileName(state.report);
+    const mimeType = isDocx ? DOCX_MIME : 'application/json;charset=utf-8';
+    const bytes = isDocx ? new Uint8Array(toDocxArrayBuffer(state.report)) : new TextEncoder().encode(toJson(state.report));
+    const file = { fileName, mimeType, bytes };
+    if (chooseDestination) {
+      state.fileDialogBusy = true;
+      showActionMessage({ summary: `${label}の保存先を選んでください。` });
+      render();
+    }
+    const result = chooseDestination
+      ? await saveBytesWithDialog({ ...file, nativeDialog: shouldUseLocalTrendApi() })
+      : downloadReportFile(file);
     showActionMessage({
-      summary:
-        result.mode === 'download'
-          ? `${isDocx ? '資料DOCX' : '根拠JSON'}のダウンロードを開始しました。`
-          : `${isDocx ? '資料DOCX' : '根拠JSON'}を指定先に保存しました。`,
+      summary: result.mode === 'download'
+        ? `${label}のダウンロードを開始しました。`
+        : `${label}を指定先に保存しました。`,
     });
   } catch (error) {
-    const cancelled = error instanceof DOMException && error.name === 'AbortError';
+    const cancelled = error?.name === 'AbortError';
     showActionMessage({
-      summary: cancelled ? '保存をキャンセルしました。' : `${isDocx ? '資料DOCX' : '根拠JSON'}を保存できませんでした。`,
-      risk_note: cancelled
-        ? 'ファイルは作成していません。'
-        : error instanceof Error
-          ? error.message
-          : 'ブラウザの保存処理に失敗しました。',
-      next_actions: ['もう一度保存ボタンを押すと、保存先を選び直せます。'],
+      summary: cancelled ? '保存をキャンセルしました。' : `${label}を保存できませんでした。`,
+      risk_note: cancelled ? undefined : (error instanceof Error ? error.message : 'ブラウザーの保存処理に失敗しました。'),
     });
+  } finally {
+    state.fileDialogBusy = false;
+    render();
   }
-
-  render();
 }
 
 async function runProviderDeepening() {
@@ -1208,8 +1249,14 @@ function isProviderAuthError(error) {
   return error?.category === 'authentication';
 }
 
+function confirmProviderAuthentication(operation) {
+  operation.check();
+  state.providerAuthenticated = true;
+}
+
 function handleProviderAuthFailure(providerStatus) {
   state.settings.apiKey = '';
+  state.providerAuthenticated = false;
   state.openAiModelConfirmed = true;
   state.analysisStartConfirmed = false;
   state.apiKeyDraft = '';
@@ -1220,8 +1267,8 @@ function handleProviderAuthFailure(providerStatus) {
   clearActionMessage();
   showActionMessage({
     summary: 'APIキーが認証されませんでした。',
-    risk_note: `${providerStatus.provider.name}が認証情報を受理しませんでした。入力画面から接続し直してください。`,
-    next_actions: ['API設定欄に有効なキーを入力して、接続し直してください。'],
+    risk_note: `${providerStatus.provider.name}が認証情報を受理しませんでした。`,
+    next_actions: ['API設定欄に有効なキーを設定し直してください。'],
   });
   render();
 }
@@ -1234,6 +1281,7 @@ async function runOneProvider(provider, apiKey, operation) {
     report: state.report,
     proxyBase: PROVIDER_PROXY,
     selectedModelId: state.openAiModelId,
+    onAuthenticated: () => confirmProviderAuthentication(operation),
     onModelRoute:
       provider === 'openai' ? (event) => { operation.check(); handleOpenAiModelRoute('analysis', event); } : undefined,
   });
@@ -1248,6 +1296,7 @@ async function runOnePlanDesign(provider, apiKey, operation) {
     report: state.report,
     proxyBase: PROVIDER_PROXY,
     selectedModelId: state.openAiModelId,
+    onAuthenticated: () => confirmProviderAuthentication(operation),
     onModelRoute:
       provider === 'openai' ? (event) => { operation.check(); handleOpenAiModelRoute('planDesign', event); } : undefined,
   });
@@ -1851,8 +1900,7 @@ function planSectionState(report) {
 
 function renderCreativePlan(plan, index) {
   const brief = plan.creatorBrief;
-  const isLocked = !isApiReady() || isUiWorking();
-  const disabled = disabledAttr(isLocked);
+  const disabled = disabledAttr(isUiWorking());
   return `
     <article class="plan-card">
       <div class="plan-card-head">

@@ -366,7 +366,7 @@ Default: GPT-6 Luna / 既定: GPT-6 Luna
 
 The normal `check:nano-fallback` gate checks both Gemini and OpenAI against Nano. Run `npm run sync:nano-fallback` when either catalog changes. Explicit `--openai-only` remains available for a scoped manual update, but does not replace the normal gate. / 通常の `check:nano-fallback` はGeminiとOpenAIの両方をNanoと照合します。いずれかの候補が変わった場合は `npm run sync:nano-fallback` で同期します。明示的な `--openai-only` は限定更新用に残しますが、通常検査の代わりにはしません。
 
-API connection does not start retrieval or analysis for either provider. With OpenAI, the user can change the initial GPT-6 Luna selection and then press the `情報収集・分析・企画作成を開始` button. With Gemini, the user presses the same button after connecting the key. GPT-6.2 Sol and GPT-6.2 Astra are available for more involved analysis and planning. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list. / どちらのAPIも、キーを接続しただけでは情報収集・分析・企画作成を開始しません。OpenAIはGPT-6 Lunaが初期選択され、必要なら別モデルに変更してから `情報収集・分析・企画作成を開始` ボタンを押します。Geminiはキー接続後に同じ開始ボタンを押します。より複雑な分析や企画にはGPT-6.2 SolとGPT-6.2 Astraを選べます。選択はページ内だけで保持され、再読み込みするとGPT-6 Lunaが初期選択されます。接続後はキー入力を閉じ、接続済みのマスク表示にします。「APIキーを変更」で新規入力を開き、キャンセルや形式不明の入力では現在の接続を維持します。実キーを入力欄へ復元しません。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
+Setting a key stores it in this page session. The status reads “Configured · authentication pending” until the intended provider operation returns a successful response. Starting analysis still requires the button for either provider. With OpenAI, the user can change the initial GPT-6 Luna selection and then press the `情報収集・分析・企画作成を開始` button. With Gemini, the user presses the same button after setting the key. GPT-6.2 Sol and GPT-6.2 Astra are available for more involved analysis and planning. The choice is kept for the page session only / ページ内のみ; reloading requires model selection again. The selector applies to provider analysis, plan design, and reference-draft generation. Each request starts from the selected model and falls back only to models below it in the displayed list. / キーを設定するとページ内メモリに保持し、提供元の処理に成功するまで「設定済み・認証未確認」と表示します。どちらのAPIも、情報収集・分析・企画作成は開始ボタンで実行します。OpenAIはGPT-6 Lunaが初期選択され、必要なら別モデルに変更してから `情報収集・分析・企画作成を開始` ボタンを押します。Geminiはキー設定後に同じ開始ボタンを押します。より複雑な分析や企画にはGPT-6.2 SolとGPT-6.2 Astraを選べます。選択はページ内だけで保持され、再読み込みするとGPT-6 Lunaが初期選択されます。設定後はキー入力を閉じ、マスク表示にします。「APIキーを変更」で新規入力を開き、キャンセルや形式不明の入力では現在のキーを保持します。提供元がキーを無効と判断した場合は再設定できます。実キーを入力欄へ復元しません。モデル選択は詳細分析、制作案設計、参考文章生成に共通で適用されます。各リクエストは選択モデルから開始し、表示順で下位のモデルにだけフォールバックします。
 
 API usage fees, terms, model restrictions, and rate limits follow each provider's contract. / API利用料、利用規約、モデル制限、レート制限は、各サービスの契約に従います。
 
@@ -374,11 +374,13 @@ API usage fees, terms, model restrictions, and rate limits follow each provider'
 
 ## Output & Export / 出力
 
+The JSON and DOCX save buttons use the browser's configured download location. Open `保存先を選ぶ` to choose the folder and name. / 「JSON保存」と「資料DOCX保存」はブラウザーのダウンロード設定に従います。フォルダーや名前を指定する場合は「保存先を選ぶ」を開きます。
+
 ### JSON
 
 JSON saves the screen's analysis results and production plans as structured data. / 画面の分析結果と制作案を、構造化したJSONとして保存します。
 
-Imported report text is displayed as text, including HTML-like content. JSON with invalid report structures is rejected while keeping the current report. / JSON内のHTMLのような文字列もテキストとして表示します。レポートの構造が不正なJSONは読み込まず、現在のレポートを保持します。
+You can open a saved report through `JSON読み込み` and export it again with no API key or provider request. Imported report text is displayed as text, including HTML-like content. JSON with invalid report structures is rejected while keeping the current report. / 保存済みレポートは「JSON読み込み」で開き、APIキーや提供元への通信なしで再保存できます。JSON内のHTMLのような文字列もテキストとして表示します。レポートの構造が不正なJSONは読み込まず、現在のレポートを保持します。
 
 Primary uses: / JSONは、画面の分析結果と制作案を構造化データとして保存します。
 

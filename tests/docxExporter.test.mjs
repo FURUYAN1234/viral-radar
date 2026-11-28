@@ -37,3 +37,13 @@ test('docx export creates an editor meeting brief with tables instead of a JSON-
   assert.doesNotMatch(raw, /他AIに貼る本文生成プロンプト|aiDraftPrompt|API詳細分析/);
   assert.doesNotMatch(raw, SECRET_OUTPUT_RE);
 });
+
+test('DOCX preserves the report timestamp while localizing ordinary times in manuscript text', () => {
+  const report = buildReport({ categoryId: 'story-manga', observations: PUBLIC_OBSERVATIONS });
+  report.generatedAt = '2026-11-28T00:17:09.013Z';
+  report.creativePlans[0].opening = '時計が8:15を示す。';
+  const raw = Buffer.from(toDocxArrayBuffer(report)).toString('utf8');
+  assert.ok(raw.includes(report.generatedAt), 'report generation time must round-trip');
+  assert.ok(raw.includes('時計が8時15分を示す。'));
+  assert.doesNotMatch(raw, /T00時17分/);
+});
