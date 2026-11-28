@@ -1,4 +1,8 @@
 export async function saveBytesWithDialog({ fileName, mimeType, bytes, nativeDialog }) {
+  if (window.navigator?.userActivation?.isActive === false) {
+    throw new DOMException('保存ボタンから操作してください。', 'SecurityError');
+  }
+
   const blob = new Blob([bytes], { type: mimeType });
 
   if (typeof window.showSaveFilePicker === 'function') {
@@ -20,7 +24,7 @@ export async function saveBytesWithDialog({ fileName, mimeType, bytes, nativeDia
       });
     } catch (error) {
       // A browser can expose the picker even when this page cannot open it.
-      if (error?.name !== 'SecurityError' && error?.name !== 'NotSupportedError') throw error;
+      if (error?.name !== 'NotSupportedError') throw error;
     }
 
     if (handle) {
