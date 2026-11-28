@@ -28,7 +28,7 @@ const PROVIDER_PROXY = isStaticPagesRuntime() ? '' : '/api/provider-generate';
 const ACTION_MESSAGE_TTL_MS = 3500;
 const API_SAVE_BUSY_MS = 300;
 const API_INPUT_AUTOFILL_CLEAR_MS = 250;
-const APP_VERSION = '1.4.12';
+const APP_VERSION = '1.5.2';
 const app = document.querySelector('#app');
 let mcpCurrent;
 let actionMessageTimer = null;

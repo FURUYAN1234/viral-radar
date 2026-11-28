@@ -1,6 +1,6 @@
 {
   "name": "monogatari-buzz-maker",
-  "version": "1.4.12",
+  "version": "1.5.2",
   "private": true,
   "homepage": "https://FURUYAN1234.github.io/viral-radar",
   "description": "物語バズメーカー - 公開Web/RSSトレンドを漫画・動画・小説の制作案へ整理する創作支援ツール",
@@ -17,7 +17,8 @@
     "sync:nano-fallback": "node scripts/sync-nano-fallback-chain.mjs",
     "check:nano-fallback": "node scripts/sync-nano-fallback-chain.mjs --check",
     "check:upstreams": "npm run check:nano-fallback",
-    "check:runtime": "node scripts/sync-nano-fallback-chain.mjs --check-bundled",
+    "check:version": "node scripts/check-release-version.mjs",
+    "check:runtime": "npm run check:version && node scripts/sync-nano-fallback-chain.mjs --check-bundled",
     "pretest": "npm run check:runtime",
     "test": "node --test",
     "postbuild": "node scripts/web-security.mjs --verify-dist"
